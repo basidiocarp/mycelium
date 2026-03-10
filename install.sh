@@ -4,7 +4,7 @@
 
 set -e
 
-REPO="gmovillanueva/mycelium"
+REPO="basidiocarp/mycelium"
 BINARY_NAME="mycelium"
 INSTALL_DIR="${MYCELIUM_INSTALL_DIR:-$HOME/.local/bin}"
 

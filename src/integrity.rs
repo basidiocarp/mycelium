@@ -313,6 +313,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn test_store_and_verify_ok() {
         let temp = TempDir::new().unwrap();
         let hook = temp.path().join("mycelium-rewrite.sh");
@@ -325,6 +326,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn test_verify_detects_tampering() {
         let temp = TempDir::new().unwrap();
         let hook = temp.path().join("mycelium-rewrite.sh");
@@ -385,6 +387,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn test_store_hash_creates_sha256sum_format() {
         let temp = TempDir::new().unwrap();
         let hook = temp.path().join("mycelium-rewrite.sh");
@@ -405,6 +408,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn test_store_hash_overwrites_existing() {
         let temp = TempDir::new().unwrap();
         let hook = temp.path().join("mycelium-rewrite.sh");
@@ -441,6 +445,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn test_remove_hash() {
         let temp = TempDir::new().unwrap();
         let hook = temp.path().join("mycelium-rewrite.sh");
@@ -517,6 +522,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn test_hash_format_compatible_with_sha256sum() {
         let temp = TempDir::new().unwrap();
         let hook = temp.path().join("mycelium-rewrite.sh");

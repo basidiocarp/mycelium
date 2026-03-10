@@ -1,6 +1,7 @@
 //! Patches Claude Code settings.json to register the Mycelium hook.
 use anyhow::{Context, Result};
 use std::fs;
+#[cfg(unix)]
 use std::path::Path;
 
 use super::claude_md::resolve_claude_dir;
@@ -384,8 +385,9 @@ mod tests {
         assert!(!hook_already_present(&json_content, hook_command));
     }
 
-    // Tests for insert_hook_entry()
+    // Tests for insert_hook_entry() — Unix-only (hook paths use Unix conventions)
     #[test]
+    #[cfg(unix)]
     fn test_insert_hook_entry_empty_root() {
         let mut json_content = serde_json::json!({});
         let hook_command = "/Users/test/.claude/hooks/mycelium-rewrite.sh";
@@ -410,6 +412,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn test_insert_hook_entry_preserves_existing() {
         let mut json_content = serde_json::json!({
             "hooks": {
@@ -439,6 +442,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn test_insert_hook_preserves_other_keys() {
         let mut json_content = serde_json::json!({
             "env": {"PATH": "/custom/path"},

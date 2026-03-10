@@ -1,10 +1,14 @@
 //! Installs and updates the Mycelium shell rewrite hook script.
 use anyhow::{Context, Result};
+#[cfg_attr(not(unix), allow(unused_imports))]
 use std::fs;
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+#[cfg(unix)]
+use std::path::PathBuf;
 use tempfile::NamedTempFile;
 
+#[cfg(unix)]
 use super::claude_md::resolve_claude_dir;
 
 // Embedded hook script (guards before set -euo pipefail) — Unix-only (bash)

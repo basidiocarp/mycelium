@@ -17,14 +17,14 @@ echo ""
 # =========================================================
 echo "1. Checking if mycelium is installed..."
 if command -v mycelium &> /dev/null; then
-    echo -e "   ${GREEN}✅ mycelium is installed${NC}"
+    echo -e "   ${GREEN} mycelium is installed${NC}"
     MYCELIUM_PATH=$(which mycelium)
     echo "   Location: $MYCELIUM_PATH"
 else
-    echo -e "   ${RED}❌ mycelium is NOT installed${NC}"
+    echo -e "   ${RED}mycelium is NOT installed${NC}"
     echo ""
     echo "   Install with:"
-    echo "   curl -fsSL https://github.com/| sh"
+    echo "   curl -fsSL https://raw.githubusercontent.com/basidiocarp/mycelium/main/install.sh | sh"
     exit 1
 fi
 echo ""
@@ -37,23 +37,6 @@ MYCELIUM_VERSION=$(mycelium --version 2>/dev/null || echo "unknown")
 echo "   Version: $MYCELIUM_VERSION"
 echo ""
 
-# =========================================================
-#  3. Correct package verification
-# =========================================================
-echo "3. Verifying this is Mycelium (not Type Kit)..."
-if mycelium gain &>/dev/null || mycelium gain --help &>/dev/null; then
-    echo -e "   ${GREEN}✅ CORRECT - You have Mycelium${NC}"
-    CORRECT_mycelium=true
-else
-    echo -e "   ${RED}❌ WRONG - You have a different project!${NC}"
-    echo ""
-    echo "   You installed the wrong package. Fix it with:"
-    echo "   cargo uninstall mycelium"
-    echo "   curl -fsSL https://github.com/ | sh"
-    CORRECT_mycelium=false
-fi
-echo ""
-
 if [ "$CORRECT_mycelium" = false ]; then
     echo "═══════════════════════════════════════════════════════════"
     echo -e "${RED}INSTALLATION CHECK FAILED${NC}"
@@ -62,9 +45,9 @@ if [ "$CORRECT_mycelium" = false ]; then
 fi
 
 # =========================================================
-#  4. Available features
+#  3. Available features
 # =========================================================
-echo "4. Checking available features..."
+echo "3. Checking available features..."
 FEATURES=()
 MISSING_FEATURES=()
 
@@ -72,10 +55,10 @@ check_command() {
     local cmd=$1
     local name=$2
     if mycelium --help 2>/dev/null | grep -qw "$cmd"; then
-        echo -e "   ${GREEN}✅${NC} $name"
+        echo -e "   ${GREEN}${NC} $name"
         FEATURES+=("$name")
     else
-        echo -e "   ${YELLOW}⚠️${NC}  $name (missing - upgrade to fork?)"
+        echo -e "   ${YELLOW}${NC}  $name (missing - upgrade to fork?)"
         MISSING_FEATURES+=("$name")
     fi
 }
@@ -96,43 +79,43 @@ check_command "discover" "Discover missed savings"
 echo ""
 
 # =========================================================
-#  5. Claude Code integration
+#  4. Claude Code integration
 # =========================================================
-echo "5. Checking Claude Code integration..."
+echo "4. Checking Claude Code integration..."
 GLOBAL_INIT=false
 LOCAL_INIT=false
 
 if [ -f "$HOME/.claude/CLAUDE.md" ] && grep -q "mycelium" "$HOME/.claude/CLAUDE.md"; then
-    echo -e "   ${GREEN}✅${NC} Global CLAUDE.md initialized (~/.claude/CLAUDE.md)"
+    echo -e "   ${GREEN}${NC} Global CLAUDE.md initialized (~/.claude/CLAUDE.md)"
     GLOBAL_INIT=true
 else
-    echo -e "   ${YELLOW}⚠️${NC}  Global CLAUDE.md not initialized"
+    echo -e "   ${YELLOW}${NC}  Global CLAUDE.md not initialized"
     echo "      Run: mycelium init --global"
 fi
 
 if [ -f "./CLAUDE.md" ] && grep -q "mycelium" "./CLAUDE.md"; then
-    echo -e "   ${GREEN}✅${NC} Local CLAUDE.md initialized (./CLAUDE.md)"
+    echo -e "   ${GREEN}${NC} Local CLAUDE.md initialized (./CLAUDE.md)"
     LOCAL_INIT=true
 else
-    echo -e "   ${YELLOW}⚠️${NC}  Local CLAUDE.md not initialized in current directory"
+    echo -e "   ${YELLOW}${NC}  Local CLAUDE.md not initialized in current directory"
     echo "      Run: mycelium init (in your project directory)"
 fi
 echo ""
 
 # =========================================================
-#  6. Auto-rewrite hook
+#  5. Auto-rewrite hook
 # =========================================================
-echo "6. Checking auto-rewrite hook (optional but recommended)..."
+echo "5. Checking auto-rewrite hook (optional but recommended)..."
 if [ -f "$HOME/.claude/hooks/mycelium-rewrite.sh" ]; then
-    echo -e "   ${GREEN}✅${NC} Hook script installed"
+    echo -e "   ${GREEN}${NC} Hook script installed"
     if [ -f "$HOME/.claude/settings.json" ] && grep -q "mycelium-rewrite.sh" "$HOME/.claude/settings.json"; then
-        echo -e "   ${GREEN}✅${NC} Hook enabled in settings.json"
+        echo -e "   ${GREEN}${NC} Hook enabled in settings.json"
     else
-        echo -e "   ${YELLOW}⚠️${NC}  Hook script exists but not enabled in settings.json"
+        echo -e "   ${YELLOW}${NC}  Hook script exists but not enabled in settings.json"
         echo "      See README.md 'Auto-Rewrite Hook' section"
     fi
 else
-    echo -e "   ${YELLOW}⚠️${NC}  Auto-rewrite hook not installed (optional)"
+    echo -e "   ${YELLOW}${NC}  Auto-rewrite hook not installed (optional)"
     echo "      Install: cp .claude/hooks/mycelium-rewrite.sh ~/.claude/hooks/"
 fi
 echo ""
@@ -145,7 +128,7 @@ echo "                    SUMMARY"
 echo "═══════════════════════════════════════════════════════════"
 
 if [ ${#MISSING_FEATURES[@]} -gt 0 ]; then
-    echo -e "${YELLOW}⚠️  You have a basic mycelium installation${NC}"
+    echo -e "${YELLOW}You have a basic mycelium installation${NC}"
     echo ""
     echo "Missing features:"
     for feature in "${MISSING_FEATURES[@]}"; do
@@ -154,17 +137,17 @@ if [ ${#MISSING_FEATURES[@]} -gt 0 ]; then
     echo ""
     echo "To get all features, install the fork:"
     echo "  cargo uninstall mycelium"
-    echo "  curl -fsSL https://github.com/ | sh"
+    echo "  curl -fsSL https://raw.githubusercontent.com/basidiocarp/mycelium/main/install.sh | sh"
     echo "  cd mycelium && git checkout feat/all-features"
     echo "  cargo install --path . --force"
 else
-    echo -e "${GREEN}✅ Full-featured mycelium installation detected${NC}"
+    echo -e "${GREEN}Full-featured mycelium installation detected${NC}"
 fi
 
 echo ""
 
 if [ "$GLOBAL_INIT" = false ] && [ "$LOCAL_INIT" = false ]; then
-    echo -e "${YELLOW}⚠️  mycelium not initialized for Claude Code${NC}"
+    echo -e "${YELLOW}mycelium not initialized for Claude Code${NC}"
     echo "   Run: mycelium init --global (for all projects)"
     echo "   Or:  mycelium init (for this project only)"
 fi

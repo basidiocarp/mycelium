@@ -1,7 +1,10 @@
 //! Manages the Mycelium instructions block inside CLAUDE.md files.
 use anyhow::{Context, Result};
+#[cfg_attr(not(unix), allow(unused_imports))]
 use std::fs;
-use std::path::{Path, PathBuf};
+#[cfg(unix)]
+use std::path::Path;
+use std::path::PathBuf;
 
 // Embedded slim Mycelium awareness instructions — Unix-only (referenced by the bash hook)
 #[cfg(unix)]
@@ -400,6 +403,7 @@ More notes
     }
 
     #[test]
+    #[cfg(unix)]
     fn test_migration_removes_old_block() {
         let input = r#"# My Config
 
@@ -417,6 +421,7 @@ More content"#;
     }
 
     #[test]
+    #[cfg(unix)]
     fn test_migration_warns_on_missing_end_marker() {
         let input = "<!-- mycelium-instructions v2 -->\nOLD STUFF\nNo end marker";
         let (result, migrated) = remove_mycelium_block(input);
