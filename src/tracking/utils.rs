@@ -31,9 +31,10 @@ pub(super) fn get_db_path() -> Result<PathBuf> {
     }
 
     if let Ok(config) = crate::config::Config::load()
-        && let Some(db_path) = config.tracking.database_path {
-            return Ok(db_path);
-        }
+        && let Some(db_path) = config.tracking.database_path
+    {
+        return Ok(db_path);
+    }
 
     let data_dir = dirs::data_local_dir().unwrap_or_else(|| PathBuf::from("."));
     Ok(data_dir.join("mycelium").join("history.db"))

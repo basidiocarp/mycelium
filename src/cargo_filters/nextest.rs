@@ -66,9 +66,10 @@ pub(crate) fn filter_cargo_nextest(output: &str) -> String {
         // Parse binary count from Starting line
         if trimmed.starts_with("Starting") {
             if let Some(caps) = starting_re.captures(trimmed)
-                && let Some(m) = caps.get(1) {
-                    binaries = m.as_str().parse().unwrap_or(0);
-                }
+                && let Some(m) = caps.get(1)
+            {
+                binaries = m.as_str().parse().unwrap_or(0);
+            }
             continue;
         }
 

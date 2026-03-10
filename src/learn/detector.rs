@@ -50,9 +50,7 @@ pub struct CorrectionRule {
 
 fn env_prefix_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| {
-        Regex::new(r"^(?:sudo\s+|[A-Z_][A-Z0-9_]*=[^\s]*\s+)+").unwrap()
-    })
+    RE.get_or_init(|| Regex::new(r"^(?:sudo\s+|[A-Z_][A-Z0-9_]*=[^\s]*\s+)+").unwrap())
 }
 
 fn unknown_flag_re() -> &'static Regex {
@@ -496,7 +494,10 @@ mod tests {
             extract_base_command("GIT_PAGER=cat git log --oneline"),
             "git log"
         );
-        assert_eq!(extract_base_command("sudo cargo install foo"), "cargo install");
+        assert_eq!(
+            extract_base_command("sudo cargo install foo"),
+            "cargo install"
+        );
     }
 
     #[test]

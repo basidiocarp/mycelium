@@ -136,9 +136,9 @@ fn summarize_tests(output: &str, result: &mut Vec<String>) {
         }
         if (lower.contains("skipped") || lower.contains("ignored"))
             && let Some(n) = extract_number(&lower, "skipped").or(extract_number(&lower, "ignored"))
-            {
-                skipped = n;
-            }
+        {
+            skipped = n;
+        }
     }
 
     result.push(format!("   ✅ {} passed", passed));

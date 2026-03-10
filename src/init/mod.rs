@@ -396,10 +396,9 @@ fn run_claude_md_mode(global: bool, verbose: u8) -> Result<()> {
         PathBuf::from("CLAUDE.md")
     };
 
-    if global
-        && let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
-        }
+    if global && let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
 
     if verbose > 0 {
         eprintln!("Writing mycelium instructions to: {}", path.display());

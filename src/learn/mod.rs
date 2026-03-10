@@ -5,7 +5,7 @@ pub mod report;
 
 use crate::discover::provider::{ClaudeProvider, SessionProvider};
 use anyhow::Result;
-use corrections_store::{UserCorrection, write_corrections_json, CORRECTIONS_JSON};
+use corrections_store::{CORRECTIONS_JSON, UserCorrection, write_corrections_json};
 use detector::{CommandExecution, deduplicate_corrections, find_corrections};
 use report::{format_console_report, write_rules_file};
 

@@ -104,10 +104,11 @@ impl SessionProvider for ClaudeProvider {
                 // Apply mtime filter
                 if let Some(cutoff_time) = cutoff
                     && let Ok(meta) = fs::metadata(file_path)
-                        && let Ok(mtime) = meta.modified()
-                            && mtime < cutoff_time {
-                                continue;
-                            }
+                    && let Ok(mtime) = meta.modified()
+                    && mtime < cutoff_time
+                {
+                    continue;
+                }
 
                 sessions.push(file_path.to_path_buf());
             }
@@ -164,14 +165,15 @@ impl SessionProvider for ClaudeProvider {
                                 && let (Some(id), Some(cmd)) = (
                                     block.get("id").and_then(|i| i.as_str()),
                                     block.pointer("/input/command").and_then(|c| c.as_str()),
-                                ) {
-                                    pending_tool_uses.push((
-                                        id.to_string(),
-                                        cmd.to_string(),
-                                        sequence_counter,
-                                    ));
-                                    sequence_counter += 1;
-                                }
+                                )
+                            {
+                                pending_tool_uses.push((
+                                    id.to_string(),
+                                    cmd.to_string(),
+                                    sequence_counter,
+                                ));
+                                sequence_counter += 1;
+                            }
                         }
                     }
                 }
@@ -183,26 +185,25 @@ impl SessionProvider for ClaudeProvider {
                         for block in content {
                             if block.get("type").and_then(|t| t.as_str()) == Some("tool_result")
                                 && let Some(id) = block.get("tool_use_id").and_then(|i| i.as_str())
-                                {
-                                    // Get content, length, and error status
-                                    let content =
-                                        block.get("content").and_then(|c| c.as_str()).unwrap_or("");
+                            {
+                                // Get content, length, and error status
+                                let content =
+                                    block.get("content").and_then(|c| c.as_str()).unwrap_or("");
 
-                                    let output_len = content.len();
-                                    let is_error = block
-                                        .get("is_error")
-                                        .and_then(|e| e.as_bool())
-                                        .unwrap_or(false);
+                                let output_len = content.len();
+                                let is_error = block
+                                    .get("is_error")
+                                    .and_then(|e| e.as_bool())
+                                    .unwrap_or(false);
 
-                                    // Store first ~1000 chars of content for error detection
-                                    let content_preview: String =
-                                        content.chars().take(1000).collect();
+                                // Store first ~1000 chars of content for error detection
+                                let content_preview: String = content.chars().take(1000).collect();
 
-                                    tool_results.insert(
-                                        id.to_string(),
-                                        (output_len, content_preview, is_error),
-                                    );
-                                }
+                                tool_results.insert(
+                                    id.to_string(),
+                                    (output_len, content_preview, is_error),
+                                );
+                            }
                         }
                     }
                 }

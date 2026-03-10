@@ -112,38 +112,41 @@ impl PeriodEconomics {
                 self.cc_output_tokens,
                 self.cc_cache_create_tokens,
                 self.cc_cache_read_tokens,
-            ) {
-                // Weighted units = input + 5*output + 1.25*cache_create + 0.1*cache_read
-                let weighted_units = input as f64
-                    + WEIGHT_OUTPUT * output as f64
-                    + WEIGHT_CACHE_CREATE * cache_create as f64
-                    + WEIGHT_CACHE_READ * cache_read as f64;
+            )
+        {
+            // Weighted units = input + 5*output + 1.25*cache_create + 0.1*cache_read
+            let weighted_units = input as f64
+                + WEIGHT_OUTPUT * output as f64
+                + WEIGHT_CACHE_CREATE * cache_create as f64
+                + WEIGHT_CACHE_READ * cache_read as f64;
 
-                if weighted_units > 0.0 {
-                    let input_cpt = cost / weighted_units;
-                    let savings = saved as f64 * input_cpt;
+            if weighted_units > 0.0 {
+                let input_cpt = cost / weighted_units;
+                let savings = saved as f64 * input_cpt;
 
-                    self.weighted_input_cpt = Some(input_cpt);
-                    self.savings_weighted = Some(savings);
-                }
+                self.weighted_input_cpt = Some(input_cpt);
+                self.savings_weighted = Some(savings);
             }
+        }
     }
 
     pub fn compute_dual_metrics(&mut self) {
         if let (Some(cost), Some(saved)) = (self.cc_cost, self.mycelium_saved_tokens) {
             // Blended CPT (cost / total_tokens including cache)
             if let Some(total) = self.cc_total_tokens
-                && total > 0 {
-                    self.blended_cpt = Some(cost / total as f64);
-                    self.savings_blended = Some(saved as f64 * (cost / total as f64));
-                }
+                && total > 0
+            {
+                self.blended_cpt = Some(cost / total as f64);
+                self.savings_blended = Some(saved as f64 * (cost / total as f64));
+            }
 
             // Active CPT (cost / active_tokens = input+output only)
             if let Some(active) = self.cc_active_tokens
-                && active > 0 {
-                    self.active_cpt = Some(cost / active as f64);
-                    self.savings_active = Some(saved as f64 * (cost / active as f64));
-                }
+                && active > 0
+            {
+                self.active_cpt = Some(cost / active as f64);
+                self.savings_active = Some(saved as f64 * (cost / active as f64));
+            }
         }
     }
 }

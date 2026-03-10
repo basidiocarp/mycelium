@@ -131,12 +131,13 @@ impl TokenFormatter for DependencyState {
 
         for dep in self.dependencies.iter().take(10) {
             if let Some(latest) = &dep.latest_version
-                && &dep.current_version != latest {
-                    lines.push(format!(
-                        "{}: {} → {}",
-                        dep.name, dep.current_version, latest
-                    ));
-                }
+                && &dep.current_version != latest
+            {
+                lines.push(format!(
+                    "{}: {} → {}",
+                    dep.name, dep.current_version, latest
+                ));
+            }
         }
 
         if self.outdated_count > 10 {
@@ -156,17 +157,19 @@ impl TokenFormatter for DependencyState {
             lines.push("\nOutdated packages:".to_string());
             for dep in &self.dependencies {
                 if let Some(latest) = &dep.latest_version
-                    && &dep.current_version != latest {
-                        let dev_marker = if dep.dev_dependency { " (dev)" } else { "" };
-                        lines.push(format!(
-                            "  {}: {} → {}{}",
-                            dep.name, dep.current_version, latest, dev_marker
-                        ));
-                        if let Some(wanted) = &dep.wanted_version
-                            && wanted != latest {
-                                lines.push(format!("    (wanted: {})", wanted));
-                            }
+                    && &dep.current_version != latest
+                {
+                    let dev_marker = if dep.dev_dependency { " (dev)" } else { "" };
+                    lines.push(format!(
+                        "  {}: {} → {}{}",
+                        dep.name, dep.current_version, latest, dev_marker
+                    ));
+                    if let Some(wanted) = &dep.wanted_version
+                        && wanted != latest
+                    {
+                        lines.push(format!("    (wanted: {})", wanted));
                     }
+                }
             }
         }
 

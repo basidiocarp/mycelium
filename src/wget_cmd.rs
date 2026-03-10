@@ -122,9 +122,10 @@ fn extract_filename_from_output(stderr: &str, url: &str, args: &[String]) -> Str
     // Check for -O argument first
     for (i, arg) in args.iter().enumerate() {
         if (arg == "-O" || arg == "--output-document")
-            && let Some(name) = args.get(i + 1) {
-                return name.clone();
-            }
+            && let Some(name) = args.get(i + 1)
+        {
+            return name.clone();
+        }
         if let Some(name) = arg.strip_prefix("-O") {
             return name.to_string();
         }
@@ -149,10 +150,11 @@ fn extract_filename_from_output(stderr: &str, url: &str, args: &[String]) -> Str
             }
 
             if let (Some(s), Some(e)) = (start_idx, end_idx)
-                && e > s + 1 {
-                    let filename: String = chars[s + 1..e].iter().collect();
-                    return filename.trim().to_string();
-                }
+                && e > s + 1
+            {
+                let filename: String = chars[s + 1..e].iter().collect();
+                return filename.trim().to_string();
+            }
         }
     }
 

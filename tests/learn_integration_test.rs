@@ -5,7 +5,9 @@
 //! provider extraction → find_corrections → deduplicate_corrections.
 
 use mycelium::discover::provider::{ClaudeProvider, SessionProvider};
-use mycelium::learn::corrections_store::{apply_correction, load_corrections, write_corrections_json, UserCorrection};
+use mycelium::learn::corrections_store::{
+    UserCorrection, apply_correction, load_corrections, write_corrections_json,
+};
 use mycelium::learn::detector::{
     CommandExecution, deduplicate_corrections, extract_base_command, find_corrections,
 };
@@ -156,7 +158,11 @@ fn test_env_prefix_stripped_before_base_command() {
 #[test]
 fn test_corrections_store_roundtrip() {
     let dir = tempdir().unwrap();
-    let path = dir.path().join("cli-corrections.json").to_string_lossy().into_owned();
+    let path = dir
+        .path()
+        .join("cli-corrections.json")
+        .to_string_lossy()
+        .into_owned();
 
     let corrections = vec![
         UserCorrection {

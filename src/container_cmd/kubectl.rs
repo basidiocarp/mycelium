@@ -64,10 +64,11 @@ pub(crate) fn kubectl_pods(args: &[String], _verbose: u8) -> Result<()> {
                 if let Some(containers) = pod["status"]["containerStatuses"].as_array() {
                     for c in containers {
                         if let Some(w) = c["state"]["waiting"]["reason"].as_str()
-                            && (w.contains("CrashLoop") || w.contains("Error")) {
-                                failed += 1;
-                                issues.push(format!("{}/{} {}", ns, name, w));
-                            }
+                            && (w.contains("CrashLoop") || w.contains("Error"))
+                        {
+                            failed += 1;
+                            issues.push(format!("{}/{} {}", ns, name, w));
+                        }
                     }
                 }
             }

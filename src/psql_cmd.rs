@@ -196,9 +196,10 @@ fn filter_expanded(output: &str) -> String {
 
     // Flush last record
     if let Some(rec) = current_record.take()
-        && record_count <= MAX_EXPANDED_RECORDS {
-            result.push(format!("{} {}", rec, current_pairs.join(" ")));
-        }
+        && record_count <= MAX_EXPANDED_RECORDS
+    {
+        result.push(format!("{} {}", rec, current_pairs.join(" ")));
+    }
 
     if record_count > MAX_EXPANDED_RECORDS {
         result.push(format!(

@@ -94,10 +94,7 @@ mod tests {
             apply_correction("git commit --ammend", &corrections),
             Some("git commit --amend".to_string())
         );
-        assert_eq!(
-            apply_correction("git commit --amend", &corrections),
-            None
-        );
+        assert_eq!(apply_correction("git commit --amend", &corrections), None);
         assert_eq!(apply_correction("ls -la", &corrections), None);
     }
 

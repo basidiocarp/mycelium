@@ -130,9 +130,10 @@ pub fn filter_prettier_output(output: &str) -> String {
         // Count total files checked
         if trimmed.contains("All matched files use Prettier")
             && let Some(count_str) = trimmed.split_whitespace().next()
-                && let Ok(count) = count_str.parse::<usize>() {
-                    files_checked = count;
-                }
+            && let Ok(count) = count_str.parse::<usize>()
+        {
+            files_checked = count;
+        }
     }
 
     // Check if all files are formatted

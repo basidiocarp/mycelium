@@ -26,9 +26,10 @@ pub fn run(filter: Option<&str>, show_all: bool, verbose: u8) -> Result<()> {
     for (key, value) in &vars {
         // Apply filter if provided
         if let Some(f) = filter
-            && !key.to_lowercase().contains(&f.to_lowercase()) {
-                continue;
-            }
+            && !key.to_lowercase().contains(&f.to_lowercase())
+        {
+            continue;
+        }
 
         // Check if sensitive
         let is_sensitive = sensitive_patterns
