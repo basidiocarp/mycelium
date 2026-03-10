@@ -74,7 +74,7 @@ jobs:
         shell: bash
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mycelium-${{ matrix.target }}
           path: mycelium-${{ matrix.target }}.${{ matrix.archive }}
@@ -102,13 +102,13 @@ jobs:
           cargo generate-rpm
 
       - name: Upload DEB
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mycelium-deb
           path: target/debian/*.deb
 
       - name: Upload RPM
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mycelium-rpm
           path: target/generate-rpm/*.rpm
