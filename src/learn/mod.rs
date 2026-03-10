@@ -1,7 +1,6 @@
 //! Learns correction patterns from Claude Code session history to suggest command improvements.
 pub mod detector;
 pub mod report;
-mod types;
 
 use crate::discover::provider::{ClaudeProvider, SessionProvider};
 use anyhow::Result;

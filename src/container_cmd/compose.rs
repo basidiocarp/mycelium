@@ -94,15 +94,14 @@ pub fn format_compose_build(raw: &str) -> String {
     // find('[') returns byte offset — use byte slicing throughout
     // '[' and ']' are single-byte ASCII, so byte arithmetic is safe
     for line in raw.lines() {
-        if let Some(start) = line.find('[') {
-            if let Some(end) = line[start + 1..].find(']') {
+        if let Some(start) = line.find('[')
+            && let Some(end) = line[start + 1..].find(']') {
                 let bracket = &line[start + 1..start + 1 + end];
                 let svc = bracket.split_whitespace().next().unwrap_or("");
                 if !svc.is_empty() && svc != "+" && !services.contains(&svc.to_string()) {
                     services.push(svc.to_string());
                 }
             }
-        }
     }
 
     if !services.is_empty() {

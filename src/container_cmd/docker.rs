@@ -99,11 +99,10 @@ pub(crate) fn docker_images(_verbose: u8) -> Result<()> {
                 if let Ok(n) = size_str.replace("GB", "").trim().parse::<f64>() {
                     total_size_mb += n * 1024.0;
                 }
-            } else if size_str.contains("MB") {
-                if let Ok(n) = size_str.replace("MB", "").trim().parse::<f64>() {
+            } else if size_str.contains("MB")
+                && let Ok(n) = size_str.replace("MB", "").trim().parse::<f64>() {
                     total_size_mb += n;
                 }
-            }
         }
     }
 

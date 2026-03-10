@@ -106,8 +106,8 @@ impl PeriodEconomics {
 
     pub fn compute_weighted_metrics(&mut self) {
         // Weighted input CPT derivation using API price ratios
-        if let (Some(cost), Some(saved)) = (self.cc_cost, self.mycelium_saved_tokens) {
-            if let (Some(input), Some(output), Some(cache_create), Some(cache_read)) = (
+        if let (Some(cost), Some(saved)) = (self.cc_cost, self.mycelium_saved_tokens)
+            && let (Some(input), Some(output), Some(cache_create), Some(cache_read)) = (
                 self.cc_input_tokens,
                 self.cc_output_tokens,
                 self.cc_cache_create_tokens,
@@ -127,26 +127,23 @@ impl PeriodEconomics {
                     self.savings_weighted = Some(savings);
                 }
             }
-        }
     }
 
     pub fn compute_dual_metrics(&mut self) {
         if let (Some(cost), Some(saved)) = (self.cc_cost, self.mycelium_saved_tokens) {
             // Blended CPT (cost / total_tokens including cache)
-            if let Some(total) = self.cc_total_tokens {
-                if total > 0 {
+            if let Some(total) = self.cc_total_tokens
+                && total > 0 {
                     self.blended_cpt = Some(cost / total as f64);
                     self.savings_blended = Some(saved as f64 * (cost / total as f64));
                 }
-            }
 
             // Active CPT (cost / active_tokens = input+output only)
-            if let Some(active) = self.cc_active_tokens {
-                if active > 0 {
+            if let Some(active) = self.cc_active_tokens
+                && active > 0 {
                     self.active_cpt = Some(cost / active as f64);
                     self.savings_active = Some(saved as f64 * (cost / active as f64));
                 }
-            }
         }
     }
 }

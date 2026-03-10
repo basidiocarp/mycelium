@@ -255,11 +255,10 @@ pub(crate) fn remove_hook_from_json(root: &mut serde_json::Value) -> bool {
     pre_tool_use_array.retain(|entry| {
         if let Some(hooks_array) = entry.get("hooks").and_then(|h| h.as_array()) {
             for hook in hooks_array {
-                if let Some(command) = hook.get("command").and_then(|c| c.as_str()) {
-                    if command.contains("mycelium-rewrite.sh") {
+                if let Some(command) = hook.get("command").and_then(|c| c.as_str())
+                    && command.contains("mycelium-rewrite.sh") {
                         return false; // Remove this entry
                     }
-                }
             }
         }
         true // Keep this entry

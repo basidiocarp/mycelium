@@ -11,12 +11,11 @@ pub(crate) fn format_status_output(porcelain: &str) -> String {
     let mut output = String::new();
 
     // Parse branch info
-    if let Some(branch_line) = lines.first() {
-        if branch_line.starts_with("##") {
+    if let Some(branch_line) = lines.first()
+        && branch_line.starts_with("##") {
             let branch = branch_line.trim_start_matches("## ");
             output.push_str(&format!("📌 {}\n", branch));
         }
-    }
 
     // Count changes by type
     let mut staged = 0;

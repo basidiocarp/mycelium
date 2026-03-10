@@ -102,15 +102,12 @@ impl SessionProvider for ClaudeProvider {
                 }
 
                 // Apply mtime filter
-                if let Some(cutoff_time) = cutoff {
-                    if let Ok(meta) = fs::metadata(file_path) {
-                        if let Ok(mtime) = meta.modified() {
-                            if mtime < cutoff_time {
+                if let Some(cutoff_time) = cutoff
+                    && let Ok(meta) = fs::metadata(file_path)
+                        && let Ok(mtime) = meta.modified()
+                            && mtime < cutoff_time {
                                 continue;
                             }
-                        }
-                    }
-                }
 
                 sessions.push(file_path.to_path_buf());
             }
@@ -164,8 +161,7 @@ impl SessionProvider for ClaudeProvider {
                         for block in content {
                             if block.get("type").and_then(|t| t.as_str()) == Some("tool_use")
                                 && block.get("name").and_then(|n| n.as_str()) == Some("Bash")
-                            {
-                                if let (Some(id), Some(cmd)) = (
+                                && let (Some(id), Some(cmd)) = (
                                     block.get("id").and_then(|i| i.as_str()),
                                     block.pointer("/input/command").and_then(|c| c.as_str()),
                                 ) {
@@ -176,7 +172,6 @@ impl SessionProvider for ClaudeProvider {
                                     ));
                                     sequence_counter += 1;
                                 }
-                            }
                         }
                     }
                 }
@@ -186,8 +181,8 @@ impl SessionProvider for ClaudeProvider {
                         entry.pointer("/message/content").and_then(|c| c.as_array())
                     {
                         for block in content {
-                            if block.get("type").and_then(|t| t.as_str()) == Some("tool_result") {
-                                if let Some(id) = block.get("tool_use_id").and_then(|i| i.as_str())
+                            if block.get("type").and_then(|t| t.as_str()) == Some("tool_result")
+                                && let Some(id) = block.get("tool_use_id").and_then(|i| i.as_str())
                                 {
                                     // Get content, length, and error status
                                     let content =
@@ -208,7 +203,6 @@ impl SessionProvider for ClaudeProvider {
                                         (output_len, content_preview, is_error),
                                     );
                                 }
-                            }
                         }
                     }
                 }

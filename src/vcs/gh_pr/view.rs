@@ -163,8 +163,8 @@ pub fn view_pr(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()>
     filtered.push_str(&line);
     print!("{}", line);
 
-    if let Some(body) = json["body"].as_str() {
-        if !body.is_empty() {
+    if let Some(body) = json["body"].as_str()
+        && !body.is_empty() {
             let body_filtered = filter_markdown_body(body);
             if !body_filtered.is_empty() {
                 filtered.push('\n');
@@ -176,7 +176,6 @@ pub fn view_pr(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()>
                 }
             }
         }
-    }
 
     timer.track(
         &format!("gh pr view {}", pr_number),

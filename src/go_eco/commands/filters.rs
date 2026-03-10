@@ -64,11 +64,10 @@ pub fn filter_go_test_json(output: &str) -> String {
                     // Package-level build failure
                     pkg_result.build_failed = true;
                     // Collect build errors from the import path
-                    if let Some(import_path) = &event.failed_build {
-                        if let Some(errors) = build_output.remove(import_path) {
+                    if let Some(import_path) = &event.failed_build
+                        && let Some(errors) = build_output.remove(import_path) {
                             pkg_result.build_errors = errors;
                         }
-                    }
                 }
             }
             "skip" => {

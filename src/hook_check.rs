@@ -22,13 +22,11 @@ fn check_and_warn() -> Option<()> {
 
     // Rate limit: warn once per day
     let marker = warn_marker_path()?;
-    if let Ok(meta) = std::fs::metadata(&marker) {
-        if let Ok(elapsed) = meta.modified().ok()?.elapsed() {
-            if elapsed.as_secs() < WARN_INTERVAL_SECS {
+    if let Ok(meta) = std::fs::metadata(&marker)
+        && let Ok(elapsed) = meta.modified().ok()?.elapsed()
+            && elapsed.as_secs() < WARN_INTERVAL_SECS {
                 return Some(());
             }
-        }
-    }
 
     // Touch marker
     let _ = std::fs::create_dir_all(marker.parent()?);
@@ -42,11 +40,10 @@ fn check_and_warn() -> Option<()> {
 /// Extract the hook version number from a hook script's header comments.
 pub fn parse_hook_version(content: &str) -> u8 {
     for line in content.lines().take(5) {
-        if let Some(rest) = line.strip_prefix("# mycelium-hook-version:") {
-            if let Ok(v) = rest.trim().parse::<u8>() {
+        if let Some(rest) = line.strip_prefix("# mycelium-hook-version:")
+            && let Ok(v) = rest.trim().parse::<u8>() {
                 return v;
             }
-        }
     }
     0 // No version tag = version 0 (outdated)
 }

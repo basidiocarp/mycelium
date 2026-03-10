@@ -189,17 +189,15 @@ pub(crate) fn filter_cargo_test(output: &str, show_passing: bool) -> String {
         }
 
         // If all lines parsed successfully and we have at least one suite, return compact format
-        if all_parsed {
-            if let Some(agg) = aggregated {
-                if agg.suites > 0 {
+        if all_parsed
+            && let Some(agg) = aggregated
+                && agg.suites > 0 {
                     if show_passing && !passing_lines.is_empty() {
                         result.push_str(&agg.format_compact());
                     } else {
                         return agg.format_compact();
                     }
                 }
-            }
-        }
 
         // Fallback: use original behavior if regex failed
         for line in &summary_lines {
