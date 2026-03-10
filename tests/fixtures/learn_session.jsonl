@@ -1,0 +1,14 @@
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"tu_001","name":"Bash","input":{"command":"git commit --ammend"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"tu_001","content":"error: unexpected argument '--ammend'\nDid you mean '--amend'?","is_error":true}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"tu_002","name":"Bash","input":{"command":"git commit --amend"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"tu_002","content":"[main a1b2c3d] Fix typo\n 1 file changed, 1 insertion(+)","is_error":false}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"tu_003","name":"Bash","input":{"command":"GIT_PAGER=cat git log --oneline -5"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"tu_003","content":"a1b2c3d Fix typo\nb2c3d4e Add feature","is_error":false}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"tu_004","name":"Bash","input":{"command":"cargo test"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"tu_004","content":"error[E0425]: cannot find value `x` in this scope\naborting due to previous error","is_error":true}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"tu_005","name":"Bash","input":{"command":"cargo test"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"tu_005","content":"test result: ok. 5 passed; 0 failed","is_error":false}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"tu_006","name":"Bash","input":{"command":"gh pr edit -t 'New title'"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"tu_006","content":"unknown flag: -t\nUsage: gh pr edit [<number> | <url> | <branch>] [flags]","is_error":true}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"tu_007","name":"Bash","input":{"command":"gh pr edit --title 'New title'"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"tu_007","content":"https://github.com/owner/repo/pull/42","is_error":false}]}}

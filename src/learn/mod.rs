@@ -1,9 +1,11 @@
 //! Learns correction patterns from Claude Code session history to suggest command improvements.
+pub mod corrections_store;
 pub mod detector;
 pub mod report;
 
 use crate::discover::provider::{ClaudeProvider, SessionProvider};
 use anyhow::Result;
+use corrections_store::{UserCorrection, write_corrections_json, CORRECTIONS_JSON};
 use detector::{CommandExecution, deduplicate_corrections, find_corrections};
 use report::{format_console_report, write_rules_file};
 
@@ -113,6 +115,17 @@ pub fn run(
                 let rules_path = ".claude/rules/cli-corrections.md";
                 write_rules_file(&rules, rules_path)?;
                 println!("\nWritten to: {}", rules_path);
+
+                // Also write machine-readable JSON for `mycelium rewrite` hook integration.
+                let json_corrections: Vec<UserCorrection> = rules
+                    .iter()
+                    .map(|r| UserCorrection {
+                        wrong: r.wrong_pattern.clone(),
+                        right: r.right_pattern.clone(),
+                    })
+                    .collect();
+                write_corrections_json(&json_corrections, CORRECTIONS_JSON)?;
+                println!("Written to: {} (used by rewrite hook)", CORRECTIONS_JSON);
             }
         }
     }

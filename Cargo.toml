@@ -11,6 +11,14 @@ readme = "README.md"
 keywords = ["cli", "llm", "token", "filter", "productivity"]
 categories = ["command-line-utilities", "development-tools"]
 
+[[bin]]
+name = "mycelium"
+path = "src/main.rs"
+
+[lib]
+name = "mycelium"
+path = "src/lib.rs"
+
 [dependencies]
 clap = { version = "4", features = ["derive"] }
 clap_complete = "4"

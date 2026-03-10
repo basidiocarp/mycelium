@@ -1,10 +1,15 @@
 //! Rewrites shell commands to their Mycelium equivalents for transparent hook integration.
 use crate::discover::registry;
+use crate::learn::corrections_store;
 
 /// Run the `mycelium rewrite` command.
 ///
 /// Prints the Mycelium-rewritten command to stdout and exits 0.
 /// Exits 1 (without output) if the command has no Mycelium equivalent.
+///
+/// Resolution order:
+///   1. Built-in registry (`src/discover/registry.rs`)
+///   2. User-learned corrections (`.claude/rules/cli-corrections.json` in cwd)
 ///
 /// Used by shell hooks to rewrite commands transparently:
 /// ```bash
@@ -16,15 +21,20 @@ pub fn run(cmd: &str) -> anyhow::Result<()> {
         .map(|c| c.hooks.exclude_commands)
         .unwrap_or_default();
 
-    match registry::rewrite_command(cmd, &excluded) {
-        Some(rewritten) => {
-            print!("{}", rewritten);
-            Ok(())
-        }
-        None => {
-            std::process::exit(1);
-        }
+    // 1. Try built-in registry first.
+    if let Some(rewritten) = registry::rewrite_command(cmd, &excluded) {
+        print!("{}", rewritten);
+        return Ok(());
     }
+
+    // 2. Fall back to user-learned corrections from `.claude/rules/cli-corrections.json`.
+    let user_corrections = corrections_store::load_corrections(corrections_store::CORRECTIONS_JSON);
+    if let Some(rewritten) = corrections_store::apply_correction(cmd, &user_corrections) {
+        print!("{}", rewritten);
+        return Ok(());
+    }
+
+    std::process::exit(1);
 }
 
 #[cfg(test)]

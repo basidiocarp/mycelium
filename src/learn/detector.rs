@@ -48,6 +48,13 @@ pub struct CorrectionRule {
     pub example_error: String,
 }
 
+fn env_prefix_re() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| {
+        Regex::new(r"^(?:sudo\s+|[A-Z_][A-Z0-9_]*=[^\s]*\s+)+").unwrap()
+    })
+}
+
 fn unknown_flag_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| Regex::new(
@@ -140,18 +147,10 @@ pub struct CommandExecution {
 const CORRECTION_WINDOW: usize = 3;
 const MIN_CONFIDENCE: f64 = 0.6;
 
-/// Extract base command (first 1-2 tokens, stripping env prefixes)
+/// Extract base command (first 1-2 tokens, stripping any KEY=VALUE env prefixes and sudo).
 pub fn extract_base_command(cmd: &str) -> String {
     let trimmed = cmd.trim();
-
-    // Strip common env prefixes
-    let stripped = trimmed
-        .strip_prefix("RUST_BACKTRACE=1 ")
-        .or_else(|| trimmed.strip_prefix("NODE_ENV=production "))
-        .or_else(|| trimmed.strip_prefix("DEBUG=* "))
-        .unwrap_or(trimmed);
-
-    // Get first 1-2 tokens
+    let stripped = env_prefix_re().replace(trimmed, "");
     let parts: Vec<&str> = stripped.split_whitespace().collect();
     match parts.len() {
         0 => String::new(),
@@ -199,20 +198,53 @@ pub fn command_similarity(a: &str, b: &str) -> f64 {
 }
 
 /// Check if error is a compilation/test error (TDD cycle, not CLI correction)
-fn is_tdd_cycle_error(error_type: &ErrorType, output: &str) -> bool {
-    // Compilation errors
+fn is_tdd_cycle_error(_error_type: &ErrorType, output: &str) -> bool {
+    // Rust: compilation errors
     if output.contains("error[E") || output.contains("aborting due to") {
         return true;
     }
 
-    // Test failures
-    if output.contains("test result: FAILED") || output.contains("tests failed") {
+    // Rust: test failures
+    if output.contains("test result: FAILED") {
         return true;
     }
 
-    // Only syntax errors are CLI corrections
-    matches!(error_type, ErrorType::CommandNotFound | ErrorType::Other(_))
-        && (output.contains("error[E") || output.contains("FAILED"))
+    // Python: pytest failures
+    if output.contains("short test summary info")
+        || (output.contains("FAILED ") && output.contains("::"))
+    {
+        return true;
+    }
+
+    // Python: interpreter / import errors (not CLI errors)
+    if output.contains("Traceback (most recent call last)")
+        || output.contains("SyntaxError:")
+        || output.contains("IndentationError:")
+        || output.contains("NameError:")
+        || output.contains("TypeError:")
+        || output.contains("AttributeError:")
+    {
+        return true;
+    }
+
+    // JS/TS: jest / vitest test failures
+    if (output.contains("FAIL ") || output.contains("Tests failed:"))
+        && (output.contains(".test.") || output.contains(".spec."))
+    {
+        return true;
+    }
+
+    // npm/pnpm test script failures
+    if output.contains("npm ERR! Test failed") || output.contains("ERR_PNPM_RECURSIVE_FAIL") {
+        return true;
+    }
+
+    // Go: test failures
+    if output.contains("--- FAIL:") || (output.contains("FAIL\t") && output.contains("---")) {
+        return true;
+    }
+
+    false
 }
 
 /// Check if commands differ only by path (exploration, not correction)
@@ -451,10 +483,20 @@ mod tests {
             extract_base_command("git commit --amend -m 'fix'"),
             "git commit"
         );
+        // Generic KEY=VALUE env prefix stripping
         assert_eq!(
             extract_base_command("RUST_BACKTRACE=1 cargo test"),
             "cargo test"
         );
+        assert_eq!(
+            extract_base_command("NODE_ENV=test CI=1 npx vitest run"),
+            "npx vitest"
+        );
+        assert_eq!(
+            extract_base_command("GIT_PAGER=cat git log --oneline"),
+            "git log"
+        );
+        assert_eq!(extract_base_command("sudo cargo install foo"), "cargo install");
     }
 
     #[test]
