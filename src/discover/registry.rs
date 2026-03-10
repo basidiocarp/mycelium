@@ -1,0 +1,545 @@
+//! Classifies shell commands against the rule set and rewrites them to Mycelium equivalents.
+use std::sync::OnceLock;
+use regex::{Regex, RegexSet};
+
+use super::rules::{IGNORED_EXACT, IGNORED_PREFIXES, PATTERNS, RULES};
+
+/// Result of classifying a command.
+#[derive(Debug, PartialEq)]
+pub enum Classification {
+    Supported {
+        mycelium_equivalent: &'static str,
+        category: &'static str,
+        estimated_savings_pct: f64,
+        status: super::report::MyceliumStatus,
+    },
+    Unsupported {
+        base_command: String,
+    },
+    Ignored,
+}
+
+/// Average token counts per category for estimation when no output_len available.
+pub fn category_avg_tokens(category: &str, subcmd: &str) -> usize {
+    match category {
+        "Git" => match subcmd {
+            "log" | "diff" | "show" => 200,
+            _ => 40,
+        },
+        "Cargo" => match subcmd {
+            "test" => 500,
+            _ => 150,
+        },
+        "Tests" => 800,
+        "Files" => 100,
+        "Build" => 300,
+        "Infra" => 120,
+        "Network" => 150,
+        "GitHub" => 200,
+        "PackageManager" => 150,
+        _ => 150,
+    }
+}
+
+fn regex_set() -> &'static RegexSet {
+    static RE: OnceLock<RegexSet> = OnceLock::new();
+    RE.get_or_init(|| RegexSet::new(PATTERNS).expect("invalid regex patterns"))
+}
+
+fn compiled() -> &'static Vec<Regex> {
+    static RE: OnceLock<Vec<Regex>> = OnceLock::new();
+    RE.get_or_init(|| PATTERNS.iter().map(|p| Regex::new(p).expect("invalid regex")).collect())
+}
+
+fn env_prefix() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| Regex::new(r"^(?:sudo\s+|env\s+|[A-Z_][A-Z0-9_]*=[^\s]*\s+)+").unwrap())
+}
+
+/// Classify a single (already-split) command.
+pub fn classify_command(cmd: &str) -> Classification {
+    let trimmed = cmd.trim();
+    if trimmed.is_empty() {
+        return Classification::Ignored;
+    }
+
+    // Check ignored
+    for exact in IGNORED_EXACT {
+        if trimmed == *exact {
+            return Classification::Ignored;
+        }
+    }
+    for prefix in IGNORED_PREFIXES {
+        if trimmed.starts_with(prefix) {
+            return Classification::Ignored;
+        }
+    }
+
+    // Strip env prefixes (sudo, env VAR=val, VAR=val)
+    let stripped = env_prefix().replace(trimmed, "");
+    let cmd_clean = stripped.trim();
+    if cmd_clean.is_empty() {
+        return Classification::Ignored;
+    }
+
+    // Fast check with RegexSet — take the last (most specific) match
+    let matches: Vec<usize> = regex_set().matches(cmd_clean).into_iter().collect();
+    if let Some(&idx) = matches.last() {
+        let rule = &RULES[idx];
+
+        // Extract subcommand for savings override and status detection
+        let (savings, status) = if let Some(caps) = compiled()[idx].captures(cmd_clean) {
+            if let Some(sub) = caps.get(1) {
+                let subcmd = sub.as_str();
+                // Check if this subcommand has a special status
+                let status = rule
+                    .subcmd_status
+                    .iter()
+                    .find(|(s, _)| *s == subcmd)
+                    .map(|(_, st)| *st)
+                    .unwrap_or(super::report::MyceliumStatus::Existing);
+
+                // Check if this subcommand has custom savings
+                let savings = rule
+                    .subcmd_savings
+                    .iter()
+                    .find(|(s, _)| *s == subcmd)
+                    .map(|(_, pct)| *pct)
+                    .unwrap_or(rule.savings_pct);
+
+                (savings, status)
+            } else {
+                (rule.savings_pct, super::report::MyceliumStatus::Existing)
+            }
+        } else {
+            (rule.savings_pct, super::report::MyceliumStatus::Existing)
+        };
+
+        Classification::Supported {
+            mycelium_equivalent: rule.mycelium_cmd,
+            category: rule.category,
+            estimated_savings_pct: savings,
+            status,
+        }
+    } else {
+        // Extract base command for unsupported
+        let base = extract_base_command(cmd_clean);
+        if base.is_empty() {
+            Classification::Ignored
+        } else {
+            Classification::Unsupported {
+                base_command: base.to_string(),
+            }
+        }
+    }
+}
+
+/// Extract the base command (first word, or first two if it looks like a subcommand pattern).
+fn extract_base_command(cmd: &str) -> &str {
+    let parts: Vec<&str> = cmd.splitn(3, char::is_whitespace).collect();
+    match parts.len() {
+        0 => "",
+        1 => parts[0],
+        _ => {
+            let second = parts[1];
+            // If the second token looks like a subcommand (no leading -)
+            if !second.starts_with('-') && !second.contains('/') && !second.contains('.') {
+                // Return "cmd subcmd"
+                let end = cmd
+                    .find(char::is_whitespace)
+                    .and_then(|i| {
+                        let rest = &cmd[i..];
+                        let trimmed = rest.trim_start();
+                        trimmed
+                            .find(char::is_whitespace)
+                            .map(|j| i + (rest.len() - trimmed.len()) + j)
+                    })
+                    .unwrap_or(cmd.len());
+                &cmd[..end]
+            } else {
+                parts[0]
+            }
+        }
+    }
+}
+
+/// Split a command chain on `&&`, `||`, `;` outside quotes.
+/// For pipes `|`, only keep the first command.
+/// Lines with `<<` (heredoc) or `$((` are returned whole.
+pub fn split_command_chain(cmd: &str) -> Vec<&str> {
+    let trimmed = cmd.trim();
+    if trimmed.is_empty() {
+        return vec![];
+    }
+
+    // Heredoc or arithmetic expansion: treat as single command
+    if trimmed.contains("<<") || trimmed.contains("$((") {
+        return vec![trimmed];
+    }
+
+    let mut results = Vec::new();
+    let mut start = 0;
+    let bytes = trimmed.as_bytes();
+    let len = bytes.len();
+    let mut i = 0;
+    let mut in_single = false;
+    let mut in_double = false;
+    let mut pipe_seen = false;
+
+    while i < len {
+        let b = bytes[i];
+        match b {
+            b'\'' if !in_double => {
+                in_single = !in_single;
+                i += 1;
+            }
+            b'"' if !in_single => {
+                in_double = !in_double;
+                i += 1;
+            }
+            b'|' if !in_single && !in_double => {
+                if i + 1 < len && bytes[i + 1] == b'|' {
+                    // ||
+                    let segment = trimmed[start..i].trim();
+                    if !segment.is_empty() {
+                        results.push(segment);
+                    }
+                    i += 2;
+                    start = i;
+                } else {
+                    // pipe: keep only first command
+                    let segment = trimmed[start..i].trim();
+                    if !segment.is_empty() {
+                        results.push(segment);
+                    }
+                    pipe_seen = true;
+                    break;
+                }
+            }
+            b'&' if !in_single && !in_double && i + 1 < len && bytes[i + 1] == b'&' => {
+                let segment = trimmed[start..i].trim();
+                if !segment.is_empty() {
+                    results.push(segment);
+                }
+                i += 2;
+                start = i;
+            }
+            b';' if !in_single && !in_double => {
+                let segment = trimmed[start..i].trim();
+                if !segment.is_empty() {
+                    results.push(segment);
+                }
+                i += 1;
+                start = i;
+            }
+            _ => {
+                i += 1;
+            }
+        }
+    }
+
+    if !pipe_seen && start < len {
+        let segment = trimmed[start..].trim();
+        if !segment.is_empty() {
+            results.push(segment);
+        }
+    }
+
+    results
+}
+
+/// Rewrite a raw command to its Mycelium equivalent.
+///
+/// Returns `Some(rewritten)` if the command has a Mycelium equivalent or is already Mycelium.
+/// Returns `None` if the command is unsupported or ignored (hook should pass through).
+///
+/// Handles compound commands (`&&`, `||`, `;`) by rewriting each segment independently.
+/// For pipes (`|`), only rewrites the first command (the filter stays raw).
+pub fn rewrite_command(cmd: &str, excluded: &[String]) -> Option<String> {
+    let trimmed = cmd.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    // Heredoc or arithmetic expansion — unsafe to split/rewrite
+    if trimmed.contains("<<") || trimmed.contains("$((") {
+        return None;
+    }
+
+    // Simple (non-compound) already-Mycelium command — return as-is.
+    // For compound commands that start with "mycelium" (e.g. "mycelium git add . && cargo test"),
+    // fall through to rewrite_compound so the remaining segments get rewritten.
+    let has_compound = trimmed.contains("&&")
+        || trimmed.contains("||")
+        || trimmed.contains(';')
+        || trimmed.contains('|')
+        || trimmed.contains(" & ");
+    if !has_compound && (trimmed.starts_with("mycelium ") || trimmed == "mycelium") {
+        return Some(trimmed.to_string());
+    }
+
+    rewrite_compound(trimmed, excluded)
+}
+
+/// Rewrite a compound command (with `&&`, `||`, `;`, `|`) by rewriting each segment.
+fn rewrite_compound(cmd: &str, excluded: &[String]) -> Option<String> {
+    let bytes = cmd.as_bytes();
+    let len = bytes.len();
+    let mut result = String::with_capacity(len + 32);
+    let mut any_changed = false;
+    let mut seg_start = 0;
+    let mut i = 0;
+    let mut in_single = false;
+    let mut in_double = false;
+
+    while i < len {
+        let b = bytes[i];
+        match b {
+            b'\'' if !in_double => {
+                in_single = !in_single;
+                i += 1;
+            }
+            b'"' if !in_single => {
+                in_double = !in_double;
+                i += 1;
+            }
+            b'|' if !in_single && !in_double => {
+                if i + 1 < len && bytes[i + 1] == b'|' {
+                    // `||` operator — rewrite left, continue
+                    let seg = cmd[seg_start..i].trim();
+                    let rewritten =
+                        rewrite_segment(seg, excluded).unwrap_or_else(|| seg.to_string());
+                    if rewritten != seg {
+                        any_changed = true;
+                    }
+                    result.push_str(&rewritten);
+                    result.push_str(" || ");
+                    i += 2;
+                    while i < len && bytes[i] == b' ' {
+                        i += 1;
+                    }
+                    seg_start = i;
+                } else {
+                    // `|` pipe — rewrite first segment only, pass through the rest unchanged
+                    let seg = cmd[seg_start..i].trim();
+                    let rewritten =
+                        rewrite_segment(seg, excluded).unwrap_or_else(|| seg.to_string());
+                    if rewritten != seg {
+                        any_changed = true;
+                    }
+                    result.push_str(&rewritten);
+                    // Preserve the space before the pipe that was lost by trim()
+                    result.push(' ');
+                    result.push_str(cmd[i..].trim_start());
+                    return if any_changed { Some(result) } else { None };
+                }
+            }
+            b'&' if !in_single && !in_double && i + 1 < len && bytes[i + 1] == b'&' => {
+                // `&&` operator — rewrite left, continue
+                let seg = cmd[seg_start..i].trim();
+                let rewritten = rewrite_segment(seg, excluded).unwrap_or_else(|| seg.to_string());
+                if rewritten != seg {
+                    any_changed = true;
+                }
+                result.push_str(&rewritten);
+                result.push_str(" && ");
+                i += 2;
+                while i < len && bytes[i] == b' ' {
+                    i += 1;
+                }
+                seg_start = i;
+            }
+            b'&' if !in_single && !in_double => {
+                // #346: redirect detection — 2>&1 / >&2 (> before &) or &>file / &>>file (> after &)
+                let is_redirect =
+                    (i > 0 && bytes[i - 1] == b'>') || (i + 1 < len && bytes[i + 1] == b'>');
+                if is_redirect {
+                    i += 1;
+                } else {
+                    // single `&` background execution operator
+                    let seg = cmd[seg_start..i].trim();
+                    let rewritten =
+                        rewrite_segment(seg, excluded).unwrap_or_else(|| seg.to_string());
+                    if rewritten != seg {
+                        any_changed = true;
+                    }
+                    result.push_str(&rewritten);
+                    result.push_str(" & ");
+                    i += 1;
+                    while i < len && bytes[i] == b' ' {
+                        i += 1;
+                    }
+                    seg_start = i;
+                }
+            }
+            b';' if !in_single && !in_double => {
+                // `;` separator
+                let seg = cmd[seg_start..i].trim();
+                let rewritten = rewrite_segment(seg, excluded).unwrap_or_else(|| seg.to_string());
+                if rewritten != seg {
+                    any_changed = true;
+                }
+                result.push_str(&rewritten);
+                result.push(';');
+                i += 1;
+                while i < len && bytes[i] == b' ' {
+                    i += 1;
+                }
+                if i < len {
+                    result.push(' ');
+                }
+                seg_start = i;
+            }
+            _ => {
+                i += 1;
+            }
+        }
+    }
+
+    // Last (or only) segment
+    let seg = cmd[seg_start..len].trim();
+    let rewritten = rewrite_segment(seg, excluded).unwrap_or_else(|| seg.to_string());
+    if rewritten != seg {
+        any_changed = true;
+    }
+    result.push_str(&rewritten);
+
+    if any_changed {
+        Some(result)
+    } else {
+        None
+    }
+}
+
+/// Rewrite `head -N file` → `mycelium read file --max-lines N`.
+/// Returns `None` if the command doesn't match this pattern (fall through to generic logic).
+fn rewrite_head_numeric(cmd: &str) -> Option<String> {
+    // Match: head -<digits> <file>  (with optional env prefix)
+    fn head_n() -> &'static Regex {
+        static RE: OnceLock<Regex> = OnceLock::new();
+        RE.get_or_init(|| Regex::new(r"^head\s+-(\d+)\s+(.+)$").expect("valid regex"))
+    }
+    fn head_lines() -> &'static Regex {
+        static RE: OnceLock<Regex> = OnceLock::new();
+        RE.get_or_init(|| Regex::new(r"^head\s+--lines=(\d+)\s+(.+)$").expect("valid regex"))
+    }
+    if let Some(caps) = head_n().captures(cmd) {
+        let n = caps.get(1)?.as_str();
+        let file = caps.get(2)?.as_str();
+        return Some(format!("mycelium read {} --max-lines {}", file, n));
+    }
+    if let Some(caps) = head_lines().captures(cmd) {
+        let n = caps.get(1)?.as_str();
+        let file = caps.get(2)?.as_str();
+        return Some(format!("mycelium read {} --max-lines {}", file, n));
+    }
+    // head with any other flag (e.g. -c, -q): skip rewriting to avoid clap errors
+    if cmd.starts_with("head -") {
+        return None;
+    }
+    None
+}
+
+/// Rewrite a single (non-compound) command segment.
+/// Returns `Some(rewritten)` if matched (including already-Mycelium passthrough).
+/// Returns `None` if no match (caller uses original segment).
+fn rewrite_segment(seg: &str, excluded: &[String]) -> Option<String> {
+    let trimmed = seg.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    // Already Mycelium — pass through unchanged
+    if trimmed.starts_with("mycelium ") || trimmed == "mycelium" {
+        return Some(trimmed.to_string());
+    }
+
+    // Special case: `head -N file` / `head --lines=N file` → `mycelium read file --max-lines N`
+    // Must intercept before generic prefix replacement, which would produce `mycelium read -20 file`.
+    // Only intercept when head has a flag (-N, --lines=N, -c, etc.); plain `head file` falls
+    // through to the generic rewrite below and produces `mycelium read file` as expected.
+    if trimmed.starts_with("head -") {
+        return rewrite_head_numeric(trimmed);
+    }
+
+    // Use classify_command for correct ignore/prefix handling
+    let mycelium_equivalent = match classify_command(trimmed) {
+        Classification::Supported {
+            mycelium_equivalent,
+            ..
+        } => {
+            // Check if the base command is excluded from rewriting (#243)
+            let base = trimmed.split_whitespace().next().unwrap_or("");
+            if excluded.iter().any(|e| e == base) {
+                return None;
+            }
+            mycelium_equivalent
+        }
+        _ => return None,
+    };
+
+    // Extract env prefix (sudo, env VAR=val, etc.)
+    let stripped_cow = env_prefix().replace(trimmed, "");
+    let env_prefix_len = trimmed.len() - stripped_cow.len();
+    let env_prefix = &trimmed[..env_prefix_len];
+    let cmd_clean = stripped_cow.trim();
+
+    // #345: MYCELIUM_DISABLED=1 in env prefix → skip rewrite entirely
+    if env_prefix.contains("MYCELIUM_DISABLED=") {
+        return None;
+    }
+
+    // Find the matching rule — pick the rule whose rewrite_prefixes actually match the input,
+    // since multiple rules can share the same mycelium_cmd (e.g. diff + diffsitter).
+    let rule = RULES.iter().find(|r| {
+        r.mycelium_cmd == mycelium_equivalent
+            && r.rewrite_prefixes
+                .iter()
+                .any(|&p| strip_word_prefix(cmd_clean, p).is_some())
+    })?;
+
+    // #196: gh with --json/--jq/--template produces structured output that
+    // mycelium gh would corrupt — skip rewrite so the caller gets raw JSON.
+    if rule.mycelium_cmd == "mycelium gh" {
+        let args_lower = cmd_clean.to_lowercase();
+        if args_lower.contains("--json")
+            || args_lower.contains("--jq")
+            || args_lower.contains("--template")
+        {
+            return None;
+        }
+    }
+
+    // Try each rewrite prefix (longest first) with word-boundary check
+    for &prefix in rule.rewrite_prefixes {
+        if let Some(rest) = strip_word_prefix(cmd_clean, prefix) {
+            let rewritten = if rest.is_empty() {
+                format!("{}{}", env_prefix, rule.mycelium_cmd)
+            } else {
+                format!("{}{} {}", env_prefix, rule.mycelium_cmd, rest)
+            };
+            return Some(rewritten);
+        }
+    }
+
+    None
+}
+
+/// Strip a command prefix with word-boundary check.
+/// Returns the remainder of the command after the prefix, or `None` if no match.
+fn strip_word_prefix<'a>(cmd: &'a str, prefix: &str) -> Option<&'a str> {
+    if cmd == prefix {
+        Some("")
+    } else if cmd.len() > prefix.len()
+        && cmd.starts_with(prefix)
+        && cmd.as_bytes()[prefix.len()] == b' '
+    {
+        Some(cmd[prefix.len() + 1..].trim_start())
+    } else {
+        None
+    }
+}
+
+#[cfg(test)]
+#[path = "registry_tests.rs"]
+mod tests;
