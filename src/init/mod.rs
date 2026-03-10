@@ -11,14 +11,16 @@ pub use json_patch::PatchMode;
 #[cfg(unix)]
 pub use json_patch::PatchResult;
 
-use claude_md::{MYCELIUM_INSTRUCTIONS, MyceliumBlockUpsert, resolve_claude_dir, upsert_mycelium_block};
+use claude_md::{
+    MYCELIUM_INSTRUCTIONS, MyceliumBlockUpsert, resolve_claude_dir, upsert_mycelium_block,
+};
 #[cfg(unix)]
 use claude_md::{MYCELIUM_SLIM, patch_claude_md};
 #[cfg(unix)]
 use hook::{prepare_hook_paths, write_if_changed};
-use json_patch::{clean_double_blanks, hook_already_present, remove_hook_from_settings};
 #[cfg(unix)]
 use json_patch::patch_settings_json;
+use json_patch::{clean_double_blanks, hook_already_present, remove_hook_from_settings};
 
 #[cfg(unix)]
 use hook::ensure_hook_installed;
