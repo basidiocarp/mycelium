@@ -2,7 +2,7 @@
 use anyhow::{Context, Result};
 use std::io::{Read, Write};
 
-const GITHUB_API_URL: &str = "https://api.github.com/repos/";
+const REPO: &str = env!("CARGO_PKG_REPOSITORY"); // "https://github.com/basidiocarp/mycelium"
 
 /// Check for updates and optionally download the latest Mycelium release from GitHub.
 pub fn run(check_only: bool) -> Result<()> {
@@ -49,9 +49,16 @@ pub fn run(check_only: bool) -> Result<()> {
 }
 
 fn fetch_latest_release() -> Result<serde_json::Value> {
+    // Convert "https://github.com/owner/repo" → "https://api.github.com/repos/owner/repo/releases/latest"
+    let repo_path = REPO
+        .trim_end_matches('/')
+        .strip_prefix("https://github.com/")
+        .context("CARGO_PKG_REPOSITORY is not a github.com URL")?;
+    let api_url = format!("https://api.github.com/repos/{repo_path}/releases/latest");
+
     let agent = ureq::Agent::new_with_defaults();
     let response = agent
-        .get(GITHUB_API_URL)
+        .get(&api_url)
         .header(
             "User-Agent",
             &format!("mycelium/{}", env!("CARGO_PKG_VERSION")),
