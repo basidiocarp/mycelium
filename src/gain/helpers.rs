@@ -108,24 +108,22 @@ pub(crate) fn resolve_project_scope(project: bool) -> Result<Option<String>> {
 
 /// Shorten long absolute paths for display.
 pub(crate) fn shorten_path(path: &str) -> String {
+    use std::path::{Component, MAIN_SEPARATOR};
     let path_buf = PathBuf::from(path);
-    let comps: Vec<String> = path_buf
-        .components()
-        .map(|c| c.as_os_str().to_string_lossy().to_string())
-        .collect();
+    let comps: Vec<_> = path_buf.components().collect();
     if comps.len() <= 4 {
         return path.to_string();
     }
-    let root = comps[0].as_str();
-    if root == "/" || root.is_empty() {
-        format!("/.../{}/{}", comps[comps.len() - 2], comps[comps.len() - 1])
-    } else {
-        format!(
-            "{}/.../{}/{}",
-            root,
-            comps[comps.len() - 2],
-            comps[comps.len() - 1]
-        )
+    let tail_2 = comps[comps.len() - 2].as_os_str().to_string_lossy();
+    let tail_1 = comps[comps.len() - 1].as_os_str().to_string_lossy();
+    let sep = MAIN_SEPARATOR;
+    match comps[0] {
+        Component::RootDir => format!("{sep}...{sep}{tail_2}{sep}{tail_1}"),
+        Component::Prefix(_) => {
+            let prefix = comps[0].as_os_str().to_string_lossy();
+            format!("{prefix}{sep}...{sep}{tail_2}{sep}{tail_1}")
+        }
+        _ => format!("...{sep}{tail_2}{sep}{tail_1}"),
     }
 }
 
@@ -165,6 +163,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn test_shorten_path_short() {
         // 3 components: / + usr + bin → should return as-is
         let result = shorten_path("/usr/bin");
@@ -172,9 +171,17 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn test_shorten_path_long() {
         let result = shorten_path("/home/user/projects/myapp/src");
         assert_eq!(result, "/.../myapp/src");
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn test_shorten_path_long_windows() {
+        let result = shorten_path(r"C:\Users\user\projects\myapp\src");
+        assert_eq!(result, r"C:\...\myapp\src");
     }
 
     #[test]
