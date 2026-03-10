@@ -59,7 +59,7 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
         }
         timer.track(
             &format!("prettier {}", args.join(" ")),
-            &format!("rtk prettier {}", args.join(" ")),
+            &format!("mycelium prettier {}", args.join(" ")),
             &raw,
             &raw,
         );
@@ -77,7 +77,7 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
 
     timer.track(
         &format!("prettier {}", args.join(" ")),
-        &format!("rtk prettier {}", args.join(" ")),
+        &format!("mycelium prettier {}", args.join(" ")),
         &raw,
         &filtered,
     );

@@ -35,12 +35,6 @@ The tooling is written in Rust — a language that shares its name with another 
 
 ## Installation
 
-### Homebrew (recommended)
-
-```bash
-brew install mycelium
-```
-
 ### Quick Install (Linux/macOS)
 
 ```bash
@@ -71,9 +65,6 @@ Download from [releases](https://github.com/basidiocarp/mycelium):
 mycelium --version   # Should show "mycelium 0.1.0"
 mycelium gain        # Should show token savings stats
 ```
-
-> **Name collision warning**: Another project named "mycelium" (Rust Type Kit) exists on crates.io. If `mycelium gain` fails, you have the wrong package. Use `cargo install --git` above instead.
-
 ## Quick Start
 
 ```bash
@@ -316,7 +307,6 @@ max_files = 20          # rotation limit
 ```bash
 mycelium init -g --uninstall     # Remove hook, Mycelium.md, settings.json entry
 cargo uninstall mycelium          # Remove binary
-brew uninstall mycelium           # If installed via Homebrew
 ```
 
 ## Documentation

@@ -114,7 +114,7 @@ pub fn dispatch(cli: Cli) -> Result<()> {
             }
         }
 
-        Commands::Smart {
+        Commands::Peek {
             file,
             model,
             force_download,
@@ -1090,7 +1090,7 @@ pub fn is_operational_command(cmd: &Commands) -> bool {
         Commands::Ls { .. }
             | Commands::Tree { .. }
             | Commands::Read { .. }
-            | Commands::Smart { .. }
+            | Commands::Peek { .. }
             | Commands::Git { .. }
             | Commands::Gh { .. }
             | Commands::Pnpm { .. }

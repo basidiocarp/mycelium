@@ -35,7 +35,10 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
+    // ── Files & Search ──────────────────────────────────────────────────────
+
     /// List directory contents with token-optimized output (proxy to native ls)
+    #[command(display_order = 10)]
     Ls {
         /// Arguments passed to ls (supports all native ls flags like -l, -a, -h, -R)
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
@@ -43,6 +46,7 @@ pub enum Commands {
     },
 
     /// Directory tree with token-optimized output (proxy to native tree)
+    #[command(display_order = 11)]
     Tree {
         /// Arguments passed to tree (supports all native tree flags like -L, -d, -a)
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
@@ -50,6 +54,7 @@ pub enum Commands {
     },
 
     /// Read file with intelligent filtering
+    #[command(display_order = 12)]
     Read {
         /// File to read
         file: PathBuf,
@@ -64,8 +69,9 @@ pub enum Commands {
         line_numbers: bool,
     },
 
-    /// Generate 2-line technical summary (heuristic-based)
-    Smart {
+    /// Generate 2-line technical summary of a file (heuristic-based)
+    #[command(display_order = 13)]
+    Peek {
         /// File to analyze
         file: PathBuf,
         /// Model: heuristic
@@ -76,7 +82,55 @@ pub enum Commands {
         force_download: bool,
     },
 
+    /// Find files with compact tree output (accepts native find flags like -name, -type)
+    #[command(display_order = 14)]
+    Find {
+        /// All find arguments (supports both Mycelium and native find syntax)
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+
+    /// Compact grep - strips whitespace, truncates, groups by file
+    #[command(display_order = 15)]
+    Grep {
+        /// Pattern to search
+        pattern: String,
+        /// Path to search in
+        #[arg(default_value = ".")]
+        path: String,
+        /// Max line length
+        #[arg(short = 'l', long, default_value = "80")]
+        max_len: usize,
+        /// Max results to show
+        #[arg(short, long, default_value = "50")]
+        max: usize,
+        /// Show only match context (not full line)
+        #[arg(short, long)]
+        context_only: bool,
+        /// Filter by file type (e.g., ts, py, rust)
+        #[arg(short = 't', long)]
+        file_type: Option<String>,
+        /// Show line numbers (always on, accepted for grep/rg compatibility)
+        #[arg(short = 'n', long)]
+        line_numbers: bool,
+        /// Extra ripgrep arguments (e.g., -i, -A 3, -w, --glob)
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        extra_args: Vec<String>,
+    },
+
+    /// Ultra-condensed diff (only changed lines)
+    #[command(display_order = 16)]
+    Diff {
+        /// First file or - for stdin (unified diff)
+        file1: PathBuf,
+        /// Second file (optional if stdin)
+        file2: Option<PathBuf>,
+    },
+
+    // ── VCS & Code Review ────────────────────────────────────────────────────
+
     /// Git commands with compact output
+    #[command(display_order = 20)]
     Git {
         /// Change to directory before executing (like git -C <path>, can be repeated)
         #[arg(short = 'C', action = clap::ArgAction::Append)]
@@ -115,169 +169,192 @@ pub enum Commands {
     },
 
     /// GitHub CLI (gh) commands with token-optimized output
+    #[command(display_order = 21)]
     Gh {
         #[command(subcommand)]
         command: GhCommands,
     },
 
-    /// AWS CLI with compact output (force JSON, compress)
-    Aws {
+    /// Graphite (gt) stacked PR commands with compact output
+    #[command(display_order = 22)]
+    Gt {
         #[command(subcommand)]
-        command: AwsCommands,
+        command: GtCommands,
     },
 
-    /// PostgreSQL client with compact output (strip borders, compress tables)
-    Psql {
-        /// psql arguments
+    // ── Build & Compile ──────────────────────────────────────────────────────
+
+    /// Cargo commands with compact output
+    #[command(display_order = 30)]
+    Cargo {
+        #[command(subcommand)]
+        command: CargoCommands,
+    },
+
+    /// TypeScript compiler with grouped error output
+    #[command(display_order = 31)]
+    Tsc {
+        /// TypeScript compiler arguments
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
 
-    /// pnpm commands with ultra-compact output
-    Pnpm {
-        #[command(subcommand)]
-        command: PnpmCommands,
-    },
-
-    /// Run command and show only errors/warnings
-    Err {
-        /// Command to run
+    /// Next.js build with compact output
+    #[command(display_order = 32)]
+    Next {
+        /// Next.js build arguments
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
-        command: Vec<String>,
+        args: Vec<String>,
     },
 
-    /// Run tests and show only failures
+    /// Go commands with compact output
+    #[command(display_order = 33)]
+    Go {
+        #[command(subcommand)]
+        command: GoCommands,
+    },
+
+    // ── Lint & Format ────────────────────────────────────────────────────────
+
+    /// ESLint with grouped rule violations
+    #[command(display_order = 40)]
+    Lint {
+        /// Linter arguments
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+
+    /// Prettier format checker with compact output
+    #[command(display_order = 41)]
+    Prettier {
+        /// Prettier arguments (e.g., --check, --write)
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+
+    /// Auto-detects formatter (prettier, black, ruff) from project files
+    #[command(display_order = 42)]
+    Format {
+        /// Formatter arguments (auto-detects formatter from project files)
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+
+    /// Ruff linter/formatter with compact output
+    #[command(display_order = 43)]
+    Ruff {
+        #[command(subcommand)]
+        command: RuffCommands,
+    },
+
+    /// Mypy type checker with grouped error output
+    #[command(display_order = 44)]
+    Mypy {
+        /// Mypy arguments
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+
+    /// golangci-lint with compact output
+    #[command(display_order = 45, name = "golangci-lint")]
+    GolangciLint {
+        /// golangci-lint arguments
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+
+    // ── Test ─────────────────────────────────────────────────────────────────
+
+    /// Run tests and show only failures (generic wrapper — use specific runners when available)
+    #[command(display_order = 50)]
     Test {
         /// Test command (e.g. cargo test)
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         command: Vec<String>,
     },
 
-    /// Show JSON structure without values
-    Json {
-        /// JSON file
-        file: PathBuf,
-        /// Max depth
-        #[arg(short, long, default_value = "5")]
-        depth: usize,
+    /// Vitest commands with compact output
+    #[command(display_order = 51)]
+    Vitest {
+        #[command(subcommand)]
+        command: VitestCommands,
     },
 
-    /// Summarize project dependencies
-    Deps {
-        /// Project path
-        #[arg(default_value = ".")]
-        path: PathBuf,
-    },
-
-    /// Show environment variables (filtered, sensitive masked)
-    Env {
-        /// Filter by name (e.g. PATH, AWS)
-        #[arg(short, long)]
-        filter: Option<String>,
-        /// Show all (include sensitive)
-        #[arg(long)]
-        show_all: bool,
-    },
-
-    /// Find files with compact tree output (accepts native find flags like -name, -type)
-    Find {
-        /// All find arguments (supports both Mycelium and native find syntax)
+    /// Playwright E2E tests with compact output
+    #[command(display_order = 52)]
+    Playwright {
+        /// Playwright arguments
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
 
-    /// Ultra-condensed diff (only changed lines)
-    Diff {
-        /// First file or - for stdin (unified diff)
-        file1: PathBuf,
-        /// Second file (optional if stdin)
-        file2: Option<PathBuf>,
-    },
-
-    /// Filter and deduplicate log output
-    Log {
-        /// Log file (omit for stdin)
-        file: Option<PathBuf>,
-    },
-
-    /// Docker commands with compact output
-    Docker {
-        #[command(subcommand)]
-        command: DockerCommands,
-    },
-
-    /// Kubectl commands with compact output
-    Kubectl {
-        #[command(subcommand)]
-        command: KubectlCommands,
-    },
-
-    /// Run command and show heuristic summary
-    Summary {
-        /// Command to run and summarize
+    /// Pytest test runner with compact output
+    #[command(display_order = 53)]
+    Pytest {
+        /// Pytest arguments
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
-        command: Vec<String>,
+        args: Vec<String>,
     },
 
-    /// Compact grep - strips whitespace, truncates, groups by file
-    Grep {
-        /// Pattern to search
-        pattern: String,
-        /// Path to search in
-        #[arg(default_value = ".")]
-        path: String,
-        /// Max line length
-        #[arg(short = 'l', long, default_value = "80")]
-        max_len: usize,
-        /// Max results to show
-        #[arg(short, long, default_value = "50")]
-        max: usize,
-        /// Show only match context (not full line)
-        #[arg(short, long)]
-        context_only: bool,
-        /// Filter by file type (e.g., ts, py, rust)
-        #[arg(short = 't', long)]
-        file_type: Option<String>,
-        /// Show line numbers (always on, accepted for grep/rg compatibility)
-        #[arg(short = 'n', long)]
-        line_numbers: bool,
-        /// Extra ripgrep arguments (e.g., -i, -A 3, -w, --glob)
+    // ── Package Managers ─────────────────────────────────────────────────────
+
+    /// pnpm commands with ultra-compact output
+    #[command(display_order = 60)]
+    Pnpm {
+        #[command(subcommand)]
+        command: PnpmCommands,
+    },
+
+    /// Pip package manager with compact output (auto-detects uv)
+    #[command(display_order = 61)]
+    Pip {
+        #[command(subcommand)]
+        command: PipCommands,
+    },
+
+    /// npm run with filtered output (strip boilerplate)
+    #[command(display_order = 62)]
+    Npm {
+        /// npm run arguments (script name + options)
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
-        extra_args: Vec<String>,
+        args: Vec<String>,
     },
 
-    /// Initialize mycelium instructions in CLAUDE.md
-    Init {
-        /// Add to global ~/.claude/CLAUDE.md instead of local
-        #[arg(short, long)]
-        global: bool,
+    /// npx with intelligent routing (tsc, eslint, prisma -> specialized filters)
+    #[command(display_order = 63)]
+    Npx {
+        /// npx arguments (command + options)
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
 
-        /// Show current configuration
-        #[arg(long)]
-        show: bool,
+    // ── Databases & APIs ─────────────────────────────────────────────────────
 
-        /// Inject full instructions into CLAUDE.md (legacy mode)
-        #[arg(long = "claude-md", group = "mode")]
-        claude_md: bool,
+    /// PostgreSQL client with compact output (strip borders, compress tables)
+    #[command(display_order = 70)]
+    Psql {
+        /// psql arguments
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
 
-        /// Hook only, no Mycelium.md
-        #[arg(long = "hook-only", group = "mode")]
-        hook_only: bool,
+    /// Prisma commands with compact output (no ASCII art)
+    #[command(display_order = 71)]
+    Prisma {
+        #[command(subcommand)]
+        command: PrismaCommands,
+    },
 
-        /// Auto-patch settings.json without prompting
-        #[arg(long = "auto-patch", group = "patch")]
-        auto_patch: bool,
-
-        /// Skip settings.json patching (print manual instructions)
-        #[arg(long = "no-patch", group = "patch")]
-        no_patch: bool,
-
-        /// Remove all Mycelium artifacts (hook, CLAUDE.md reference, settings.json entry)
-        #[arg(long)]
-        uninstall: bool,
+    /// Curl with auto-JSON detection and schema output
+    #[command(display_order = 72)]
+    Curl {
+        /// Curl arguments (URL + options)
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
     },
 
     /// Download with compact output (strips progress bars)
+    #[command(display_order = 73)]
     Wget {
         /// URL to download
         url: String,
@@ -289,14 +366,94 @@ pub enum Commands {
         args: Vec<String>,
     },
 
-    /// Word/line/byte count with compact output (strips paths and padding)
-    Wc {
-        /// Arguments passed to wc (files, flags like -l, -w, -c)
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
-        args: Vec<String>,
+    // ── Infrastructure ───────────────────────────────────────────────────────
+
+    /// Docker commands with compact output
+    #[command(display_order = 80)]
+    Docker {
+        #[command(subcommand)]
+        command: DockerCommands,
     },
 
+    /// Kubectl commands with compact output
+    #[command(display_order = 81)]
+    Kubectl {
+        #[command(subcommand)]
+        command: KubectlCommands,
+    },
+
+    /// Terraform with compact plan/apply output
+    #[command(display_order = 82)]
+    Terraform {
+        #[command(subcommand)]
+        command: TerraformCommands,
+    },
+
+    /// AWS CLI with compact output (force JSON, compress)
+    #[command(display_order = 83)]
+    Aws {
+        #[command(subcommand)]
+        command: AwsCommands,
+    },
+
+    // ── Logs & Data ──────────────────────────────────────────────────────────
+
+    /// Show JSON structure without values
+    #[command(display_order = 90)]
+    Json {
+        /// JSON file
+        file: PathBuf,
+        /// Max depth
+        #[arg(short, long, default_value = "5")]
+        depth: usize,
+    },
+
+    /// Filter and deduplicate log output
+    #[command(display_order = 91)]
+    Log {
+        /// Log file (omit for stdin)
+        file: Option<PathBuf>,
+    },
+
+    /// Run command and show only errors/warnings
+    #[command(display_order = 92)]
+    Err {
+        /// Command to run
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        command: Vec<String>,
+    },
+
+    /// Run command and show heuristic summary
+    #[command(display_order = 93)]
+    Summary {
+        /// Command to run and summarize
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        command: Vec<String>,
+    },
+
+    /// Show environment variables (filtered, sensitive masked)
+    #[command(display_order = 94)]
+    Env {
+        /// Filter by name (e.g. PATH, AWS)
+        #[arg(short, long)]
+        filter: Option<String>,
+        /// Show all (include sensitive)
+        #[arg(long)]
+        show_all: bool,
+    },
+
+    /// Summarize project dependencies
+    #[command(display_order = 95)]
+    Deps {
+        /// Project path
+        #[arg(default_value = ".")]
+        path: PathBuf,
+    },
+
+    // ── Analytics ────────────────────────────────────────────────────────────
+
     /// Show token savings summary and history
+    #[command(display_order = 100)]
     Gain {
         /// Filter statistics to current project (current working directory)
         #[arg(short, long)]
@@ -336,122 +493,8 @@ pub enum Commands {
         compare: Option<String>,
     },
 
-    /// Show parser degradation statistics
-    #[command(name = "parse-health")]
-    ParseHealth {
-        /// Number of days to analyze (default: 30)
-        #[arg(long, default_value = "30")]
-        days: u32,
-    },
-
-    /// Claude Code economics: spending (ccusage) vs savings (mycelium) analysis
-    CcEconomics {
-        /// Show detailed daily breakdown
-        #[arg(short, long)]
-        daily: bool,
-        /// Show weekly breakdown
-        #[arg(short, long)]
-        weekly: bool,
-        /// Show monthly breakdown
-        #[arg(short, long)]
-        monthly: bool,
-        /// Show all time breakdowns (daily + weekly + monthly)
-        #[arg(short, long)]
-        all: bool,
-        /// Output format: text, json, csv
-        #[arg(short, long, default_value = "text")]
-        format: String,
-    },
-
-    /// Show or create configuration file
-    Config {
-        /// Create default config file
-        #[arg(long)]
-        create: bool,
-    },
-
-    /// Vitest commands with compact output
-    Vitest {
-        #[command(subcommand)]
-        command: VitestCommands,
-    },
-
-    /// Prisma commands with compact output (no ASCII art)
-    Prisma {
-        #[command(subcommand)]
-        command: PrismaCommands,
-    },
-
-    /// TypeScript compiler with grouped error output
-    Tsc {
-        /// TypeScript compiler arguments
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
-        args: Vec<String>,
-    },
-
-    /// Next.js build with compact output
-    Next {
-        /// Next.js build arguments
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
-        args: Vec<String>,
-    },
-
-    /// ESLint with grouped rule violations
-    Lint {
-        /// Linter arguments
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
-        args: Vec<String>,
-    },
-
-    /// Prettier format checker with compact output
-    Prettier {
-        /// Prettier arguments (e.g., --check, --write)
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
-        args: Vec<String>,
-    },
-
-    /// Universal format checker (prettier, black, ruff format)
-    Format {
-        /// Formatter arguments (auto-detects formatter from project files)
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
-        args: Vec<String>,
-    },
-
-    /// Playwright E2E tests with compact output
-    Playwright {
-        /// Playwright arguments
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
-        args: Vec<String>,
-    },
-
-    /// Cargo commands with compact output
-    Cargo {
-        #[command(subcommand)]
-        command: CargoCommands,
-    },
-
-    /// npm run with filtered output (strip boilerplate)
-    Npm {
-        /// npm run arguments (script name + options)
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
-        args: Vec<String>,
-    },
-
-    /// npx with intelligent routing (tsc, eslint, prisma -> specialized filters)
-    Npx {
-        /// npx arguments (command + options)
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
-        args: Vec<String>,
-    },
-
-    /// Curl with auto-JSON detection and schema output
-    Curl {
-        /// Curl arguments (URL + options)
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
-        args: Vec<String>,
-    },
-
     /// Discover missed Mycelium savings from Claude Code history
+    #[command(display_order = 101)]
     Discover {
         /// Filter by project path (substring match)
         #[arg(short, long)]
@@ -471,6 +514,7 @@ pub enum Commands {
     },
 
     /// Learn CLI corrections from Claude Code error history
+    #[command(display_order = 102)]
     Learn {
         /// Filter by project path (substring match)
         #[arg(short, long)]
@@ -495,67 +539,119 @@ pub enum Commands {
         min_occurrences: usize,
     },
 
+    // ── Setup ────────────────────────────────────────────────────────────────
+
+    /// Initialize mycelium instructions in CLAUDE.md
+    #[command(display_order = 110)]
+    Init {
+        /// Add to global ~/.claude/CLAUDE.md instead of local
+        #[arg(short, long)]
+        global: bool,
+
+        /// Show current configuration
+        #[arg(long)]
+        show: bool,
+
+        /// Inject full instructions into CLAUDE.md (legacy mode)
+        #[arg(long = "claude-md", group = "mode")]
+        claude_md: bool,
+
+        /// Hook only, no Mycelium.md
+        #[arg(long = "hook-only", group = "mode")]
+        hook_only: bool,
+
+        /// Auto-patch settings.json without prompting
+        #[arg(long = "auto-patch", group = "patch")]
+        auto_patch: bool,
+
+        /// Skip settings.json patching (print manual instructions)
+        #[arg(long = "no-patch", group = "patch")]
+        no_patch: bool,
+
+        /// Remove all Mycelium artifacts (hook, CLAUDE.md reference, settings.json entry)
+        #[arg(long)]
+        uninstall: bool,
+    },
+
+    /// Show or create configuration file
+    #[command(display_order = 111)]
+    Config {
+        /// Create default config file
+        #[arg(long)]
+        create: bool,
+    },
+
+    /// Run health checks on Mycelium installation
+    #[command(display_order = 112)]
+    Doctor,
+
+    /// Verify hook integrity (SHA-256 check)
+    #[command(display_order = 113)]
+    Verify,
+
+    /// Check for and install updates to mycelium
+    #[command(display_order = 114, name = "self-update")]
+    SelfUpdate {
+        /// Only check for updates, don't download
+        #[arg(long)]
+        check: bool,
+    },
+
+    /// Generate shell completion scripts
+    #[command(display_order = 115)]
+    Completions {
+        /// Shell to generate completions for (bash, zsh, fish)
+        shell: String,
+    },
+
     /// Execute command without filtering but track usage
+    #[command(display_order = 116)]
     Proxy {
         /// Command and arguments to execute
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<OsString>,
     },
 
-    /// Verify hook integrity (SHA-256 check)
-    Verify,
+    // ── Hidden (internal/debug) ──────────────────────────────────────────────
 
-    /// Run health checks on Mycelium installation
-    Doctor,
-
-    /// Ruff linter/formatter with compact output
-    Ruff {
-        #[command(subcommand)]
-        command: RuffCommands,
-    },
-
-    /// Pytest test runner with compact output
-    Pytest {
-        /// Pytest arguments
+    /// Word/line/byte count with compact output (strips paths and padding)
+    #[command(hide = true)]
+    Wc {
+        /// Arguments passed to wc (files, flags like -l, -w, -c)
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
 
-    /// Mypy type checker with grouped error output
-    Mypy {
-        /// Mypy arguments
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
-        args: Vec<String>,
+    /// Show parser degradation statistics
+    #[command(hide = true, name = "parse-health")]
+    ParseHealth {
+        /// Number of days to analyze (default: 30)
+        #[arg(long, default_value = "30")]
+        days: u32,
     },
 
-    /// Pip package manager with compact output (auto-detects uv)
-    Pip {
-        #[command(subcommand)]
-        command: PipCommands,
-    },
-
-    /// Go commands with compact output
-    Go {
-        #[command(subcommand)]
-        command: GoCommands,
-    },
-
-    /// Graphite (gt) stacked PR commands with compact output
-    Gt {
-        #[command(subcommand)]
-        command: GtCommands,
-    },
-
-    /// golangci-lint with compact output
-    #[command(name = "golangci-lint")]
-    GolangciLint {
-        /// golangci-lint arguments
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
-        args: Vec<String>,
+    /// Claude Code economics: spending (ccusage) vs savings (mycelium) analysis
+    #[command(hide = true)]
+    CcEconomics {
+        /// Show detailed daily breakdown
+        #[arg(short, long)]
+        daily: bool,
+        /// Show weekly breakdown
+        #[arg(short, long)]
+        weekly: bool,
+        /// Show monthly breakdown
+        #[arg(short, long)]
+        monthly: bool,
+        /// Show all time breakdowns (daily + weekly + monthly)
+        #[arg(short, long)]
+        all: bool,
+        /// Output format: text, json, csv
+        #[arg(short, long, default_value = "text")]
+        format: String,
     },
 
     /// Show hook rewrite audit metrics (requires MYCELIUM_HOOK_AUDIT=1)
-    #[command(name = "hook-audit")]
+    #[command(hide = true, name = "hook-audit")]
     HookAudit {
         /// Show entries from last N days (0 = all time)
         #[arg(short, long, default_value = "7")]
@@ -563,35 +659,10 @@ pub enum Commands {
     },
 
     /// Rewrite a raw command to its Mycelium equivalent (single source of truth for hooks)
-    ///
-    /// Exits 0 and prints the rewritten command if supported.
-    /// Exits 1 with no output if the command has no Mycelium equivalent.
-    ///
-    /// Used by Claude Code, Gemini CLI, and other LLM hooks:
-    ///   REWRITTEN=$(mycelium rewrite "$CMD") || exit 0
+    #[command(hide = true)]
     Rewrite {
         /// Raw command to rewrite (e.g. "git status", "cargo test && git push")
         cmd: String,
-    },
-
-    /// Generate shell completion scripts
-    Completions {
-        /// Shell to generate completions for (bash, zsh, fish)
-        shell: String,
-    },
-
-    /// Terraform with compact plan/apply output
-    Terraform {
-        #[command(subcommand)]
-        command: TerraformCommands,
-    },
-
-    /// Check for and install updates to mycelium
-    #[command(name = "self-update")]
-    SelfUpdate {
-        /// Only check for updates, don't download
-        #[arg(long)]
-        check: bool,
     },
 }
 

@@ -39,7 +39,7 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
         .args(all_args)
         .verbose(verbose)
         .tee_slug("next")
-        .rtk_label("rtk next build")
+        .mycelium_label("mycelium next build")
         .filter(filter_next_build)
         .run()
 }

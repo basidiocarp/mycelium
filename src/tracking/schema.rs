@@ -55,9 +55,9 @@ pub(super) fn init_schema(conn: &Connection) -> Result<()> {
             [],
         );
     }
-    // Migration: rename rtk_cmd column to mycelium_cmd
+    // Migration: rename mycelium_cmd column to mycelium_cmd
     let _ = conn.execute(
-        "ALTER TABLE commands RENAME COLUMN rtk_cmd TO mycelium_cmd",
+        "ALTER TABLE commands RENAME COLUMN mycelium_cmd TO mycelium_cmd",
         [],
     );
     // Index for fast project-scoped gain queries

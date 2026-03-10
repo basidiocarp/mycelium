@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use std::process::Command;
 
-/// Builder for the standard RTK filter-track-exit pattern.
+/// Builder for the standard mycelium filter-track-exit pattern.
 ///
 /// Abstracts the boilerplate shared by 20+ command modules:
 /// timer → run command → strip ANSI (optional) → filter → tee → print → track → exit on failure.
@@ -20,7 +20,7 @@ pub struct FilteredCommand {
     envs: Vec<(String, String)>,
     verbose: u8,
     tee_slug: Option<String>,
-    rtk_label: Option<String>,
+    mycelium_label: Option<String>,
     filter_fn: Box<dyn Fn(&str) -> String>,
     do_strip_ansi: bool,
 }
@@ -36,7 +36,7 @@ impl FilteredCommand {
             envs: Vec::new(),
             verbose: 0,
             tee_slug: None,
-            rtk_label: None,
+            mycelium_label: None,
             filter_fn: Box::new(|s: &str| s.to_string()),
             do_strip_ansi: false,
         }
@@ -78,9 +78,9 @@ impl FilteredCommand {
         self
     }
 
-    /// Override the "rtk ..." label used in token tracking.
-    pub fn rtk_label(mut self, label: &str) -> Self {
-        self.rtk_label = Some(label.to_string());
+    /// Override the "mycelium ..." label used in token tracking.
+    pub fn mycelium_label(mut self, label: &str) -> Self {
+        self.mycelium_label = Some(label.to_string());
         self
     }
 
@@ -127,9 +127,9 @@ impl FilteredCommand {
         let exit_code = utils::exit_code(&output.status);
 
         let raw_label = format!("{} {}", self.tool_name, self.args.join(" "));
-        let rtk_label = self
-            .rtk_label
-            .unwrap_or_else(|| format!("rtk {} {}", self.tool_name, self.args.join(" ")));
+        let mycelium_label = self
+            .mycelium_label
+            .unwrap_or_else(|| format!("mycelium {} {}", self.tool_name, self.args.join(" ")));
         let slug = self.tee_slug.unwrap_or_else(|| self.tool_name.clone());
 
         if let Some(hint) = tee::tee_and_hint(&raw, &slug, exit_code) {
@@ -138,7 +138,7 @@ impl FilteredCommand {
             println!("{}", filtered);
         }
 
-        timer.track(&raw_label, &rtk_label, &raw, &filtered);
+        timer.track(&raw_label, &mycelium_label, &raw, &filtered);
 
         if exit_code != 0 {
             std::process::exit(exit_code);
@@ -179,11 +179,11 @@ impl FilteredCommand {
         let filtered = (self.filter_fn)(&raw);
 
         let raw_label = format!("{} {}", self.tool_name, self.args.join(" "));
-        let rtk_label = self
-            .rtk_label
-            .unwrap_or_else(|| format!("rtk {} {}", self.tool_name, self.args.join(" ")));
+        let mycelium_label = self
+            .mycelium_label
+            .unwrap_or_else(|| format!("mycelium {} {}", self.tool_name, self.args.join(" ")));
 
-        timer.track(&raw_label, &rtk_label, &raw, &filtered);
+        timer.track(&raw_label, &mycelium_label, &raw, &filtered);
 
         Ok((raw, filtered))
     }
