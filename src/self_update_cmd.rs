@@ -60,8 +60,8 @@ fn fetch_latest_release() -> Result<serde_json::Value> {
         .call()
         .context("Failed to fetch latest release (check your internet connection)")?;
 
-    let json: serde_json::Value =
-        serde_json::from_reader(response.into_body().as_reader()).context("Invalid JSON from GitHub API")?;
+    let json: serde_json::Value = serde_json::from_reader(response.into_body().as_reader())
+        .context("Invalid JSON from GitHub API")?;
     Ok(json)
 }
 

@@ -267,9 +267,9 @@ fn truncate_line(line: &str, max: usize) -> String {
 
 #[cfg(test)]
 mod tests {
-  use super::*;
+    use super::*;
 
-  #[test]
+    #[test]
     fn test_compact_url() {
         assert_eq!(
             compact_url("https://example.com/file.txt"),

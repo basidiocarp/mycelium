@@ -81,7 +81,9 @@ pub(crate) fn export_csv(
     if all || daily {
         let days = tracker.get_all_days_filtered(project_scope)?;
         println!("# Daily Data");
-        println!("date,commands,input_tokens,output_tokens,saved_tokens,savings_pct,total_time_ms,avg_time_ms");
+        println!(
+            "date,commands,input_tokens,output_tokens,saved_tokens,savings_pct,total_time_ms,avg_time_ms"
+        );
         for day in days {
             println!(
                 "{},{},{},{},{},{:.2},{},{}",
@@ -124,7 +126,9 @@ pub(crate) fn export_csv(
     if all || monthly {
         let months = tracker.get_by_month_filtered(project_scope)?;
         println!("# Monthly Data");
-        println!("month,commands,input_tokens,output_tokens,saved_tokens,savings_pct,total_time_ms,avg_time_ms");
+        println!(
+            "month,commands,input_tokens,output_tokens,saved_tokens,savings_pct,total_time_ms,avg_time_ms"
+        );
         for month in months {
             println!(
                 "{},{},{},{},{},{:.2},{},{}",

@@ -4,7 +4,7 @@ use crate::tracking;
 use anyhow::Result;
 use serde_json::Value;
 
-use super::generic::{run_aws_json, MAX_ITEMS};
+use super::generic::{MAX_ITEMS, run_aws_json};
 
 /// AWS EC2 – Elastic Compute Cloud.
 ///

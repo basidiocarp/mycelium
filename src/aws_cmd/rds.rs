@@ -5,7 +5,7 @@ use crate::utils::join_with_overflow;
 use anyhow::Result;
 use serde_json::Value;
 
-use super::generic::{run_aws_json, MAX_ITEMS};
+use super::generic::{MAX_ITEMS, run_aws_json};
 
 /// AWS RDS – Relational Database Service.
 ///

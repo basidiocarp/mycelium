@@ -1,20 +1,25 @@
 //! Log file filter that deduplicates repeated lines and shows counts.
 use crate::tracking;
 use anyhow::Result;
-use std::sync::OnceLock;
 use regex::Regex;
 use std::collections::HashMap;
 use std::fs;
 use std::io::{self, BufRead};
 use std::path::Path;
+use std::sync::OnceLock;
 
 fn timestamp_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"^\d{4}[-/]\d{2}[-/]\d{2}[T ]\d{2}:\d{2}:\d{2}[.,]?\d*\s*").unwrap())
+    RE.get_or_init(|| {
+        Regex::new(r"^\d{4}[-/]\d{2}[-/]\d{2}[T ]\d{2}:\d{2}:\d{2}[.,]?\d*\s*").unwrap()
+    })
 }
 fn uuid_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}").unwrap())
+    RE.get_or_init(|| {
+        Regex::new(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+            .unwrap()
+    })
 }
 fn hex_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
@@ -85,8 +90,14 @@ fn analyze_logs(content: &str) -> String {
         let line_lower = line.to_lowercase();
 
         // Normalize for deduplication
-        let normalized =
-            normalize_log_line(line, timestamp_re(), uuid_re(), hex_re(), num_re(), path_re());
+        let normalized = normalize_log_line(
+            line,
+            timestamp_re(),
+            uuid_re(),
+            hex_re(),
+            num_re(),
+            path_re(),
+        );
 
         // Categorize
         if line_lower.contains("error")

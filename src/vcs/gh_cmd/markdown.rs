@@ -3,8 +3,8 @@
 //! Removes noise (HTML comments, badges, image lines, horizontal rules)
 //! while preserving meaningful content and code blocks.
 
-use std::sync::OnceLock;
 use regex::Regex;
+use std::sync::OnceLock;
 
 fn html_comment_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();

@@ -1,16 +1,18 @@
 //! Heuristic-based code summarizer that extracts structure without an external model.
 use anyhow::{Context, Result};
-use std::sync::OnceLock;
 use regex::Regex;
 use std::fs;
 use std::path::Path;
+use std::sync::OnceLock;
 
 use crate::filter::Language;
 
 // Import patterns
 fn import_rust() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"^use\s+([a-zA-Z_][a-zA-Z0-9_]*(?:::[a-zA-Z_][a-zA-Z0-9_]*)?)").unwrap())
+    RE.get_or_init(|| {
+        Regex::new(r"^use\s+([a-zA-Z_][a-zA-Z0-9_]*(?:::[a-zA-Z_][a-zA-Z0-9_]*)?)").unwrap()
+    })
 }
 fn import_python() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
@@ -18,7 +20,9 @@ fn import_python() -> &'static Regex {
 }
 fn import_js_ts() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r#"import.*from\s+['"]([^'"]+)['"]|require\(['"]([^'"]+)['"]\)"#).unwrap())
+    RE.get_or_init(|| {
+        Regex::new(r#"import.*from\s+['"]([^'"]+)['"]|require\(['"]([^'"]+)['"]\)"#).unwrap()
+    })
 }
 fn import_go() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();

@@ -8,7 +8,7 @@ use anyhow::Result;
 use std::collections::HashMap;
 
 use provider::{ClaudeProvider, SessionProvider};
-use registry::{category_avg_tokens, classify_command, split_command_chain, Classification};
+use registry::{Classification, category_avg_tokens, classify_command, split_command_chain};
 use report::{DiscoverReport, SupportedEntry, UnsupportedEntry};
 
 /// Aggregation bucket for supported commands.
@@ -222,11 +222,7 @@ pub fn run(
 /// Extract the subcommand from a command string (second word).
 fn extract_subcmd(cmd: &str) -> &str {
     let parts: Vec<&str> = cmd.trim().splitn(3, char::is_whitespace).collect();
-    if parts.len() >= 2 {
-        parts[1]
-    } else {
-        ""
-    }
+    if parts.len() >= 2 { parts[1] } else { "" }
 }
 
 /// Truncate a command for display (keep first meaningful portion).

@@ -389,11 +389,13 @@ mod tests {
 
         // Should create full structure
         assert!(json_content.get("hooks").is_some());
-        assert!(json_content
-            .get("hooks")
-            .unwrap()
-            .get("PreToolUse")
-            .is_some());
+        assert!(
+            json_content
+                .get("hooks")
+                .unwrap()
+                .get("PreToolUse")
+                .is_some()
+        );
 
         let pre_tool_use = json_content["hooks"]["PreToolUse"].as_array().unwrap();
         assert_eq!(pre_tool_use.len(), 1);

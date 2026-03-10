@@ -47,11 +47,13 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
 /// Filter Next.js build output - extract routes, bundles, warnings
 fn bundle_pattern() -> &'static Regex {
     static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"^[○●◐λ✓]\s+([\w/\-.]+)\s+(\d+(?:\.\d+)?)\s*(kB|B)\s+(\d+(?:\.\d+)?)\s*(kB|B)").unwrap())
+    RE.get_or_init(|| {
+        Regex::new(r"^[○●◐λ✓]\s+([\w/\-.]+)\s+(\d+(?:\.\d+)?)\s*(kB|B)\s+(\d+(?:\.\d+)?)\s*(kB|B)")
+            .unwrap()
+    })
 }
 
 fn filter_next_build(output: &str) -> String {
-
     let mut routes_static = 0;
     let mut routes_dynamic = 0;
     let mut routes_total = 0;

@@ -217,10 +217,10 @@ impl Default for TeeConfig {
 
 #[cfg(test)]
 mod tests {
-  use super::*;
-  use std::fs;
+    use super::*;
+    use std::fs;
 
-  #[test]
+    #[test]
     fn test_sanitize_slug() {
         assert_eq!(sanitize_slug("cargo_test"), "cargo_test");
         assert_eq!(sanitize_slug("cargo test"), "cargo_test");

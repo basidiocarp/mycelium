@@ -104,9 +104,17 @@ pub(crate) fn show_summary(
         println!("{}", "─".repeat(table_width));
         println!(
             "{:>3}  {:<cmd_width$}  {:>count_width$}  {:>saved_width$}  {:>6}  {:>time_width$}  {:<impact_width$}",
-            "#", "Command", "Count", "Saved", "Avg%", "Time", "Impact",
-            cmd_width = cmd_width, count_width = count_width,
-            saved_width = saved_width, time_width = time_width,
+            "#",
+            "Command",
+            "Count",
+            "Saved",
+            "Avg%",
+            "Time",
+            "Impact",
+            cmd_width = cmd_width,
+            count_width = count_width,
+            saved_width = saved_width,
+            time_width = time_width,
             impact_width = impact_width
         );
         println!("{}", "─".repeat(table_width));

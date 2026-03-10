@@ -222,9 +222,9 @@ fn action_symbol(action: &str) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-  use super::*;
+    use super::*;
 
-  fn count_tokens(text: &str) -> usize {
+    fn count_tokens(text: &str) -> usize {
         text.split(|c: char| c.is_whitespace() || c == '"' || c == '\'' || c == ',')
             .filter(|s| !s.is_empty())
             .count()

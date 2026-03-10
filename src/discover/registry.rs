@@ -1,6 +1,6 @@
 //! Classifies shell commands against the rule set and rewrites them to Mycelium equivalents.
-use std::sync::OnceLock;
 use regex::{Regex, RegexSet};
+use std::sync::OnceLock;
 
 use super::rules::{IGNORED_EXACT, IGNORED_PREFIXES, PATTERNS, RULES};
 
@@ -48,7 +48,12 @@ fn regex_set() -> &'static RegexSet {
 
 fn compiled() -> &'static Vec<Regex> {
     static RE: OnceLock<Vec<Regex>> = OnceLock::new();
-    RE.get_or_init(|| PATTERNS.iter().map(|p| Regex::new(p).expect("invalid regex")).collect())
+    RE.get_or_init(|| {
+        PATTERNS
+            .iter()
+            .map(|p| Regex::new(p).expect("invalid regex"))
+            .collect()
+    })
 }
 
 fn env_prefix() -> &'static Regex {
@@ -404,11 +409,7 @@ fn rewrite_compound(cmd: &str, excluded: &[String]) -> Option<String> {
     }
     result.push_str(&rewritten);
 
-    if any_changed {
-        Some(result)
-    } else {
-        None
-    }
+    if any_changed { Some(result) } else { None }
 }
 
 /// Rewrite `head -N file` → `mycelium read file --max-lines N`.

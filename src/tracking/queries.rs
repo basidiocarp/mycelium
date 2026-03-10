@@ -8,7 +8,7 @@ use jiff::Timestamp;
 use rusqlite::params;
 
 use super::{
-    project_filter_params, CommandRecord, DayStats, GainSummary, MonthStats, Tracker, WeekStats,
+    CommandRecord, DayStats, GainSummary, MonthStats, Tracker, WeekStats, project_filter_params,
 };
 
 /// A row from the parse health query.

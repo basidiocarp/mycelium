@@ -57,11 +57,7 @@ fn hook_installed_path() -> Option<PathBuf> {
         .join(".claude")
         .join("hooks")
         .join("mycelium-rewrite.sh");
-    if path.exists() {
-        Some(path)
-    } else {
-        None
-    }
+    if path.exists() { Some(path) } else { None }
 }
 
 fn warn_marker_path() -> Option<PathBuf> {

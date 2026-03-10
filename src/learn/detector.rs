@@ -1,6 +1,6 @@
 //! Detects error-then-correction patterns in command execution sequences.
-use std::sync::OnceLock;
 use regex::Regex;
+use std::sync::OnceLock;
 
 /// Classification of CLI error types detected in command output.
 #[derive(Debug, Clone, PartialEq)]
@@ -57,16 +57,18 @@ fn unknown_flag_re() -> &'static Regex {
 
 fn cmd_not_found_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(
+    RE.get_or_init(|| {
+        Regex::new(
         r"(?i)(command not found|not recognized as an internal|no such file or directory.*command)"
-    ).unwrap())
+    ).unwrap()
+    })
 }
 
 fn wrong_path_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(
-        r"(?i)(no such file or directory|cannot find the path|file not found)"
-    ).unwrap())
+    RE.get_or_init(|| {
+        Regex::new(r"(?i)(no such file or directory|cannot find the path|file not found)").unwrap()
+    })
 }
 
 fn missing_arg_re() -> &'static Regex {
@@ -78,9 +80,7 @@ fn missing_arg_re() -> &'static Regex {
 
 fn permission_denied_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(
-        r"(?i)(permission denied|access denied|not permitted)"
-    ).unwrap())
+    RE.get_or_init(|| Regex::new(r"(?i)(permission denied|access denied|not permitted)").unwrap())
 }
 
 // User rejection patterns - NOT actual errors

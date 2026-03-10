@@ -1,7 +1,7 @@
 //! Language-aware code filtering with configurable levels (none, minimal, aggressive).
-use std::sync::OnceLock;
 use regex::Regex;
 use std::str::FromStr;
+use std::sync::OnceLock;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FilterLevel {
@@ -241,9 +241,11 @@ fn import_pattern() -> &'static Regex {
 
 fn func_signature() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(
+    RE.get_or_init(|| {
+        Regex::new(
         r"^(pub\s+)?(async\s+)?(fn|def|function|func|class|struct|enum|trait|interface|type)\s+\w+"
-    ).unwrap())
+    ).unwrap()
+    })
 }
 
 impl FilterStrategy for AggressiveFilter {

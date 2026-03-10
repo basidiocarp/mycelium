@@ -36,7 +36,7 @@ pub(crate) mod utils;
 
 use anyhow::Result;
 use jiff::{SignedDuration, Timestamp};
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 use serde::Serialize;
 
 use utils::{current_project_path_string, get_db_path};

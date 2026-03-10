@@ -1,14 +1,16 @@
 //! Summarizes project dependencies from Cargo.toml, package.json, and requirements.txt.
 use crate::tracking;
 use anyhow::Result;
-use std::sync::OnceLock;
 use regex::Regex;
 use std::fs;
 use std::path::Path;
+use std::sync::OnceLock;
 
 fn cargo_dep_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r#"^([a-zA-Z0-9_-]+)\s*=\s*(?:"([^"]+)"|.*version\s*=\s*"([^"]+)")"#).unwrap())
+    RE.get_or_init(|| {
+        Regex::new(r#"^([a-zA-Z0-9_-]+)\s*=\s*(?:"([^"]+)"|.*version\s*=\s*"([^"]+)")"#).unwrap()
+    })
 }
 fn cargo_section_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();

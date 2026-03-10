@@ -60,8 +60,8 @@ mod utils;
 mod wget_cmd;
 
 use anyhow::Result;
-use clap::error::ErrorKind;
 use clap::Parser;
+use clap::error::ErrorKind;
 
 use commands::Cli;
 
@@ -86,8 +86,8 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::commands::*;
-    use clap::error::ErrorKind;
     use clap::Parser;
+    use clap::error::ErrorKind;
 
     #[test]
     fn test_git_commit_single_message() {

@@ -18,7 +18,9 @@ struct Package {
 #[allow(dead_code)]
 pub fn run(args: &[String], verbose: u8) -> Result<()> {
     if args.is_empty() {
-        anyhow::bail!("mycelium pip: no subcommand specified\nSupported: list, outdated, install, uninstall, show");
+        anyhow::bail!(
+            "mycelium pip: no subcommand specified\nSupported: list, outdated, install, uninstall, show"
+        );
     }
 
     // Detect subcommand

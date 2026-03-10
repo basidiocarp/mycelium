@@ -1,6 +1,6 @@
 //! Pylint JSON output parser, formatter, and generic lint fallback.
 use crate::parser::types::{Diagnostic, DiagnosticReport, DiagnosticSeverity};
-use crate::parser::{emit_passthrough_warning, truncate_output, OutputParser, ParseResult};
+use crate::parser::{OutputParser, ParseResult, emit_passthrough_warning, truncate_output};
 use crate::utils::truncate;
 use serde::Deserialize;
 use std::collections::HashMap;

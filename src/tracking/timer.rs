@@ -5,7 +5,7 @@
 
 use std::time::Instant;
 
-use super::{estimate_tokens, Tracker};
+use super::{Tracker, estimate_tokens};
 
 /// Helper for timing command execution and tracking results.
 ///

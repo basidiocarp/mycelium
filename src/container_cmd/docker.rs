@@ -229,7 +229,9 @@ mod tests {
 
     #[test]
     fn test_compact_ports_many() {
-        let result = compact_ports("0.0.0.0:80->80/tcp, 0.0.0.0:443->443/tcp, 0.0.0.0:8080->8080/tcp, 0.0.0.0:9090->9090/tcp");
+        let result = compact_ports(
+            "0.0.0.0:80->80/tcp, 0.0.0.0:443->443/tcp, 0.0.0.0:8080->8080/tcp, 0.0.0.0:9090->9090/tcp",
+        );
         assert!(result.contains("..."), "should truncate for >3 ports");
     }
 }

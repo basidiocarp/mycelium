@@ -5,8 +5,8 @@
 
 use crate::tracking;
 use anyhow::{Context, Result};
-use std::sync::OnceLock;
 use regex::Regex;
+use std::sync::OnceLock;
 
 const MAX_TABLE_ROWS: usize = 30;
 const MAX_EXPANDED_RECORDS: usize = 20;

@@ -1,7 +1,7 @@
 //! Filter functions for Graphite (gt) CLI output token reduction.
 use crate::utils::{ok_confirmation, truncate};
-use std::sync::OnceLock;
 use regex::Regex;
+use std::sync::OnceLock;
 
 fn email_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
@@ -10,14 +10,20 @@ fn email_re() -> &'static Regex {
 
 fn branch_name_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(
-        r#"(?:Created|Pushed|pushed|Deleted|deleted)\s+branch\s+[`"']?([a-zA-Z0-9/_.\-+@]+)"#
-    ).unwrap())
+    RE.get_or_init(|| {
+        Regex::new(
+            r#"(?:Created|Pushed|pushed|Deleted|deleted)\s+branch\s+[`"']?([a-zA-Z0-9/_.\-+@]+)"#,
+        )
+        .unwrap()
+    })
 }
 
 fn pr_line_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"(Created|Updated)\s+pull\s+request\s+#(\d+)\s+for\s+([^\s:]+)(?::\s*(\S+))?").unwrap())
+    RE.get_or_init(|| {
+        Regex::new(r"(Created|Updated)\s+pull\s+request\s+#(\d+)\s+for\s+([^\s:]+)(?::\s*(\S+))?")
+            .unwrap()
+    })
 }
 
 pub(super) const MAX_LOG_ENTRIES: usize = 15;

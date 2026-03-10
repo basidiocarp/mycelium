@@ -1,6 +1,6 @@
 //! JSON file inspector that shows structure (keys, types, depths) without full values.
 use crate::tracking;
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use serde_json::Value;
 use std::fs;
 use std::io::{self, Read};

@@ -106,31 +106,32 @@ pub fn run_test(command: &str, verbose: u8) -> Result<()> {
 
 fn error_patterns() -> &'static Vec<Regex> {
     static RE: std::sync::OnceLock<Vec<Regex>> = std::sync::OnceLock::new();
-    RE.get_or_init(|| vec![
-        // Generic errors
-        Regex::new(r"(?i)^.*error[\s:\[].*$").unwrap(),
-        Regex::new(r"(?i)^.*\berr\b.*$").unwrap(),
-        Regex::new(r"(?i)^.*warning[\s:\[].*$").unwrap(),
-        Regex::new(r"(?i)^.*\bwarn\b.*$").unwrap(),
-        Regex::new(r"(?i)^.*failed.*$").unwrap(),
-        Regex::new(r"(?i)^.*failure.*$").unwrap(),
-        Regex::new(r"(?i)^.*exception.*$").unwrap(),
-        Regex::new(r"(?i)^.*panic.*$").unwrap(),
-        // Rust specific
-        Regex::new(r"^error\[E\d+]:.*$").unwrap(),
-        Regex::new(r"^\s*--> .*:\d+:\d+$").unwrap(),
-        // Python
-        Regex::new(r"^Traceback.*$").unwrap(),
-        Regex::new(r#"^\s*File ".*", line \d+.*$"#).unwrap(),
-        // JavaScript/TypeScript
-        Regex::new(r"^\s*at .*:\d+:\d+.*$").unwrap(),
-        // Go
-        Regex::new(r"^.*\.go:\d+:.*$").unwrap(),
-    ])
+    RE.get_or_init(|| {
+        vec![
+            // Generic errors
+            Regex::new(r"(?i)^.*error[\s:\[].*$").unwrap(),
+            Regex::new(r"(?i)^.*\berr\b.*$").unwrap(),
+            Regex::new(r"(?i)^.*warning[\s:\[].*$").unwrap(),
+            Regex::new(r"(?i)^.*\bwarn\b.*$").unwrap(),
+            Regex::new(r"(?i)^.*failed.*$").unwrap(),
+            Regex::new(r"(?i)^.*failure.*$").unwrap(),
+            Regex::new(r"(?i)^.*exception.*$").unwrap(),
+            Regex::new(r"(?i)^.*panic.*$").unwrap(),
+            // Rust specific
+            Regex::new(r"^error\[E\d+]:.*$").unwrap(),
+            Regex::new(r"^\s*--> .*:\d+:\d+$").unwrap(),
+            // Python
+            Regex::new(r"^Traceback.*$").unwrap(),
+            Regex::new(r#"^\s*File ".*", line \d+.*$"#).unwrap(),
+            // JavaScript/TypeScript
+            Regex::new(r"^\s*at .*:\d+:\d+.*$").unwrap(),
+            // Go
+            Regex::new(r"^.*\.go:\d+:.*$").unwrap(),
+        ]
+    })
 }
 
 fn filter_errors(output: &str) -> String {
-
     let mut result = Vec::new();
     let mut in_error_block = false;
     let mut blank_count = 0;

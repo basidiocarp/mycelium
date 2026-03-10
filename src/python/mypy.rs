@@ -33,13 +33,12 @@ struct MypyError {
 /// Filter mypy output to group errors by file with error code summaries.
 fn mypy_diag() -> &'static Regex {
     static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
-    RE.get_or_init(|| Regex::new(
-        r"^(.+?):(\d+)(?::\d+)?: (error|warning|note): (.+?)(?:\s+\[(.+)])?$"
-    ).unwrap())
+    RE.get_or_init(|| {
+        Regex::new(r"^(.+?):(\d+)(?::\d+)?: (error|warning|note): (.+?)(?:\s+\[(.+)])?$").unwrap()
+    })
 }
 
 pub fn filter_mypy_output(output: &str) -> String {
-
     let lines: Vec<&str> = output.lines().collect();
     let mut errors: Vec<MypyError> = Vec::new();
     let mut fileless_lines: Vec<String> = Vec::new();

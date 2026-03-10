@@ -10,8 +10,8 @@ use std::path::PathBuf;
 pub use json_patch::{PatchMode, PatchResult};
 
 use claude_md::{
-    patch_claude_md, resolve_claude_dir, upsert_mycelium_block, MyceliumBlockUpsert,
-    MYCELIUM_INSTRUCTIONS, MYCELIUM_SLIM,
+    MYCELIUM_INSTRUCTIONS, MYCELIUM_SLIM, MyceliumBlockUpsert, patch_claude_md, resolve_claude_dir,
+    upsert_mycelium_block,
 };
 use hook::{prepare_hook_paths, write_if_changed};
 use json_patch::{
@@ -40,7 +40,9 @@ pub fn run(
 /// Full uninstall: remove hook, MYCELIUM.md, @MYCELIUM.md reference, settings.json entry
 pub fn uninstall(global: bool, verbose: u8) -> Result<()> {
     if !global {
-        anyhow::bail!("Uninstall only works with --global flag. For local projects, manually remove Mycelium from CLAUDE.md");
+        anyhow::bail!(
+            "Uninstall only works with --global flag. For local projects, manually remove Mycelium from CLAUDE.md"
+        );
     }
 
     let claude_dir = resolve_claude_dir()?;
@@ -250,7 +252,9 @@ pub fn show_config() -> Result<()> {
 
     println!("\nUsage:");
     println!("  mycelium init              # Full injection into local CLAUDE.md");
-    println!("  mycelium init -g           # Hook + MYCELIUM.md + @MYCELIUM.md + settings.json (recommended)");
+    println!(
+        "  mycelium init -g           # Hook + MYCELIUM.md + @MYCELIUM.md + settings.json (recommended)"
+    );
     println!("  mycelium init -g --auto-patch    # Same as above but no prompt");
     println!("  mycelium init -g --no-patch      # Skip settings.json (manual setup)");
     println!("  mycelium init -g --uninstall     # Remove all Mycelium artifacts");

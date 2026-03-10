@@ -5,7 +5,7 @@ mod types;
 
 use crate::discover::provider::{ClaudeProvider, SessionProvider};
 use anyhow::Result;
-use detector::{deduplicate_corrections, find_corrections, CommandExecution};
+use detector::{CommandExecution, deduplicate_corrections, find_corrections};
 use report::{format_console_report, write_rules_file};
 
 /// Scan Claude Code sessions for error-then-correction patterns and report learned rules.

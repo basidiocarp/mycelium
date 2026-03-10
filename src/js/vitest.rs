@@ -4,8 +4,8 @@ use regex::Regex;
 use serde::Deserialize;
 
 use crate::parser::{
-    emit_degradation_warning, emit_passthrough_warning, extract_json_object, truncate_output,
     FormatMode, OutputParser, ParseResult, TestFailure, TestResult, TokenFormatter,
+    emit_degradation_warning, emit_passthrough_warning, extract_json_object, truncate_output,
 };
 use crate::tracking;
 use crate::utils::{package_manager_exec, strip_ansi};
@@ -130,7 +130,6 @@ fn duration_re() -> &'static Regex {
 }
 
 fn extract_stats_regex(output: &str) -> Option<TestResult> {
-
     let clean_output = strip_ansi(output);
 
     let mut passed = 0;

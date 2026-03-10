@@ -7,8 +7,8 @@ use std::ffi::OsString;
 use std::process::Command;
 
 use crate::parser::{
-    emit_degradation_warning, emit_passthrough_warning, FormatMode, OutputParser, ParseResult,
-    TokenFormatter,
+    FormatMode, OutputParser, ParseResult, TokenFormatter, emit_degradation_warning,
+    emit_passthrough_warning,
 };
 use parsers::{PnpmListParser, PnpmOutdatedParser};
 

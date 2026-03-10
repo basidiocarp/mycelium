@@ -1,6 +1,6 @@
 //! ESLint JSON output parser and formatter.
 use crate::parser::types::{Diagnostic, DiagnosticReport, DiagnosticSeverity};
-use crate::parser::{emit_passthrough_warning, truncate_output, OutputParser, ParseResult};
+use crate::parser::{OutputParser, ParseResult, emit_passthrough_warning, truncate_output};
 use crate::utils::truncate;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

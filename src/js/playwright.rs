@@ -6,8 +6,8 @@ use regex::Regex;
 use serde::Deserialize;
 
 use crate::parser::{
-    emit_degradation_warning, emit_passthrough_warning, truncate_output, FormatMode, OutputParser,
-    ParseResult, TestFailure, TestResult, TokenFormatter,
+    FormatMode, OutputParser, ParseResult, TestFailure, TestResult, TokenFormatter,
+    emit_degradation_warning, emit_passthrough_warning, truncate_output,
 };
 
 /// Matches real Playwright JSON reporter output (suites → specs → tests → results)
@@ -171,7 +171,6 @@ fn pw_duration_re() -> &'static Regex {
 }
 
 fn extract_playwright_regex(output: &str) -> Option<TestResult> {
-
     let clean_output = strip_ansi(output);
 
     let mut passed = 0;

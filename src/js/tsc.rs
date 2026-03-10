@@ -72,9 +72,9 @@ impl OutputParser for TscParser {
     fn parse(input: &str) -> ParseResult<DiagnosticReport> {
         fn tsc_error() -> &'static Regex {
             static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
-            RE.get_or_init(|| Regex::new(
-                r"^(.+?)\((\d+),(\d+)\):\s+(error|warning)\s+(TS\d+):\s+(.+)$"
-            ).unwrap())
+            RE.get_or_init(|| {
+                Regex::new(r"^(.+?)\((\d+),(\d+)\):\s+(error|warning)\s+(TS\d+):\s+(.+)$").unwrap()
+            })
         }
 
         let mut diagnostics: Vec<Diagnostic> = Vec::new();

@@ -1,5 +1,5 @@
 //! Serde structs and output parsers for pnpm list and pnpm outdated.
-use crate::parser::{truncate_output, Dependency, DependencyState, OutputParser, ParseResult};
+use crate::parser::{Dependency, DependencyState, OutputParser, ParseResult, truncate_output};
 use serde::Deserialize;
 use std::collections::HashMap;
 
