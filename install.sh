@@ -1,6 +1,6 @@
 #!/bin/sh
-# mycelium installer - https://github.com/mycelium-ai/mycelium
-# Usage: curl -fsSL https://raw.githubusercontent.com/mycelium-ai/mycelium/refs/heads/master/install.sh | sh
+# mycelium installer - https://github.com/basidiocarp/mycelium
+# Usage: curl -fsSL https://raw.githubusercontent.com/basidiocarp/mycelium/refs/heads/master/install.sh | sh
 
 set -e
 

@@ -14,7 +14,8 @@ pub enum PatchMode {
     Skip, // --no-patch: manual instructions
 }
 
-/// Result of settings.json patching operation
+/// Result of settings.json patching operation — Unix-only (hook install is Unix-only)
+#[cfg(unix)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PatchResult {
     Patched,        // Hook was added successfully
@@ -24,7 +25,8 @@ pub enum PatchResult {
 }
 
 /// Orchestrator: patch settings.json with Mycelium hook
-/// Handles reading, checking, prompting, merging, backing up, and atomic writing
+/// Handles reading, checking, prompting, merging, backing up, and atomic writing — Unix-only
+#[cfg(unix)]
 pub(crate) fn patch_settings_json(
     hook_path: &Path,
     mode: PatchMode,
@@ -108,7 +110,8 @@ pub(crate) fn patch_settings_json(
 
 /// Prompt user for consent to patch settings.json
 /// Prints to stderr (stdout may be piped), reads from stdin
-/// Default is No (capital N)
+/// Default is No (capital N) — Unix-only
+#[cfg(unix)]
 fn prompt_user_consent(settings_path: &Path) -> Result<bool> {
     use std::io::{self, BufRead, IsTerminal};
 
@@ -131,7 +134,8 @@ fn prompt_user_consent(settings_path: &Path) -> Result<bool> {
     Ok(response == "y" || response == "yes")
 }
 
-/// Print manual instructions for settings.json patching
+/// Print manual instructions for settings.json patching — Unix-only
+#[cfg(unix)]
 fn print_manual_instructions(hook_path: &Path) {
     println!("\n  MANUAL STEP: Add this to ~/.claude/settings.json:");
     println!("  {{");
@@ -177,7 +181,8 @@ pub(crate) fn clean_double_blanks(content: &str) -> String {
 }
 
 /// Deep-merge Mycelium hook entry into settings.json
-/// Creates hooks.PreToolUse structure if missing, preserves existing hooks
+/// Creates hooks.PreToolUse structure if missing, preserves existing hooks — Unix-only
+#[cfg(unix)]
 pub(crate) fn insert_hook_entry(root: &mut serde_json::Value, hook_command: &str) {
     // Ensure root is an object
     let root_obj = match root.as_object_mut() {

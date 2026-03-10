@@ -8,8 +8,8 @@ mycelium filters and compresses command outputs before they reach your LLM conte
 Mycelium is part of a fungal-themed suite of developer tools, named after the biology of fungi — a fitting metaphor for software that works quietly underground to connect and support what's above.
 
 - **mycelium** — the vast underground network of filaments that feeds and connects. This tool: the connective tissue between your LLM and your dev environment, silently filtering everything that flows through.
-- **[hyphae](https://github.com/gmovillanueva/hyphae)** — the individual thread-like filaments that form mycelium. Fine-grained instrumentation and tracing.
-- **[cap](https://github.com/gmovillanueva/cap)** — the visible fruiting body above ground. The surface layer: dashboards, analytics, the part you actually see.
+- **[hyphae](https://github.com/basidiocarp/hyphae)** — the individual thread-like filaments that form mycelium. Fine-grained instrumentation and tracing.
+- **[cap](https://github.com/basidiocarp/cap)** — the visible fruiting body above ground. The surface layer: dashboards, analytics, the part you actually see.
 
 The tooling is written in Rust — a language that shares its name with another form of fungal life. Coincidence, but a good one.
 
@@ -60,7 +60,7 @@ cargo install --git
 
 ### Pre-built Binaries
 
-Download from [releases](https://github.com/):
+Download from [releases](https://github.com/basidiocarp/mycelium):
 - macOS: `mycelium-x86_64-apple-darwin.tar.gz` / `mycelium-aarch64-apple-darwin.tar.gz`
 - Linux: `mycelium-x86_64-unknown-linux-musl.tar.gz` / `mycelium-aarch64-unknown-linux-gnu.tar.gz`
 - Windows: `mycelium-x86_64-pc-windows-msvc.zip`

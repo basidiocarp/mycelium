@@ -199,10 +199,12 @@ fn is_secure(_path: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
     use std::io::Write;
 
     // ── helpers ────────────────────────────────────────────────────────────────
 
+    #[cfg(unix)]
     fn find_in(dir: &Path, command: &str) -> Option<PathBuf> {
         let config = PluginConfig {
             enabled: true,
@@ -310,9 +312,11 @@ mod tests {
 
         let dir = tempfile::tempdir().expect("temp dir");
         let script = dir.path().join("upper.sh");
-        let mut f = std::fs::File::create(&script).expect("create");
-        writeln!(f, "#!/bin/sh").unwrap();
-        writeln!(f, "tr '[:lower:]' '[:upper:]'").unwrap();
+        {
+            let mut f = std::fs::File::create(&script).expect("create");
+            writeln!(f, "#!/bin/sh").unwrap();
+            writeln!(f, "tr '[:lower:]' '[:upper:]'").unwrap();
+        } // drop f before exec to avoid ETXTBSY on Linux
         std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
 
         let result = run_plugin(&script, "hello world");
@@ -347,9 +351,11 @@ mod tests {
 
         let dir = tempfile::tempdir().expect("temp dir");
         let script = dir.path().join("echo_back.sh");
-        let mut f = std::fs::File::create(&script).expect("create");
-        writeln!(f, "#!/bin/sh").unwrap();
-        writeln!(f, "cat").unwrap(); // echo stdin to stdout
+        {
+            let mut f = std::fs::File::create(&script).expect("create");
+            writeln!(f, "#!/bin/sh").unwrap();
+            writeln!(f, "cat").unwrap(); // echo stdin to stdout
+        } // drop f before exec to avoid ETXTBSY on Linux
         std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
 
         let result = run_plugin(&script, "token data").unwrap();

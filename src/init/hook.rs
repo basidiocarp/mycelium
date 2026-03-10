@@ -5,14 +5,14 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use tempfile::NamedTempFile;
 
-use crate::integrity;
-
 use super::claude_md::resolve_claude_dir;
 
-// Embedded hook script (guards before set -euo pipefail)
+// Embedded hook script (guards before set -euo pipefail) — Unix-only (bash)
+#[cfg(unix)]
 pub(crate) const REWRITE_HOOK: &str = include_str!("../../hooks/mycelium-rewrite.sh");
 
-/// Prepare hook directory and return paths (hook_dir, hook_path)
+/// Prepare hook directory and return paths (hook_dir, hook_path) — Unix-only
+#[cfg(unix)]
 pub(crate) fn prepare_hook_paths() -> Result<(PathBuf, PathBuf)> {
     let claude_dir = resolve_claude_dir()?;
     let hook_dir = claude_dir.join("hooks");
@@ -59,6 +59,7 @@ pub(crate) fn ensure_hook_installed(hook_path: &Path, verbose: u8) -> Result<boo
     // Store SHA-256 hash for runtime integrity verification.
     // Always store (idempotent) to ensure baseline exists even for
     // hooks installed before integrity checks were added.
+    use crate::integrity;
     integrity::store_hash(hook_path)
         .with_context(|| format!("Failed to store integrity hash for {}", hook_path.display()))?;
     if verbose > 0 && changed {
@@ -68,7 +69,8 @@ pub(crate) fn ensure_hook_installed(hook_path: &Path, verbose: u8) -> Result<boo
     Ok(changed)
 }
 
-/// Idempotent file write: create or update if content differs
+/// Idempotent file write: create or update if content differs — Unix-only
+#[cfg(unix)]
 pub(crate) fn write_if_changed(
     path: &Path,
     content: &str,
@@ -138,6 +140,7 @@ mod tests {
     use tempfile::TempDir;
 
     #[test]
+    #[cfg(unix)]
     fn test_hook_has_guards() {
         assert!(REWRITE_HOOK.contains("command -v mycelium"));
         assert!(REWRITE_HOOK.contains("command -v jq"));

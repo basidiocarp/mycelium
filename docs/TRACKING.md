@@ -362,7 +362,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Install Mycelium
-        run: cargo install --git https://github.com/OWNER/mycelium
+        run: cargo install --git https://github.com/basidiocarp/mycelium
 
       - name: Export weekly stats
         run: |
@@ -437,7 +437,7 @@ if __name__ == "__main__":
 ```rust
 // In your Cargo.toml
 // [dependencies]
-// mycelium = { git = "https://github.com/OWNER/mycelium" }
+// mycelium = { git = "https://github.com/basidiocarp/mycelium" }
 
 use mycelium::tracking::{Tracker, TimedExecution};
 use anyhow::Result;
