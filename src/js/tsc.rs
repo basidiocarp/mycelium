@@ -53,7 +53,12 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
     let raw_label = format!("{} {}", cmd, args.join(" "));
     let mycelium_label = format!("mycelium tsc {}", args.join(" "));
     timer.track_with_parse_info(
-      &raw_label, &mycelium_label, &raw, &filtered, parse_tier, "compact",
+        &raw_label,
+        &mycelium_label,
+        &raw,
+        &filtered,
+        parse_tier,
+        "compact",
     );
 
     if exit_code != 0 {

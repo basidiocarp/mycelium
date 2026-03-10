@@ -36,7 +36,6 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Commands {
     // ── Files & Search ──────────────────────────────────────────────────────
-
     /// List directory contents with token-optimized output (proxy to native ls)
     #[command(display_order = 10)]
     Ls {
@@ -128,7 +127,6 @@ pub enum Commands {
     },
 
     // ── VCS & Code Review ────────────────────────────────────────────────────
-
     /// Git commands with compact output
     #[command(display_order = 20)]
     Git {
@@ -183,7 +181,6 @@ pub enum Commands {
     },
 
     // ── Build & Compile ──────────────────────────────────────────────────────
-
     /// Cargo commands with compact output
     #[command(display_order = 30)]
     Cargo {
@@ -215,7 +212,6 @@ pub enum Commands {
     },
 
     // ── Lint & Format ────────────────────────────────────────────────────────
-
     /// ESLint with grouped rule violations
     #[command(display_order = 40)]
     Lint {
@@ -264,7 +260,6 @@ pub enum Commands {
     },
 
     // ── Test ─────────────────────────────────────────────────────────────────
-
     /// Run tests and show only failures (generic wrapper — use specific runners when available)
     #[command(display_order = 50)]
     Test {
@@ -297,7 +292,6 @@ pub enum Commands {
     },
 
     // ── Package Managers ─────────────────────────────────────────────────────
-
     /// pnpm commands with ultra-compact output
     #[command(display_order = 60)]
     Pnpm {
@@ -329,7 +323,6 @@ pub enum Commands {
     },
 
     // ── Databases & APIs ─────────────────────────────────────────────────────
-
     /// PostgreSQL client with compact output (strip borders, compress tables)
     #[command(display_order = 70)]
     Psql {
@@ -367,7 +360,6 @@ pub enum Commands {
     },
 
     // ── Infrastructure ───────────────────────────────────────────────────────
-
     /// Docker commands with compact output
     #[command(display_order = 80)]
     Docker {
@@ -397,7 +389,6 @@ pub enum Commands {
     },
 
     // ── Logs & Data ──────────────────────────────────────────────────────────
-
     /// Show JSON structure without values
     #[command(display_order = 90)]
     Json {
@@ -451,7 +442,6 @@ pub enum Commands {
     },
 
     // ── Analytics ────────────────────────────────────────────────────────────
-
     /// Show token savings summary and history
     #[command(display_order = 100)]
     Gain {
@@ -540,7 +530,6 @@ pub enum Commands {
     },
 
     // ── Setup ────────────────────────────────────────────────────────────────
-
     /// Initialize mycelium instructions in CLAUDE.md
     #[command(display_order = 110)]
     Init {
@@ -613,7 +602,6 @@ pub enum Commands {
     },
 
     // ── Hidden (internal/debug) ──────────────────────────────────────────────
-
     /// Word/line/byte count with compact output (strips paths and padding)
     #[command(hide = true)]
     Wc {
