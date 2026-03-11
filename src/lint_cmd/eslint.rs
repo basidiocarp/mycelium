@@ -135,7 +135,7 @@ pub fn filter_eslint_json(output: &str) -> String {
     }
     let mut file_list: Vec<(&str, usize)> = by_file.iter().map(|(f, ds)| (*f, ds.len())).collect();
     file_list.sort_by(|a, b| match b.1.cmp(&a.1) {
-        std::cmp::Ordering::Equal => a.0.cmp(&b.0),
+        std::cmp::Ordering::Equal => a.0.cmp(b.0),
         other => other,
     });
 
@@ -150,7 +150,7 @@ pub fn filter_eslint_json(output: &str) -> String {
         }
         let mut file_rule_counts: Vec<_> = file_rules.iter().collect();
         file_rule_counts.sort_by(|a, b| match b.1.cmp(a.1) {
-            std::cmp::Ordering::Equal => a.0.cmp(&b.0),
+            std::cmp::Ordering::Equal => a.0.cmp(b.0),
             other => other,
         });
         for (rule, count) in file_rule_counts.iter().take(3) {

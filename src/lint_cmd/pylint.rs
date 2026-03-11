@@ -144,7 +144,7 @@ pub fn filter_pylint_json(output: &str) -> String {
     }
     let mut file_list: Vec<(&str, usize)> = by_file.iter().map(|(f, ds)| (*f, ds.len())).collect();
     file_list.sort_by(|a, b| match b.1.cmp(&a.1) {
-        std::cmp::Ordering::Equal => a.0.cmp(&b.0),
+        std::cmp::Ordering::Equal => a.0.cmp(b.0),
         other => other,
     });
 
@@ -159,7 +159,7 @@ pub fn filter_pylint_json(output: &str) -> String {
         }
         let mut file_code_counts: Vec<_> = file_codes.iter().collect();
         file_code_counts.sort_by(|a, b| match b.1.cmp(a.1) {
-            std::cmp::Ordering::Equal => a.0.cmp(&b.0),
+            std::cmp::Ordering::Equal => a.0.cmp(b.0),
             other => other,
         });
         for (code, count) in file_code_counts.iter().take(3) {

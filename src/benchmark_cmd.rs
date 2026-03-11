@@ -295,7 +295,7 @@ fn current_binary() -> Result<String> {
 }
 
 fn estimate_tokens(text: &str) -> usize {
-    (text.len() + 3) / 4
+    text.len().div_ceil(4)
 }
 
 fn run_shell(cmd: &str) -> String {
