@@ -62,7 +62,7 @@ Download from [releases](https://github.com/basidiocarp/mycelium):
 ### Verify Installation
 
 ```bash
-mycelium --version   # Should show "mycelium 0.1.2"
+mycelium --version   # Should show "mycelium 0.1.4"
 mycelium gain        # Should show token savings stats
 ```
 ## Quick Start
