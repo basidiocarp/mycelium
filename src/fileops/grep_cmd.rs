@@ -52,7 +52,7 @@ pub fn run(
                 eprintln!("{}", stderr.trim());
             }
         }
-        let msg = format!("🔍 0 for '{}'", pattern);
+        let msg = format!("0 for '{}'", pattern);
         println!("{}", msg);
         if exit_code != 0 {
             std::process::exit(exit_code);
@@ -86,7 +86,7 @@ pub fn run(
         grouper.add(&file_display, line_num, &cleaned);
     }
 
-    println!("🔍 {} in {}:", total, grouper.file_count());
+    println!("{} in {}:", total, grouper.file_count());
     println!("{}", grouper.format());
 
     if total > max_results {

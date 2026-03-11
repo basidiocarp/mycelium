@@ -70,11 +70,98 @@ cargo clippy --all-targets --quiet 2>/dev/null || die "cargo clippy failed"
 cargo test --quiet 2>/dev/null || die "cargo test failed"
 info "All checks passed"
 
+# ── Generate changelog ─────────────────────────────────────────────────────
+
+PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+
+if [ -n "$PREV_TAG" ]; then
+    RANGE="${PREV_TAG}..HEAD"
+    info "Generating changelog from ${BOLD}$PREV_TAG${RESET} to HEAD"
+else
+    RANGE="HEAD"
+    info "Generating changelog from initial commit"
+fi
+
+# Group commits by conventional commit type
+CHANGELOG=""
+
+add_section() {
+    local title="$1" prefix="$2"
+    local commits
+    commits=$(git log "$RANGE" --pretty=format:"%s|%h" --no-merges | grep -E "^${prefix}" | while IFS='|' read -r msg hash; do
+        # Strip type prefix for cleaner display
+        desc=$(echo "$msg" | sed -E "s/^${prefix}:?\s*//")
+        echo "- ${desc} (\`${hash}\`)"
+    done)
+    if [ -n "$commits" ]; then
+        CHANGELOG="${CHANGELOG}### ${title}\n${commits}\n\n"
+    fi
+}
+
+add_section "Features" "feat"
+add_section "Bug Fixes" "fix"
+add_section "Performance" "perf"
+add_section "Refactoring" "refactor"
+add_section "Documentation" "docs"
+add_section "Tests" "test"
+add_section "Chores" "chore"
+add_section "CI" "ci"
+
+# Catch any commits that don't match conventional format
+OTHER=$(git log "$RANGE" --pretty=format:"%s|%h" --no-merges | grep -vE "^(feat|fix|perf|refactor|docs|test|chore|ci)" | while IFS='|' read -r msg hash; do
+    echo "- ${msg} (\`${hash}\`)"
+done)
+if [ -n "$OTHER" ]; then
+    CHANGELOG="${CHANGELOG}### Other\n${OTHER}\n\n"
+fi
+
+if [ -z "$CHANGELOG" ]; then
+    CHANGELOG="No changes since last release.\n"
+fi
+
+RELEASE_NOTES="## v${VERSION}\n\n${CHANGELOG}"
+
+info "Changelog:"
+echo ""
+echo -e "$RELEASE_NOTES"
+
+# Write CHANGELOG.md (prepend to existing or create new)
+CHANGELOG_FILE="CHANGELOG.md"
+FORMATTED_NOTES=$(echo -e "$RELEASE_NOTES")
+
+if [ -f "$CHANGELOG_FILE" ]; then
+    # Prepend new release notes after the header
+    if head -1 "$CHANGELOG_FILE" | grep -q "^# Changelog"; then
+        # Has header — insert after it
+        {
+            head -1 "$CHANGELOG_FILE"
+            echo ""
+            echo "$FORMATTED_NOTES"
+            tail -n +2 "$CHANGELOG_FILE"
+        } > "${CHANGELOG_FILE}.tmp" && mv "${CHANGELOG_FILE}.tmp" "$CHANGELOG_FILE"
+    else
+        # No header — prepend with header
+        {
+            echo "# Changelog"
+            echo ""
+            echo "$FORMATTED_NOTES"
+            cat "$CHANGELOG_FILE"
+        } > "${CHANGELOG_FILE}.tmp" && mv "${CHANGELOG_FILE}.tmp" "$CHANGELOG_FILE"
+    fi
+else
+    {
+        echo "# Changelog"
+        echo ""
+        echo "$FORMATTED_NOTES"
+    } > "$CHANGELOG_FILE"
+fi
+info "Updated ${BOLD}$CHANGELOG_FILE${RESET}"
+
 # ── Commit & tag ────────────────────────────────────────────────────────────
 
-git add Cargo.toml Cargo.lock
+git add Cargo.toml Cargo.lock "$CHANGELOG_FILE"
 git commit -m "chore: bump version to v$VERSION"
-git tag -a "v$VERSION" -m "Release v$VERSION"
+git tag -a "v$VERSION" -m "$(echo -e "Release v$VERSION\n\n$FORMATTED_NOTES")"
 
 info "Created commit and tag ${BOLD}v$VERSION${RESET}"
 

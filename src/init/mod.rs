@@ -127,7 +127,7 @@ pub fn show_config() -> Result<()> {
     let global_claude_md = claude_dir.join("CLAUDE.md");
     let local_claude_md = PathBuf::from("CLAUDE.md");
 
-    println!("📋 mycelium Configuration:\n");
+    println!("mycelium Configuration:\n");
 
     // Check hook
     if hook_path.exists() {
@@ -146,12 +146,12 @@ pub fn show_config() -> Result<()> {
 
             if !is_executable {
                 println!(
-                    "⚠️  Hook: {} (NOT executable - run: chmod +x)",
+                    "[!] Hook: {} (NOT executable - run: chmod +x)",
                     hook_path.display()
                 );
             } else if !is_thin_delegator {
                 println!(
-                    "⚠️  Hook: {} (outdated — inline logic, not thin delegator)",
+                    "[!] Hook: {} (outdated — inline logic, not thin delegator)",
                     hook_path.display()
                 );
                 println!(
@@ -159,47 +159,49 @@ pub fn show_config() -> Result<()> {
                 );
             } else if is_executable && has_guards {
                 println!(
-                    "✅ Hook: {} (thin delegator, version {})",
+                    "ok Hook: {} (thin delegator, version {})",
                     hook_path.display(),
                     hook_version
                 );
             } else {
-                println!("⚠️  Hook: {} (no guards - outdated)", hook_path.display());
+                println!("[!] Hook: {} (no guards - outdated)", hook_path.display());
             }
         }
 
         #[cfg(not(unix))]
         {
-            println!("✅ Hook: {} (exists)", hook_path.display());
+            println!("ok Hook: {} (exists)", hook_path.display());
         }
     } else {
-        println!("⚪ Hook: not found");
+        println!("- Hook: not found");
     }
 
     // Check MYCELIUM.md
     if mycelium_md_path.exists() {
-        println!("✅ MYCELIUM.md: {} (slim mode)", mycelium_md_path.display());
+        println!("ok MYCELIUM.md: {} (slim mode)", mycelium_md_path.display());
     } else {
-        println!("⚪ MYCELIUM.md: not found");
+        println!("- MYCELIUM.md: not found");
     }
 
     // Check hook integrity
     match crate::integrity::verify_hook_at(&hook_path) {
         Ok(crate::integrity::IntegrityStatus::Verified) => {
-            println!("✅ Integrity: hook hash verified");
+            println!("ok Integrity: hook hash verified");
         }
         Ok(crate::integrity::IntegrityStatus::Tampered { .. }) => {
-            println!("❌ Integrity: hook modified outside mycelium init (run: mycelium verify)");
+            println!(
+                "error: Integrity: hook modified outside mycelium init (run: mycelium verify)"
+            );
         }
         Ok(crate::integrity::IntegrityStatus::NoBaseline) => {
-            println!("⚠️  Integrity: no baseline hash (run: mycelium init -g to establish)");
+            println!("[!] Integrity: no baseline hash (run: mycelium init -g to establish)");
         }
         Ok(crate::integrity::IntegrityStatus::NotInstalled)
         | Ok(crate::integrity::IntegrityStatus::OrphanedHash) => {
             // Don't show integrity line if hook isn't installed
         }
         Err(_) => {
-            println!("⚠️  Integrity: check failed");
+            println!("[!] Integrity: check failed");
         }
     }
 
@@ -207,28 +209,28 @@ pub fn show_config() -> Result<()> {
     if global_claude_md.exists() {
         let content = fs::read_to_string(&global_claude_md)?;
         if content.contains("@MYCELIUM.md") {
-            println!("✅ Global (~/.claude/CLAUDE.md): @MYCELIUM.md reference");
+            println!("ok Global (~/.claude/CLAUDE.md): @MYCELIUM.md reference");
         } else if content.contains("<!-- mycelium-instructions") {
             println!(
-                "⚠️  Global (~/.claude/CLAUDE.md): old Mycelium block (run: mycelium init -g to migrate)"
+                "[!] Global (~/.claude/CLAUDE.md): old Mycelium block (run: mycelium init -g to migrate)"
             );
         } else {
-            println!("⚪ Global (~/.claude/CLAUDE.md): exists but mycelium not configured");
+            println!("- Global (~/.claude/CLAUDE.md): exists but mycelium not configured");
         }
     } else {
-        println!("⚪ Global (~/.claude/CLAUDE.md): not found");
+        println!("- Global (~/.claude/CLAUDE.md): not found");
     }
 
     // Check local CLAUDE.md
     if local_claude_md.exists() {
         let content = fs::read_to_string(&local_claude_md)?;
         if content.contains("mycelium") {
-            println!("✅ Local (./CLAUDE.md): mycelium enabled");
+            println!("ok Local (./CLAUDE.md): mycelium enabled");
         } else {
-            println!("⚪ Local (./CLAUDE.md): exists but mycelium not configured");
+            println!("- Local (./CLAUDE.md): exists but mycelium not configured");
         }
     } else {
-        println!("⚪ Local (./CLAUDE.md): not found");
+        println!("- Local (./CLAUDE.md): not found");
     }
 
     // Check settings.json
@@ -239,19 +241,19 @@ pub fn show_config() -> Result<()> {
             if let Ok(root) = serde_json::from_str::<serde_json::Value>(&content) {
                 let hook_command = hook_path.display().to_string();
                 if hook_already_present(&root, &hook_command) {
-                    println!("✅ settings.json: Mycelium hook configured");
+                    println!("ok settings.json: Mycelium hook configured");
                 } else {
-                    println!("⚠️  settings.json: exists but Mycelium hook not configured");
+                    println!("[!] settings.json: exists but Mycelium hook not configured");
                     println!("    Run: mycelium init -g --auto-patch");
                 }
             } else {
-                println!("⚠️  settings.json: exists but invalid JSON");
+                println!("[!] settings.json: exists but invalid JSON");
             }
         } else {
-            println!("⚪ settings.json: empty");
+            println!("- settings.json: empty");
         }
     } else {
-        println!("⚪ settings.json: not found");
+        println!("- settings.json: not found");
     }
 
     println!("\nUsage:");
@@ -273,7 +275,7 @@ pub fn show_config() -> Result<()> {
 /// Default mode: hook + slim MYCELIUM.md + @MYCELIUM.md reference
 #[cfg(not(unix))]
 fn run_default_mode(_global: bool, _patch_mode: PatchMode, _verbose: u8) -> Result<()> {
-    eprintln!("⚠️  Hook-based mode requires Unix (macOS/Linux).");
+    eprintln!("[!] Hook-based mode requires Unix (macOS/Linux).");
     eprintln!("    Windows: use --claude-md mode for full injection.");
     eprintln!("    Falling back to --claude-md mode.");
     run_claude_md_mode(_global, _verbose)
@@ -315,7 +317,7 @@ fn run_default_mode(global: bool, patch_mode: PatchMode, verbose: u8) -> Result<
     println!("  CLAUDE.md: @MYCELIUM.md reference added");
 
     if migrated {
-        println!("\n  ✅ Migrated: removed 137-line Mycelium block from CLAUDE.md");
+        println!("\n  ok Migrated: removed 137-line Mycelium block from CLAUDE.md");
         println!("              replaced with @MYCELIUM.md (10 lines)");
     }
 
@@ -350,7 +352,7 @@ fn run_hook_only_mode(_global: bool, _patch_mode: PatchMode, _verbose: u8) -> Re
 #[cfg(unix)]
 fn run_hook_only_mode(global: bool, patch_mode: PatchMode, verbose: u8) -> Result<()> {
     if !global {
-        eprintln!("⚠️  Warning: --hook-only only makes sense with --global");
+        eprintln!("[!] Warning: --hook-only only makes sense with --global");
         eprintln!("    For local projects, use default mode or --claude-md");
         return Ok(());
     }
@@ -417,24 +419,24 @@ fn run_claude_md_mode(global: bool, verbose: u8) -> Result<()> {
             MyceliumBlockUpsert::Added => {
                 fs::write(&path, new_content)?;
                 println!(
-                    "✅ Added mycelium instructions to existing {}",
+                    "ok Added mycelium instructions to existing {}",
                     path.display()
                 );
             }
             MyceliumBlockUpsert::Updated => {
                 fs::write(&path, new_content)?;
-                println!("✅ Updated mycelium instructions in {}", path.display());
+                println!("ok Updated mycelium instructions in {}", path.display());
             }
             MyceliumBlockUpsert::Unchanged => {
                 println!(
-                    "✅ {} already contains up-to-date mycelium instructions",
+                    "ok {} already contains up-to-date mycelium instructions",
                     path.display()
                 );
                 return Ok(());
             }
             MyceliumBlockUpsert::Malformed => {
                 eprintln!(
-                    "⚠️  Warning: Found '<!-- mycelium-instructions' without closing marker in {}",
+                    "[!] Warning: Found '<!-- mycelium-instructions' without closing marker in {}",
                     path.display()
                 );
 
@@ -457,7 +459,7 @@ fn run_claude_md_mode(global: bool, verbose: u8) -> Result<()> {
         }
     } else {
         fs::write(&path, MYCELIUM_INSTRUCTIONS)?;
-        println!("✅ Created {} with mycelium instructions", path.display());
+        println!("ok Created {} with mycelium instructions", path.display());
     }
 
     if global {

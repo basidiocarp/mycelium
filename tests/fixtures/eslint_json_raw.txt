@@ -1,0 +1,52 @@
+[
+  {
+    "filePath": "/project/src/components/Button.tsx",
+    "messages": [
+      {"line": 5, "column": 3, "severity": 2, "message": "Unexpected var, use let or const instead.", "ruleId": "no-var"},
+      {"line": 12, "column": 1, "severity": 1, "message": "Missing semicolon.", "ruleId": "semi"},
+      {"line": 23, "column": 15, "severity": 2, "message": "'undefined' is not allowed.", "ruleId": "no-undefined"}
+    ],
+    "errorCount": 2,
+    "warningCount": 1
+  },
+  {
+    "filePath": "/project/src/utils/helpers.ts",
+    "messages": [
+      {"line": 8, "column": 5, "severity": 1, "message": "Unexpected console statement.", "ruleId": "no-console"},
+      {"line": 45, "column": 10, "severity": 2, "message": "Expected '===' and instead saw '=='.", "ruleId": "eqeqeq"},
+      {"line": 67, "column": 1, "severity": 1, "message": "Trailing spaces not allowed.", "ruleId": "no-trailing-spaces"}
+    ],
+    "errorCount": 1,
+    "warningCount": 2
+  },
+  {
+    "filePath": "/project/src/api/client.ts",
+    "messages": [
+      {"line": 15, "column": 8, "severity": 2, "message": "Parsing error: Unexpected token.", "ruleId": null},
+      {"line": 30, "column": 3, "severity": 2, "message": "'require' is not defined.", "ruleId": "no-undef"}
+    ],
+    "errorCount": 2,
+    "warningCount": 0
+  },
+  {
+    "filePath": "/project/src/hooks/useData.ts",
+    "messages": [
+      {"line": 3, "column": 1, "severity": 1, "message": "Import/no-extraneous-dependencies.", "ruleId": "import/no-extraneous-dependencies"},
+      {"line": 18, "column": 7, "severity": 2, "message": "React Hook useEffect has a missing dependency.", "ruleId": "react-hooks/exhaustive-deps"},
+      {"line": 25, "column": 12, "severity": 1, "message": "Prefer const over let for declaration.", "ruleId": "prefer-const"},
+      {"line": 42, "column": 5, "severity": 2, "message": "Unexpected any. Specify a different type.", "ruleId": "@typescript-eslint/no-explicit-any"}
+    ],
+    "errorCount": 2,
+    "warningCount": 2
+  },
+  {
+    "filePath": "/project/src/pages/index.tsx",
+    "messages": [
+      {"line": 1, "column": 1, "severity": 1, "message": "File must begin with a comment.", "ruleId": "header/header"},
+      {"line": 9, "column": 20, "severity": 2, "message": "Do not use Array index in keys.", "ruleId": "react/no-array-index-key"},
+      {"line": 33, "column": 4, "severity": 1, "message": "JSX not allowed in files with extension .tsx.", "ruleId": "react/jsx-filename-extension"}
+    ],
+    "errorCount": 1,
+    "warningCount": 2
+  }
+]

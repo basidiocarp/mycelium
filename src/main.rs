@@ -1,5 +1,6 @@
 //! Mycelium CLI entry point — parses arguments and dispatches to command handlers.
 mod aws_cmd;
+mod benchmark_cmd;
 mod cargo_cmd;
 mod cargo_filters;
 mod cc_economics;
@@ -46,6 +47,7 @@ mod lint_cmd;
 mod local_llm;
 mod parser;
 mod plugin;
+mod plugin_cmd;
 mod psql_cmd;
 mod python;
 mod rewrite_cmd;

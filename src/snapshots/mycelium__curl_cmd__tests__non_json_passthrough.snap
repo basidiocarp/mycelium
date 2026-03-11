@@ -1,0 +1,6 @@
+---
+source: src/curl_cmd.rs
+assertion_line: 147
+expression: output
+---
+<html><body><h1>Hello World</h1><p>This is a plain text response.</p></body></html>

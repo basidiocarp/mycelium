@@ -25,7 +25,7 @@ pub fn format_duration(ms: u64) -> String {
 
 /// Trait for period-based statistics that can be displayed in tables
 pub trait PeriodStats {
-    /// Icon for this period type (e.g., "📅", "📊", "📆")
+    /// Icon for this period type (e.g., "daily", "weekly", "monthly")
     fn icon() -> &'static str;
 
     /// Label for this period type (e.g., "Daily", "Weekly", "Monthly")
@@ -147,7 +147,7 @@ pub fn print_period_table<T: PeriodStats>(data: &[T]) {
 
 impl PeriodStats for DayStats {
     fn icon() -> &'static str {
-        "📅"
+        "daily"
     }
 
     fn label() -> &'static str {
@@ -197,7 +197,7 @@ impl PeriodStats for DayStats {
 
 impl PeriodStats for WeekStats {
     fn icon() -> &'static str {
-        "📊"
+        "weekly"
     }
 
     fn label() -> &'static str {
@@ -257,7 +257,7 @@ impl PeriodStats for WeekStats {
 
 impl PeriodStats for MonthStats {
     fn icon() -> &'static str {
-        "📆"
+        "monthly"
     }
 
     fn label() -> &'static str {
@@ -326,7 +326,7 @@ mod tests {
         assert_eq!(day.commands(), 10);
         assert_eq!(day.saved_tokens(), 200);
         assert_eq!(day.avg_time_ms(), 150);
-        assert_eq!(DayStats::icon(), "📅");
+        assert_eq!(DayStats::icon(), "daily");
         assert_eq!(DayStats::label(), "Daily");
     }
 
@@ -346,7 +346,7 @@ mod tests {
 
         assert_eq!(week.period(), "01-20 → 01-26");
         assert_eq!(week.avg_time_ms(), 100);
-        assert_eq!(WeekStats::icon(), "📊");
+        assert_eq!(WeekStats::icon(), "weekly");
         assert_eq!(WeekStats::label(), "Weekly");
     }
 
@@ -365,7 +365,7 @@ mod tests {
 
         assert_eq!(month.period(), "2026-01");
         assert_eq!(month.avg_time_ms(), 100);
-        assert_eq!(MonthStats::icon(), "📆");
+        assert_eq!(MonthStats::icon(), "monthly");
         assert_eq!(MonthStats::label(), "Monthly");
     }
 

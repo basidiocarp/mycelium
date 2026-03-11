@@ -1,0 +1,14 @@
+[
+  {"type": "error", "module": "src.api.client", "obj": "get_user", "line": 45, "column": 4, "message": "Undefined variable 'user_id'", "symbol": "undefined-variable", "message-id": "E0602", "path": "src/api/client.py"},
+  {"type": "error", "module": "src.api.client", "obj": "create_session", "line": 78, "column": 12, "message": "Instance of 'NoneType' has no 'connect' member", "symbol": "no-member", "message-id": "E1101", "path": "src/api/client.py"},
+  {"type": "warning", "module": "src.models.user", "obj": "User", "line": 23, "column": 0, "message": "Class 'User' has no '__init__' method", "symbol": "no-init", "message-id": "W0232", "path": "src/models/user.py"},
+  {"type": "warning", "module": "src.models.user", "obj": "validate_email", "line": 56, "column": 8, "message": "Redefining built-in 'type'", "symbol": "redefined-builtin", "message-id": "W0622", "path": "src/models/user.py"},
+  {"type": "convention", "module": "src.utils.helpers", "obj": "", "line": 1, "column": 0, "message": "Missing module docstring", "symbol": "missing-module-docstring", "message-id": "C0114", "path": "src/utils/helpers.py"},
+  {"type": "convention", "module": "src.utils.helpers", "obj": "format_date", "line": 15, "column": 0, "message": "Missing function or method docstring", "symbol": "missing-function-docstring", "message-id": "C0111", "path": "src/utils/helpers.py"},
+  {"type": "refactor", "module": "src.utils.helpers", "obj": "process_data", "line": 34, "column": 4, "message": "Too many branches (15/12)", "symbol": "too-many-branches", "message-id": "R0912", "path": "src/utils/helpers.py"},
+  {"type": "error", "module": "src.services.auth", "obj": "authenticate", "line": 12, "column": 8, "message": "Unable to import 'jwt'", "symbol": "import-error", "message-id": "E0401", "path": "src/services/auth.py"},
+  {"type": "warning", "module": "src.services.auth", "obj": "AuthService", "line": 67, "column": 12, "message": "Catching too general exception Exception", "symbol": "broad-except", "message-id": "W0703", "path": "src/services/auth.py"},
+  {"type": "convention", "module": "src.services.auth", "obj": "AuthService.verify_token", "line": 89, "column": 8, "message": "Variable name 't' doesn't conform to snake_case naming style", "symbol": "invalid-name", "message-id": "C0103", "path": "src/services/auth.py"},
+  {"type": "warning", "module": "src.config", "obj": "", "line": 5, "column": 0, "message": "Wildcard import os.path", "symbol": "wildcard-import", "message-id": "W0401", "path": "src/config.py"},
+  {"type": "error", "module": "src.config", "obj": "load_config", "line": 28, "column": 4, "message": "No exception type(s) specified", "symbol": "bare-except", "message-id": "W0702", "path": "src/config.py"}
+]

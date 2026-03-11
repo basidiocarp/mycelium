@@ -131,8 +131,19 @@ jobs:
           find artifacts -type f \( -name '*.tar.gz' -o -name '*.zip' -o -name '*.deb' -o -name '*.rpm' \) -exec cp {} release/ \;
           cd release && sha256sum * > SHA256SUMS
 
+      - name: Extract release notes from tag
+        id: notes
+        run: |
+          # Get the annotated tag message (skip the first line which is "Release vX.Y.Z")
+          NOTES=$(git tag -l --format='%(contents:body)' "${{ github.ref_name }}")
+          if [ -z "$NOTES" ]; then
+            NOTES="See [CHANGELOG.md](CHANGELOG.md) for details."
+          fi
+          # Write to file to preserve multiline formatting
+          echo "$NOTES" > /tmp/release-notes.md
+
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          generate_release_notes: true
+          body_path: /tmp/release-notes.md
           files: release/*

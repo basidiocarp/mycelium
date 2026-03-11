@@ -141,7 +141,7 @@ fn view_run(args: &[String], _verbose: u8) -> Result<()> {
 
     let mut filtered = String::new();
 
-    let line = format!("🏃 Workflow Run #{}\n", run_id);
+    let line = format!("Workflow Run #{}\n", run_id);
     filtered.push_str(&line);
     print!("{}", line);
 
@@ -156,7 +156,7 @@ fn view_run(args: &[String], _verbose: u8) -> Result<()> {
                 continue;
             }
             if line.contains('✗') || line.contains("fail") {
-                let formatted = format!("  ❌ {}\n", line.trim());
+                let formatted = format!("  FAIL: {}\n", line.trim());
                 filtered.push_str(&formatted);
                 print!("{}", formatted);
             }

@@ -281,7 +281,7 @@ fn filter_migrate_dev(output: &str) -> String {
     let mut result = String::new();
 
     if !migration_name.is_empty() {
-        result.push_str(&format!("🗃️  Migration: {}\n", migration_name));
+        result.push_str(&format!("Migration: {}\n", migration_name));
         result.push_str("═══════════════════════════════════════\n");
     }
 
@@ -361,7 +361,7 @@ fn filter_migrate_deploy(output: &str) -> String {
     if errors.is_empty() {
         result.push_str(&format!("✓ {} migration(s) deployed\n", deployed));
     } else {
-        result.push_str("❌ Deployment failed:\n");
+        result.push_str("error: Deployment failed:\n");
         for err in errors.iter().take(5) {
             result.push_str(&format!("  {}\n", err));
         }

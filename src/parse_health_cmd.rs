@@ -70,7 +70,7 @@ pub fn run(days: u32) -> Result<()> {
             health_str.green().to_string()
         };
 
-        let warn = if degradation_pct > 10 { " ⚠" } else { "" };
+        let warn = if degradation_pct > 10 { " [!]" } else { "" };
 
         println!(
             "{:<25} {:>6} {:>9} {:>11}  {}{}",

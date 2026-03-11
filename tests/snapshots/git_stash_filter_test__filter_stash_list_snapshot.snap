@@ -1,0 +1,25 @@
+---
+source: tests/git_stash_filter_test.rs
+assertion_line: 47
+expression: output
+---
+stash@{0}: abc1234 feat: add user preferences
+stash@{1}: def5678 fix: token refresh logic
+stash@{2}: 789abcd refactor: extract helper functions
+stash@{3}: 456efgh style: update colors in theme
+stash@{4}: 123ijkl perf: optimize database queries
+stash@{5}: 789lmno docs: update API documentation
+stash@{6}: abc2345 fix: responsive layout issue
+stash@{7}: def6789 feat: add search functionality
+stash@{8}: 890ghij test: add unit tests for utils
+stash@{9}: 345ijkl chore: bump dependencies
+stash@{10}: 678klmn refactor: simplify login flow
+stash@{11}: 901mnop fix: handle edge case in parser
+stash@{12}: 234opqr feat: add caching layer
+stash@{13}: 567qrst fix: security vulnerability
+stash@{14}: 890rstu docs: improve README clarity
+stash@{15}: 123uvwx perf: reduce memory usage
+stash@{16}: 456wxyz refactor: clean up old code
+stash@{17}: 789yzab feat: add webhook support
+stash@{18}: 012bcde fix: API error handling
+stash@{19}: 345cdef style: fix linting issues

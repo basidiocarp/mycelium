@@ -2,7 +2,7 @@
 
 > **Mycelium** - A high-performance CLI proxy that minimizes LLM token consumption through intelligent output filtering and compression.
 
-This document provides a comprehensive architectural overview of Mycelium, including system design, data flows, module organization, and implementation patterns.
+For extensibility guide and adding new commands, see [EXTENDING.md](EXTENDING.md).
 
 ---
 
@@ -12,14 +12,15 @@ This document provides a comprehensive architectural overview of Mycelium, inclu
 2. [Command Lifecycle](#command-lifecycle)
 3. [Module Organization](#module-organization)
 4. [Filtering Strategies](#filtering-strategies)
-5. [Shared Infrastructure](#shared-infrastructure)
-6. [Token Tracking System](#token-tracking-system)
-7. [Global Flags Architecture](#global-flags-architecture)
-8. [Error Handling](#error-handling)
-9. [Configuration System](#configuration-system)
-10. [Module Development Pattern](#module-development-pattern)
+5. [Python and Go Module Architecture](#python-and-go-module-architecture)
+6. [Shared Infrastructure](#shared-infrastructure)
+7. [Token Tracking System](#token-tracking-system)
+8. [Global Flags Architecture](#global-flags-architecture)
+9. [Error Handling](#error-handling)
+10. [Configuration System](#configuration-system)
 11. [Build Optimizations](#build-optimizations)
-12. [Extensibility Guide](#extensibility-guide)
+12. [Resources](#resources)
+13. [Glossary](#glossary)
 
 ---
 
@@ -246,8 +247,8 @@ flowchart LR
 | 7 | **Failure Focus** | Failures only, hide passing | 94-99% | vitest, playwright, runner (test mode) |
 | 8 | **Tree Compression** | Tree hierarchy, aggregate dirs | 50-70% | ls (directory tree with counts) |
 | 9 | **Progress Filtering** | Strip ANSI bars, final result | 85-95% | wget, pnpm install |
-| 10 | **JSON/Text Dual** | JSON when available, text fallback | 80%+ | ruff (check→JSON, format→text), pip |
-| 11 | **State Machine** | Track test lifecycle states | 90%+ | pytest (IDLE→TEST_START→PASSED/FAILED) |
+| 10 | **JSON/Text Dual** | JSON when available, text fallback | 80%+ | ruff (check->JSON, format->text), pip |
+| 11 | **State Machine** | Track test lifecycle states | 90%+ | pytest (IDLE->TEST_START->PASSED/FAILED) |
 | 12 | **NDJSON Streaming** | Line-by-line JSON parse, aggregate | 90%+ | go test (interleaved package events) |
 
 ### Code Filtering Levels (filter.rs)
@@ -274,7 +275,7 @@ fn calculate_total(items: &[Item]) -> i32 { ... }
 
 ---
 
-## Python & Go Module Architecture
+## Python and Go Module Architecture
 
 ### Design Rationale
 
@@ -306,8 +307,6 @@ flowchart TD
 
 ### Python Stack Architecture
 
-#### Command Implementations
-
 ```mermaid
 flowchart TD
     subgraph Python["Python Commands (3 modules)"]
@@ -325,20 +324,7 @@ flowchart TD
     I --> IU["Auto-detect uv"]
 ```
 
-#### Shared Infrastructure
-
-**No Package Manager Detection**
-Unlike JS/TS modules, Python commands don't auto-detect poetry/pipenv/pip because:
-- `pip` is universally available (system Python)
-- `uv` detection is explicit (binary presence check)
-- Poetry/pipenv aren't execution wrappers (they manage virtualenvs differently)
-
-**Virtual Environment Awareness**
-Commands respect active virtualenv via `sys.executable` paths.
-
 ### Go Stack Architecture
-
-#### Command Implementations
 
 ```mermaid
 flowchart TD
@@ -354,7 +340,7 @@ flowchart TD
     GL --> GLC["golangci-lint --out-format=json\nGroup by linter rule, count violations"]
 ```
 
-#### Sub-Enum Pattern (go_eco/commands/)
+### Sub-Enum Pattern (go_eco/commands/)
 
 ```rust
 // main.rs enum definition
@@ -380,16 +366,6 @@ pub fn run(command: &GoCommand, verbose: u8) -> Result<()> {
 }
 ```
 
-**Why Sub-Enum?**
-- `go test/build/vet` are semantically related (core Go toolchain)
-- Mirrors existing git/cargo patterns (consistency)
-- Natural CLI: `mycelium go test` not `mycelium gotest`
-
-**Why golangci-lint Standalone?**
-- Third-party tool (not core Go toolchain)
-- Different output format (JSON API vs text)
-- Distinct use case (comprehensive linting vs single-tool diagnostics)
-
 ### Format Strategy Decision Tree
 
 ```mermaid
@@ -404,38 +380,6 @@ flowchart TD
     F -->|No| H["Text filters\ngo vet, go build"]
 ```
 
-### Testing Patterns
-
-#### Python Module Tests
-
-```rust
-// python/pytest.rs tests
-#[test]
-fn test_pytest_state_machine() {
-    let output = "test_auth.py::test_login PASSED\ntest_db.py::test_query FAILED";
-    let result = parse_pytest_output(output);
-    assert!(result.contains("1 failed"));
-    assert!(result.contains("test_db.py::test_query"));
-}
-```
-
-#### Go Module Tests
-
-```rust
-// go_eco/commands/ tests
-#[test]
-fn test_go_test_ndjson_interleaved() {
-    let output = r#"{"Action":"run","Package":"pkg1"}
-{"Action":"fail","Package":"pkg1","Test":"TestA"}
-{"Action":"run","Package":"pkg2"}
-{"Action":"pass","Package":"pkg2","Test":"TestB"}"#;
-
-    let result = parse_go_test_ndjson(output);
-    assert!(result.contains("pkg1: 1 failed"));
-    assert!(!result.contains("pkg2")); // pkg2 passed, hidden
-}
-```
-
 ### Performance Characteristics
 
 | Command | Raw Time | Mycelium Time | Overhead | Savings |
@@ -446,22 +390,6 @@ fn test_go_test_ndjson_interleaved() {
 | `go test` | 2.1s | 2.12s | +20ms | 88% |
 | `go build` (errors) | 950ms | 961ms | +11ms | 80% |
 | `golangci-lint` | 4.5s | 4.52s | +20ms | 85% |
-
-**Overhead sources:** JSON parsing (5-10ms), state machine (3-8ms), NDJSON streaming (8-15ms)
-
-### Module Integration Checklist
-
-When adding Python/Go module support:
-
-- [x] **Output Format**: JSON API > NDJSON > State Machine > Text Filters
-- [x] **Failure Focus**: Hide passing tests, show failures only
-- [x] **Exit Code Preservation**: Propagate tool exit codes for CI/CD
-- [x] **Virtual Env Awareness**: Python modules respect active virtualenv
-- [x] **Error Grouping**: Group by rule/file for linters (ruff, golangci-lint)
-- [x] **Streaming Support**: Handle interleaved NDJSON events (go test)
-- [x] **Verbosity Levels**: Support -v/-vv/-vvv for debug output
-- [x] **Token Tracking**: Integrate with tracking::track()
-- [x] **Unit Tests**: Test parsing logic with representative outputs
 
 ---
 
@@ -494,12 +422,6 @@ flowchart TD
 
 Affects: lint, tsc, next, prettier, playwright, prisma, vitest, pnpm
 
-**Why This Matters**:
-- **CWD Preservation**: pnpm/yarn exec preserve working directory correctly
-- **Monorepo Support**: Works in nested package.json structures
-- **No Global Installs**: Uses project-local dependencies only
-- **CI/CD Reliability**: Consistent behavior across environments
-
 ---
 
 ## Token Tracking System
@@ -531,7 +453,7 @@ flowchart TD
 | `input_tokens` | INTEGER NOT NULL | Estimated input tokens |
 | `output_tokens` | INTEGER NOT NULL | Actual output tokens |
 | `saved_tokens` | INTEGER NOT NULL | input - output |
-| `savings_pct` | REAL NOT NULL | (saved / input) × 100 |
+| `savings_pct` | REAL NOT NULL | (saved / input) x 100 |
 | `exec_time_ms` | INTEGER DEFAULT 0 | Execution duration (added v0.7.1) |
 
 ### Thread Safety
@@ -544,7 +466,6 @@ lazy_static::lazy_static! {
 ```
 
 **Design**: Single-threaded execution with Mutex for future-proofing.
-**Current State**: No multi-threading, but Mutex enables safe concurrent access if needed.
 
 ---
 
@@ -562,7 +483,7 @@ lazy_static::lazy_static! {
 ### Ultra-Compact Mode (`-u`)
 
 Activates maximum compression for LLM contexts:
-- ASCII icons instead of words (✓ ✗ → ⚠)
+- ASCII icons instead of words
 - Inline formatting (single-line summaries)
 - Maximum token reduction
 
@@ -593,23 +514,11 @@ flowchart TD
 
 ### Exit Code Preservation (Critical for CI/CD)
 
-```mermaid
-flowchart TD
-    A["Command::new('git').args(args).output()?"] --> B{"output.status.success()?"}
-    B -->|Yes| C["Filter output\nPrint result\nexit(0)"]
-    B -->|No| D["eprintln!(stderr)"]
-    D --> E["std::process::exit(code)"]
-```
-
 | Exit Code | Meaning |
 |-----------|---------|
 | `0` | Success |
 | `1` | Mycelium internal error (parsing, filtering, etc.) |
 | `N` | Preserved exit code from underlying tool (e.g., git=128, lint=1) |
-
-**Why this matters:** CI/CD pipelines, pre-commit hooks, and git workflows rely on accurate exit codes.
-
-**Modules with exit code preservation:** git.rs, lint_cmd.rs, tsc_cmd.rs, vitest_cmd.rs, playwright_cmd.rs
 
 ---
 
@@ -632,150 +541,6 @@ flowchart LR
 
     CFG --> |"Loaded by config.rs"| MAIN["main.rs"]
     CL --> |"Created by mycelium init"| LLM["Claude Code / LLM"]
-```
-
-### Initialization Flow
-
-```mermaid
-flowchart TD
-    A["$ mycelium init [--global]"] --> B{"--global?"}
-    B -->|Yes| C["Check ~/.config/mycelium/CLAUDE.md"]
-    B -->|No| D["Check ./CLAUDE.md"]
-    C --> E{"File exists?"}
-    D --> E
-    E -->|Yes| F["Warn user, ask to overwrite"]
-    E -->|No| G["Continue"]
-    F --> G
-    G --> H["Prompt: Initialize for LLM usage? [y/N]"]
-    H -->|Yes| I["Write template:\nUse mycelium prefix for commands\n60-90% token reduction"]
-    I --> J["✓ Initialized mycelium for LLM integration"]
-    H -->|No| K["Abort"]
-```
-
----
-
-## Module Development Pattern
-
-### Standard Module Template
-
-```rust
-// src/example_cmd.rs
-
-use anyhow::{Context, Result};
-use std::process::Command;
-use crate::{tracking, utils};
-
-/// Public entry point called by main.rs router
-pub fn run(args: &[String], verbose: u8) -> Result<()> {
-    // 1. Execute underlying command
-    let raw_output = execute_command(args)?;
-
-    // 2. Apply filtering strategy
-    let filtered = filter_output(&raw_output, verbose);
-
-    // 3. Print result
-    println!("{}", filtered);
-
-    // 4. Track token savings
-    tracking::track(
-        "original_command",
-        "mycelium command",
-        &raw_output,
-        &filtered
-    );
-
-    Ok(())
-}
-
-/// Execute the underlying tool
-fn execute_command(args: &[String]) -> Result<String> {
-    let output = Command::new("tool")
-        .args(args)
-        .output()
-        .context("Failed to execute tool")?;
-
-    // Preserve exit codes (critical for CI/CD)
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        eprintln!("{}", stderr);
-        std::process::exit(output.status.code().unwrap_or(1));
-    }
-
-    Ok(String::from_utf8_lossy(&output.stdout).to_string())
-}
-
-/// Apply filtering strategy
-fn filter_output(raw: &str, verbose: u8) -> String {
-    // Choose strategy: stats, grouping, deduplication, etc.
-    // See "Filtering Strategies" section for options
-
-    if verbose >= 3 {
-        eprintln!("Raw output:\n{}", raw);
-    }
-
-    // Apply compression logic
-    let compressed = compress(raw);
-
-    compressed
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_filter_output() {
-        let raw = "verbose output here";
-        let filtered = filter_output(raw, 0);
-        assert!(filtered.len() < raw.len());
-    }
-}
-```
-
-### Common Patterns
-
-#### 1. Package Manager Detection (JS/TS modules)
-
-```rust
-// Detect lockfiles
-let is_pnpm = Path::new("pnpm-lock.yaml").exists();
-let is_yarn = Path::new("yarn.lock").exists();
-
-// Build command
-let mut cmd = if is_pnpm {
-    Command::new("pnpm").arg("exec").arg("--").arg("eslint")
-} else if is_yarn {
-    Command::new("yarn").arg("exec").arg("--").arg("eslint")
-} else {
-    Command::new("npx").arg("--no-install").arg("--").arg("eslint")
-};
-```
-
-#### 2. Lazy Static Regex (filter.rs, runner.rs)
-
-```rust
-lazy_static::lazy_static! {
-    static ref PATTERN: Regex = Regex::new(r"ERROR:.*").unwrap();
-}
-
-// Usage: compiled once, reused across invocations
-let matches: Vec<_> = PATTERN.find_iter(text).collect();
-```
-
-#### 3. Verbosity Guards
-
-```rust
-if verbose > 0 {
-    eprintln!("Debug: Processing {} files", count);
-}
-
-if verbose >= 2 {
-    eprintln!("Executing: {:?}", cmd);
-}
-
-if verbose >= 3 {
-    eprintln!("Raw output:\n{}", raw);
-}
 ```
 
 ---
@@ -817,200 +582,16 @@ pie title Overhead Breakdown (typical command)
     "SQLite tracking" : 2
 ```
 
-### Compilation
-
-```bash
-# Development build (fast compilation, debug symbols)
-cargo build
-
-# Release build (optimized, stripped)
-cargo build --release
-
-# Check without building (fast feedback)
-cargo check
-
-# Run tests
-cargo test
-
-# Lint with clippy
-cargo clippy --all-targets
-
-# Format code
-cargo fmt
-```
-
----
-
-## Extensibility Guide
-
-### Adding a New Command
-
-**Step-by-step process to add a new mycelium command:**
-
-#### 1. Create Module File
-
-```bash
-touch src/mycmd.rs
-```
-
-#### 2. Implement Module (src/mycmd.rs)
-
-```rust
-use anyhow::{Context, Result};
-use std::process::Command;
-use crate::tracking;
-
-pub fn run(args: &[String], verbose: u8) -> Result<()> {
-    // Execute underlying command
-    let output = Command::new("mycmd")
-        .args(args)
-        .output()
-        .context("Failed to execute mycmd")?;
-
-    let raw = String::from_utf8_lossy(&output.stdout);
-
-    // Apply filtering strategy
-    let filtered = filter(&raw, verbose);
-
-    // Print result
-    println!("{}", filtered);
-
-    // Track savings
-    tracking::track("mycmd", "mycelium mycmd", &raw, &filtered);
-
-    Ok(())
-}
-
-fn filter(raw: &str, verbose: u8) -> String {
-    // Implement your filtering logic
-    raw.lines().take(10).collect::<Vec<_>>().join("\n")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_filter() {
-        let raw = "line1\nline2\n";
-        let result = filter(raw, 0);
-        assert!(result.contains("line1"));
-    }
-}
-```
-
-#### 3. Declare Module (main.rs)
-
-```rust
-// Add to module declarations (alphabetically)
-mod mycmd;
-```
-
-#### 4. Add Command Enum Variant (main.rs)
-
-```rust
-#[derive(Subcommand)]
-enum Commands {
-    // ... existing commands ...
-
-    /// Description of your command
-    Mycmd {
-        /// Arguments your command accepts
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
-        args: Vec<String>,
-    },
-}
-```
-
-#### 5. Add Router Match Arm (main.rs)
-
-```rust
-match cli.command {
-    // ... existing matches ...
-
-    Commands::Mycmd { args } => {
-        mycmd::run(&args, verbose)?;
-    }
-}
-```
-
-#### 6. Test Your Command
-
-```bash
-# Build and test
-cargo build
-./target/debug/mycelium mycmd arg1 arg2
-
-# Run tests
-cargo test mycmd::tests
-
-# Check with clippy
-cargo clippy --all-targets
-```
-
-#### 7. Document Your Command
-
-Update CLAUDE.md:
-
-```markdown
-### New Commands
-
-**mycelium mycmd** - Description of what it does
-- Strategy: [stats/grouping/filtering/etc.]
-- Savings: X-Y%
-- Used by: [workflow description]
-```
-
-### Design Checklist
-
-When implementing a new command, consider:
-
-- [ ] **Filtering Strategy**: Which of the 9 strategies fits best?
-- [ ] **Exit Code Preservation**: Does your command need to preserve exit codes for CI/CD?
-- [ ] **Verbosity Support**: Add debug output for `-v`, `-vv`, `-vvv`
-- [ ] **Error Handling**: Use `.context()` for meaningful error messages
-- [ ] **Package Manager Detection**: For JS/TS tools, use the standard detection pattern
-- [ ] **Tests**: Add unit tests for filtering logic
-- [ ] **Token Tracking**: Integrate with `tracking::track()`
-- [ ] **Documentation**: Update CLAUDE.md with token savings and use cases
-
----
-
-## Architecture Decision Records
-
-### Why Rust?
-
-- **Performance**: ~5-15ms overhead per command (negligible for user experience)
-- **Safety**: No runtime errors from null pointers, data races, etc.
-- **Single Binary**: No runtime dependencies (distribute one executable)
-- **Cross-Platform**: Works on macOS, Linux, Windows without modification
-
-### Why SQLite for Tracking?
-
-- **Zero Config**: No server setup, works out-of-the-box
-- **Lightweight**: ~100KB database for 90 days of history
-- **Reliable**: ACID compliance for data integrity
-- **Queryable**: Rich analytics via SQL (gain report)
-
-### Why anyhow for Error Handling?
-
-- **Context**: `.context()` adds meaningful error messages throughout call chain
-- **Ergonomic**: `?` operator for concise error propagation
-- **User-Friendly**: Error display shows full context chain
-
-### Why Clap for CLI Parsing?
-
-- **Derive Macros**: Less boilerplate (declarative CLI definition)
-- **Auto-Generated Help**: `--help` generated automatically
-- **Type Safety**: Parse arguments directly into typed structs
-- **Global Flags**: `-v` and `-u` work across all commands
-
 ---
 
 ## Resources
 
-- **README.md**: User guide, installation, examples
-- **CLAUDE.md**: Developer documentation, module details, PR history
+- **[FEATURES.md](FEATURES.md)**: Feature overview and savings summary
+- **[COMMANDS.md](COMMANDS.md)**: Complete command reference
+- **[ANALYTICS.md](ANALYTICS.md)**: Analytics, hooks, configuration
+- **[EXTENDING.md](EXTENDING.md)**: Adding new commands, patterns, ADRs
+- **[PLUGINS.md](PLUGINS.md)**: Custom filter plugins
+- **[COST_ANALYSIS.md](COST_ANALYSIS.md)**: Token economics and accuracy
 - **Cargo.toml**: Dependencies, build profiles, package metadata
 - **src/**: Source code organized by module
 - **.github/workflows/**: CI/CD automation (multi-platform builds, releases)

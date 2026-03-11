@@ -268,6 +268,77 @@ pub(crate) fn print_monthly(tracker: &Tracker, project_scope: Option<&str>) -> R
     Ok(())
 }
 
+/// Render per-project breakdown table (`--projects`).
+pub(crate) fn show_projects_table(tracker: &Tracker) -> Result<()> {
+    let stats = tracker
+        .get_by_project()
+        .context("Failed to load per-project statistics")?;
+
+    if stats.is_empty() {
+        println!("No per-project data yet.");
+        println!("Run mycelium commands from inside a project to start tracking.");
+        return Ok(());
+    }
+
+    println!("{}", styled("Mycelium Savings by Project", true));
+    println!("{}", "═".repeat(90));
+    println!();
+
+    let path_width = 40usize;
+    let cmd_width = 8usize;
+    let saved_width = 12usize;
+    let pct_width = 7usize;
+    let date_width = 16usize;
+
+    let table_width = path_width + 2 + cmd_width + 2 + saved_width + 2 + pct_width + 2 + date_width;
+    println!(
+        "{:<path_width$}  {:>cmd_width$}  {:>saved_width$}  {:>pct_width$}  {:<date_width$}",
+        "Project",
+        "Commands",
+        "Saved",
+        "Avg%",
+        "Last Used",
+        path_width = path_width,
+        cmd_width = cmd_width,
+        saved_width = saved_width,
+        pct_width = pct_width,
+        date_width = date_width
+    );
+    println!("{}", "─".repeat(table_width));
+
+    for stat in &stats {
+        let path_display = shorten_path(&stat.project_path);
+        let path_cell = truncate_for_column(&path_display, path_width);
+        let cmd_cell = format!("{:>cmd_width$}", stat.commands, cmd_width = cmd_width);
+        let saved_cell = format!(
+            "{:>saved_width$}",
+            format_tokens(stat.saved_tokens as usize),
+            saved_width = saved_width
+        );
+        let pct_plain = format!(
+            "{:>pct_width$}",
+            format!("{:.1}%", stat.avg_savings_pct),
+            pct_width = pct_width
+        );
+        let pct_cell = colorize_pct_cell(stat.avg_savings_pct, &pct_plain);
+        // Show date portion of ISO timestamp
+        let last_used = if stat.last_used.len() >= 10 {
+            &stat.last_used[..10]
+        } else {
+            &stat.last_used
+        };
+        println!(
+            "{}  {}  {}  {}  {}",
+            path_cell, cmd_cell, saved_cell, pct_cell, last_used
+        );
+    }
+
+    println!("{}", "─".repeat(table_width));
+    println!();
+
+    Ok(())
+}
+
 pub(crate) fn show_failures(tracker: &Tracker) -> Result<()> {
     let summary = tracker
         .get_parse_failure_summary()

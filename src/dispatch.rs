@@ -32,22 +32,40 @@ pub fn run_fallback(parse_error: clap::Error) -> Result<()> {
     // Start timer before execution to capture actual command runtime
     let timer = tracking::TimedExecution::start();
 
-    // Check for a user plugin before raw passthrough
-    let plugin_output = crate::plugin::find_plugin(&args[0]).and_then(|plugin_path| {
-        let raw = std::process::Command::new(&args[0])
+    // Check for a user plugin before raw passthrough.
+    // Plugin lookup respects `[plugins] enabled = false` in config (checked inside find_plugin).
+    if let Some(plugin_path) = crate::plugin::find_plugin(&args[0]) {
+        // Run the raw command and capture its stdout for the plugin to filter.
+        match std::process::Command::new(&args[0])
             .args(&args[1..])
             .output()
-            .ok()
-            .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
-            .unwrap_or_default();
-        crate::plugin::run_plugin(&plugin_path, &raw).ok()
-    });
-
-    if let Some(filtered) = plugin_output {
-        timer.track_passthrough(&raw_command, &format!("mycelium plugin: {}", raw_command));
-        tracking::record_parse_failure_silent(&raw_command, &error_message, true);
-        print!("{}", filtered);
-        return Ok(());
+        {
+            Ok(raw_output) => {
+                let raw = String::from_utf8_lossy(&raw_output.stdout).to_string();
+                match crate::plugin::run_plugin(&plugin_path, &raw) {
+                    Ok(filtered) => {
+                        // Track savings: raw input vs filtered output
+                        timer.track(
+                            &raw_command,
+                            &format!("mycelium plugin: {}", raw_command),
+                            &raw,
+                            &filtered,
+                        );
+                        tracking::record_parse_failure_silent(&raw_command, &error_message, true);
+                        print!("{}", filtered);
+                        return Ok(());
+                    }
+                    Err(e) => {
+                        // Plugin failed — log and fall through to passthrough
+                        eprintln!("[mycelium: plugin {:?} failed: {}]", plugin_path, e);
+                    }
+                }
+            }
+            Err(e) => {
+                eprintln!("[mycelium: plugin raw capture failed: {}]", e);
+            }
+        }
+        // Fall through to normal passthrough on any plugin error
     }
 
     let status = std::process::Command::new(&args[0])
@@ -557,6 +575,8 @@ pub fn dispatch(cli: Cli) -> Result<()> {
 
         Commands::Gain {
             project,
+            project_path,
+            projects,
             graph,
             history,
             quota,
@@ -571,6 +591,8 @@ pub fn dispatch(cli: Cli) -> Result<()> {
         } => {
             gain::run(
                 project,
+                project_path.as_deref(),
+                projects,
                 graph,
                 history,
                 quota,
@@ -883,6 +905,23 @@ pub fn dispatch(cli: Cli) -> Result<()> {
         },
 
         Commands::SelfUpdate { check } => self_update_cmd::run(check)?,
+
+        Commands::Benchmark { ci } => {
+            crate::benchmark_cmd::run(ci)?;
+        }
+
+        Commands::Plugin { command } => match command {
+            PluginCommands::List => {
+                crate::plugin_cmd::run_list()?;
+            }
+            PluginCommands::Install { ref name, force } => {
+                if name == "--all" || name == "all" {
+                    crate::plugin_cmd::run_install_all(force)?;
+                } else {
+                    crate::plugin_cmd::run_install(name, force)?;
+                }
+            }
+        },
     }
 
     Ok(())

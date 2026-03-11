@@ -129,7 +129,7 @@ pub fn filter_go_test_json(output: &str) -> String {
         }
 
         result.push_str(&format!(
-            "\n📦 {} [build failed]\n",
+            "\n{} [build failed]\n",
             compact_package_name(package)
         ));
 
@@ -149,14 +149,14 @@ pub fn filter_go_test_json(output: &str) -> String {
         }
 
         result.push_str(&format!(
-            "\n📦 {} ({} passed, {} failed)\n",
+            "\n{} ({} passed, {} failed)\n",
             compact_package_name(package),
             pkg_result.pass,
             pkg_result.fail
         ));
 
         for (test, outputs) in &pkg_result.failed_tests {
-            result.push_str(&format!("  ❌ {}\n", test));
+            result.push_str(&format!("  error: {}\n", test));
 
             // Show failure output (limit to key lines)
             let relevant_lines: Vec<&String> = outputs

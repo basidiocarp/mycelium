@@ -10,6 +10,8 @@ use anyhow::{Context, Result};
 #[allow(clippy::too_many_arguments)]
 pub fn run(
     project: bool,
+    project_path: Option<&str>,
+    projects: bool,
     graph: bool,
     history: bool,
     quota: bool,
@@ -29,7 +31,13 @@ pub fn run(
     }
 
     let tracker = Tracker::new().context("Failed to initialize tracking database")?;
-    let project_scope = helpers::resolve_project_scope(project)?;
+
+    // --projects: per-project breakdown table
+    if projects {
+        return display::show_projects_table(&tracker);
+    }
+
+    let project_scope = helpers::resolve_project_scope(project, project_path)?;
 
     if failures {
         return display::show_failures(&tracker);

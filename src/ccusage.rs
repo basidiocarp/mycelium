@@ -123,7 +123,7 @@ pub fn fetch(granularity: Granularity) -> Result<Option<Vec<CcusagePeriod>>> {
     let mut cmd = match build_command() {
         Some(cmd) => cmd,
         None => {
-            eprintln!("⚠️  ccusage not found. Install: npm i -g ccusage (or use npx ccusage)");
+            eprintln!("[!] ccusage not found. Install: npm i -g ccusage (or use npx ccusage)");
             return Ok(None);
         }
     };
@@ -143,7 +143,7 @@ pub fn fetch(granularity: Granularity) -> Result<Option<Vec<CcusagePeriod>>> {
 
     let output = match output {
         Err(e) => {
-            eprintln!("⚠️  ccusage execution failed: {}", e);
+            eprintln!("[!] ccusage execution failed: {}", e);
             return Ok(None);
         }
         Ok(o) => o,
@@ -152,7 +152,7 @@ pub fn fetch(granularity: Granularity) -> Result<Option<Vec<CcusagePeriod>>> {
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         eprintln!(
-            "⚠️  ccusage exited with {}: {}",
+            "[!] ccusage exited with {}: {}",
             output.status,
             stderr.trim()
         );

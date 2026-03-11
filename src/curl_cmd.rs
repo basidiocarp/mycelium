@@ -132,4 +132,43 @@ mod tests {
         assert!(result.contains("Line 29"));
         assert!(result.contains("more lines"));
     }
+
+    #[test]
+    fn test_json_snapshot() {
+        let input = include_str!("../tests/fixtures/curl_json_raw.txt");
+        let output = filter_curl_output(input);
+        insta::assert_snapshot!(output);
+    }
+
+    #[test]
+    fn test_non_json_passthrough() {
+        let input =
+            "<html><body><h1>Hello World</h1><p>This is a plain text response.</p></body></html>";
+        let output = filter_curl_output(input);
+        insta::assert_snapshot!(output);
+    }
+
+    fn count_tokens(text: &str) -> usize {
+        text.split_whitespace().count()
+    }
+
+    #[test]
+    fn test_json_token_savings() {
+        let input = include_str!("../tests/fixtures/curl_json_raw.txt");
+        let output = filter_curl_output(input);
+        let input_tokens = count_tokens(input);
+        let output_tokens = count_tokens(&output);
+        let savings_pct = (input_tokens.saturating_sub(output_tokens)) * 100 / input_tokens.max(1);
+        assert!(
+            savings_pct >= 60,
+            "Expected >= 60% token savings, got {}%",
+            savings_pct
+        );
+    }
+
+    #[test]
+    fn test_empty_input() {
+        let output = filter_curl_output("");
+        assert_eq!(output, "");
+    }
 }

@@ -62,7 +62,10 @@ impl OutputParser for PylintParser {
                     *by_code_map.entry(d.code.clone()).or_insert(0) += 1;
                 }
                 let mut by_code: Vec<(String, usize)> = by_code_map.into_iter().collect();
-                by_code.sort_by(|a, b| b.1.cmp(&a.1));
+                by_code.sort_by(|a, b| match b.1.cmp(&a.1) {
+                    std::cmp::Ordering::Equal => a.0.cmp(&b.0),
+                    other => other,
+                });
                 let files_affected: std::collections::HashSet<&str> =
                     diagnostics.iter().map(|d| d.file.as_str()).collect();
                 let files_affected = files_affected.len();
@@ -140,7 +143,10 @@ pub fn filter_pylint_json(output: &str) -> String {
         by_file.entry(d.file.as_str()).or_default().push(d);
     }
     let mut file_list: Vec<(&str, usize)> = by_file.iter().map(|(f, ds)| (*f, ds.len())).collect();
-    file_list.sort_by(|a, b| b.1.cmp(&a.1));
+    file_list.sort_by(|a, b| match b.1.cmp(&a.1) {
+        std::cmp::Ordering::Equal => a.0.cmp(&b.0),
+        other => other,
+    });
 
     result.push_str("Top files:\n");
     for (file, count) in file_list.iter().take(10) {
@@ -152,7 +158,10 @@ pub fn filter_pylint_json(output: &str) -> String {
             *file_codes.entry(d.code.as_str()).or_insert(0) += 1;
         }
         let mut file_code_counts: Vec<_> = file_codes.iter().collect();
-        file_code_counts.sort_by(|a, b| b.1.cmp(a.1));
+        file_code_counts.sort_by(|a, b| match b.1.cmp(a.1) {
+            std::cmp::Ordering::Equal => a.0.cmp(&b.0),
+            other => other,
+        });
         for (code, count) in file_code_counts.iter().take(3) {
             result.push_str(&format!("    {} ({})\n", code, count));
         }
@@ -260,5 +269,29 @@ mod tests {
         assert!(result.contains("undefined-variable (E0602)"));
         assert!(result.contains("main.py"));
         assert!(result.contains("utils.py"));
+    }
+
+    #[test]
+    fn test_pylint_snapshot() {
+        let input = include_str!("../../tests/fixtures/pylint_json_raw.txt");
+        let output = filter_pylint_json(input);
+        insta::assert_snapshot!(output);
+    }
+
+    fn count_tokens(text: &str) -> usize {
+        text.split_whitespace().count()
+    }
+
+    #[test]
+    fn test_pylint_token_savings() {
+        let input = include_str!("../../tests/fixtures/pylint_json_raw.txt");
+        let output = filter_pylint_json(input);
+        let savings = (count_tokens(input).saturating_sub(count_tokens(&output))) * 100
+            / count_tokens(input).max(1);
+        assert!(
+            savings >= 60,
+            "Expected >= 60% token savings, got {}%",
+            savings
+        );
     }
 }

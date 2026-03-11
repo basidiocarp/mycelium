@@ -160,4 +160,32 @@ mod tests {
         // Should not panic, should have "..."
         assert!(result.contains("..."));
     }
+
+    #[test]
+    fn test_filter_stash_list_snapshot() {
+        let input = include_str!("../../../tests/fixtures/git_stash_list_raw.txt");
+        let output = filter_stash_list(input);
+        insta::assert_snapshot!(output);
+    }
+
+    #[test]
+    fn test_filter_stash_list_token_savings() {
+        fn count_tokens(text: &str) -> usize {
+            text.split_whitespace().count()
+        }
+
+        let input = include_str!("../../../tests/fixtures/git_stash_list_raw.txt");
+        let output = filter_stash_list(input);
+
+        let input_tokens = count_tokens(input);
+        let output_tokens = count_tokens(&output);
+
+        let savings = 100.0 - (output_tokens as f64 / input_tokens as f64 * 100.0);
+
+        assert!(
+            savings >= 25.0,
+            "Git stash list filter: expected ≥25% savings, got {:.1}%",
+            savings
+        );
+    }
 }

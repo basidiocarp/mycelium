@@ -1,0 +1,24 @@
+---
+source: src/curl_cmd.rs
+assertion_line: 140
+expression: output
+---
+{
+  clone_url: url,
+  created_at: string,
+  default_branch: string,
+  description: string[113],
+  fork: bool,
+  forks: int,
+  forks_count: int,
+  full_name: string,
+  git_url: string,
+  has_downloads: bool,
+  has_issues: bool,
+  has_pages: bool,
+  has_projects: bool,
+  has_wiki: bool,
+  html_url: url,
+  id: int,
+  ... +23 more keys
+}

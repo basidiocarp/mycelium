@@ -22,10 +22,15 @@ pub(super) fn current_project_path_string() -> String {
 /// Resolve the SQLite database path.
 ///
 /// Priority:
-/// 1. `MYCELIUM_DB_PATH` environment variable
-/// 2. `tracking.database_path` from `~/.config/mycelium/config.toml`
-/// 3. Platform-specific default (`~/.local/share/mycelium/history.db` on Linux)
-pub(super) fn get_db_path() -> Result<PathBuf> {
+/// 1. `override_path` argument (used in tests to avoid mutating the environment)
+/// 2. `MYCELIUM_DB_PATH` environment variable
+/// 3. `tracking.database_path` from `~/.config/mycelium/config.toml`
+/// 4. Platform-specific default (`~/.local/share/mycelium/history.db` on Linux)
+pub(super) fn get_db_path(override_path: Option<&str>) -> Result<PathBuf> {
+    if let Some(path) = override_path {
+        return Ok(PathBuf::from(path));
+    }
+
     if let Ok(custom_path) = std::env::var("MYCELIUM_DB_PATH") {
         return Ok(PathBuf::from(custom_path));
     }

@@ -52,6 +52,7 @@ pub const PATTERNS: &[&str] = &[
     r"^psql(\s|$)",
     // Terraform / OpenTofu
     r"^(terraform|tofu|opentofu)\s+(plan|apply|init|show|output|destroy|validate|fmt)",
+    r"^atmos\s+(terraform|describe|validate|workflow|version)",
 ];
 
 /// Static rule table mapping shell commands to their Mycelium equivalents and savings estimates.
@@ -425,6 +426,14 @@ pub const RULES: &[MyceliumRule] = &[
         category: "Infra",
         savings_pct: 75.0,
         subcmd_savings: &[("plan", 80.0), ("apply", 85.0)],
+        subcmd_status: &[],
+    },
+    MyceliumRule {
+        mycelium_cmd: "mycelium atmos",
+        rewrite_prefixes: &["atmos"],
+        category: "Infra",
+        savings_pct: 75.0,
+        subcmd_savings: &[("terraform", 80.0), ("describe", 70.0)],
         subcmd_status: &[],
     },
 ];

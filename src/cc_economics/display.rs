@@ -51,7 +51,7 @@ pub fn display_summary(tracker: &Tracker, verbose: u8) -> Result<()> {
 
     let totals = compute_totals(&periods);
 
-    println!("💰 Claude Code Economics");
+    println!("Claude Code Economics");
     println!("════════════════════════════════════════════════════");
     println!();
 
@@ -162,7 +162,7 @@ pub fn display_daily(tracker: &Tracker, verbose: u8) -> Result<()> {
         .context("Failed to load daily token savings from database")?;
     let periods = merge_daily(cc_daily, tracking_daily);
 
-    println!("📅 Daily Economics");
+    println!("Daily Economics");
     println!("════════════════════════════════════════════════════");
     print_period_table(&periods, verbose);
     Ok(())
@@ -176,7 +176,7 @@ pub fn display_weekly(tracker: &Tracker, verbose: u8) -> Result<()> {
         .context("Failed to load weekly token savings from database")?;
     let periods = merge_weekly(cc_weekly, tracking_weekly);
 
-    println!("📅 Weekly Economics");
+    println!("Weekly Economics");
     println!("════════════════════════════════════════════════════");
     print_period_table(&periods, verbose);
     Ok(())
@@ -190,7 +190,7 @@ pub fn display_monthly(tracker: &Tracker, verbose: u8) -> Result<()> {
         .context("Failed to load monthly token savings from database")?;
     let periods = merge_monthly(cc_monthly, tracking_monthly);
 
-    println!("📅 Monthly Economics");
+    println!("Monthly Economics");
     println!("════════════════════════════════════════════════════");
     print_period_table(&periods, verbose);
     Ok(())

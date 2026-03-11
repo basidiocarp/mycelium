@@ -96,8 +96,24 @@ pub(crate) fn print_efficiency_meter(pct: f64) {
     }
 }
 
-/// Resolve project scope from --project flag.
-pub(crate) fn resolve_project_scope(project: bool) -> Result<Option<String>> {
+/// Resolve project scope from `--project` (bool) and `--project-path <PATH>` flags.
+///
+/// `--project-path .` resolves `.` to the current working directory.
+/// `--project` uses the current working directory directly.
+/// If neither is set, returns `None` (global scope).
+pub(crate) fn resolve_project_scope(
+    project: bool,
+    project_path: Option<&str>,
+) -> Result<Option<String>> {
+    if let Some(path_str) = project_path {
+        let path = if path_str == "." {
+            std::env::current_dir().context("Failed to resolve current working directory")?
+        } else {
+            std::path::PathBuf::from(path_str)
+        };
+        let canonical = path.canonicalize().unwrap_or(path);
+        return Ok(Some(canonical.to_string_lossy().to_string()));
+    }
     if !project {
         return Ok(None);
     }

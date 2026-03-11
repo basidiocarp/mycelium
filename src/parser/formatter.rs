@@ -177,7 +177,10 @@ impl TokenFormatter for DependencyState {
     }
 
     fn format_ultra(&self) -> String {
-        format!("📦{} ⬆️{}", self.total_packages, self.outdated_count)
+        format!(
+            "{} packages (+{} outdated)",
+            self.total_packages, self.outdated_count
+        )
     }
 }
 
@@ -267,7 +270,7 @@ impl TokenFormatter for DiagnosticReport {
 
     fn format_ultra(&self) -> String {
         format!(
-            "{} ✗{} ⚠{} ({} files)",
+            "{} ✗{} [!]{} ({} files)",
             self.tool, self.total_errors, self.total_warnings, self.files_affected
         )
     }
@@ -284,12 +287,12 @@ fn truncate_str(s: &str, n: usize) -> String {
 
 impl TokenFormatter for GhIssueList {
     fn format_compact(&self) -> String {
-        let mut lines = vec!["🐛 Issues".to_string()];
+        let mut lines = vec!["Issues:".to_string()];
         for issue in self.issues.iter().take(20) {
             let icon = if issue.state == "OPEN" {
-                "🟢"
+                "open"
             } else {
-                "🔴"
+                "closed"
             };
             lines.push(format!(
                 "  {} #{} {}",
@@ -314,7 +317,11 @@ impl TokenFormatter for GhIssueList {
 
 impl TokenFormatter for GhIssueDetail {
     fn format_compact(&self) -> String {
-        let icon = if self.state == "OPEN" { "🟢" } else { "🔴" };
+        let icon = if self.state == "OPEN" {
+            "open"
+        } else {
+            "closed"
+        };
         let mut lines = vec![
             format!("{} Issue #{}: {}", icon, self.number, self.title),
             format!("  Author: @{}", self.author),
@@ -334,7 +341,11 @@ impl TokenFormatter for GhIssueDetail {
         self.format_compact()
     }
     fn format_ultra(&self) -> String {
-        let icon = if self.state == "OPEN" { "🟢" } else { "🔴" };
+        let icon = if self.state == "OPEN" {
+            "open"
+        } else {
+            "closed"
+        };
         format!(
             "{} #{}: {}",
             icon,
@@ -346,17 +357,17 @@ impl TokenFormatter for GhIssueDetail {
 
 impl TokenFormatter for GhRunList {
     fn format_compact(&self) -> String {
-        let mut lines = vec!["🏃 Workflow Runs".to_string()];
+        let mut lines = vec!["Workflow Runs".to_string()];
         for run in &self.runs {
             let icon = match run.conclusion.as_deref() {
-                Some("success") => "✅",
-                Some("failure") => "❌",
-                Some("cancelled") => "🚫",
+                Some("success") => "ok",
+                Some("failure") => "fail",
+                Some("cancelled") => "cancelled",
                 _ => {
                     if run.status == "in_progress" {
-                        "⏳"
+                        "running"
                     } else {
-                        "⚪"
+                        "-"
                     }
                 }
             };
@@ -383,28 +394,26 @@ impl TokenFormatter for GhRunList {
             .iter()
             .filter(|r| r.conclusion.as_deref() == Some("success"))
             .count();
-        format!("Runs: ✅{} ❌{} total:{}", passed, failed, self.runs.len())
+        format!(
+            "Runs: ok:{} fail:{} total:{}",
+            passed,
+            failed,
+            self.runs.len()
+        )
     }
 }
 
 impl TokenFormatter for GhRepoDetail {
     fn format_compact(&self) -> String {
-        let visibility = if self.private {
-            "🔒 Private"
-        } else {
-            "🌐 Public"
-        };
+        let visibility = if self.private { "Private" } else { "Public" };
         let mut lines = vec![
-            format!("📦 {}/{}", self.owner, self.name),
+            format!("{}/{}", self.owner, self.name),
             format!("  {}", visibility),
         ];
         if !self.description.is_empty() {
             lines.push(format!("  {}", truncate_str(&self.description, 80)));
         }
-        lines.push(format!(
-            "  ⭐ {} stars | 🔱 {} forks",
-            self.stars, self.forks
-        ));
+        lines.push(format!("  {} stars | {} forks", self.stars, self.forks));
         lines.push(format!("  {}", self.url));
         lines.join("\n")
     }
@@ -412,6 +421,6 @@ impl TokenFormatter for GhRepoDetail {
         self.format_compact()
     }
     fn format_ultra(&self) -> String {
-        format!("{}/{} ⭐{}", self.owner, self.name, self.stars)
+        format!("{}/{} ({})", self.owner, self.name, self.stars)
     }
 }

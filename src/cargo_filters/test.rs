@@ -23,7 +23,7 @@ impl AggregatedTestResult {
         let re = RE.get_or_init(|| {
             regex::Regex::new(
                 r"test result: (\w+)\.\s+(\d+) passed;\s+(\d+) failed;\s+(\d+) ignored;\s+(\d+) measured;\s+(\d+) filtered out(?:;\s+finished in ([\d.]+)s)?"
-            ).unwrap()
+            ).expect("regex: cargo test result summary")
         });
 
         let caps = re.captures(line)?;

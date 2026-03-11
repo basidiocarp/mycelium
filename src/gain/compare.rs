@@ -42,13 +42,7 @@ pub(crate) fn run_compare(cmd_str: &str) -> Result<()> {
     let raw_tokens = estimate_tokens(&raw_text);
     let mycelium_tokens = estimate_tokens(&mycelium_text);
 
-    let (saved, savings_pct) = if raw_tokens > 0 && raw_tokens >= mycelium_tokens {
-        let s = raw_tokens - mycelium_tokens;
-        let pct = (s as f64 / raw_tokens as f64) * 100.0;
-        (s, pct)
-    } else {
-        (0, 0.0)
-    };
+    let (saved, savings_pct) = calculate_savings(raw_tokens, mycelium_tokens);
 
     let bar = compare_bar(savings_pct, 30);
 
@@ -79,6 +73,20 @@ pub(crate) fn run_compare(cmd_str: &str) -> Result<()> {
     Ok(())
 }
 
+/// Calculate token savings between raw and mycelium-filtered output.
+///
+/// Returns `(tokens_saved, savings_percentage)`. Savings percentage is clamped
+/// to `[0.0, 100.0]` — if mycelium output is larger than raw, savings are 0.
+pub fn calculate_savings(raw_tokens: usize, mycelium_tokens: usize) -> (usize, f64) {
+    if raw_tokens > 0 && raw_tokens >= mycelium_tokens {
+        let saved = raw_tokens - mycelium_tokens;
+        let pct = (saved as f64 / raw_tokens as f64) * 100.0;
+        (saved, pct)
+    } else {
+        (0, 0.0)
+    }
+}
+
 /// Build a colored savings bar for the compare view (TTY-aware).
 pub(crate) fn compare_bar(pct: f64, width: usize) -> String {
     if width == 0 {
@@ -106,6 +114,83 @@ pub(crate) fn compare_bar(pct: f64, width: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tracking::estimate_tokens;
+
+    // ── calculate_savings tests ──────────────────────────────────────
+
+    #[test]
+    fn test_savings_normal_case() {
+        // 1000 raw tokens, 300 mycelium tokens → 70% savings
+        let (saved, pct) = calculate_savings(1000, 300);
+        assert_eq!(saved, 700);
+        assert!((pct - 70.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_savings_no_regression() {
+        // mycelium output larger than raw → 0% savings, not negative
+        let (saved, pct) = calculate_savings(100, 150);
+        assert_eq!(saved, 0);
+        assert!((pct - 0.0).abs() < f64::EPSILON);
+
+        // equal sizes → 0 saved, 0%
+        let (saved, pct) = calculate_savings(100, 100);
+        assert_eq!(saved, 0);
+        assert!((pct - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_savings_empty_raw() {
+        // Both empty → 0% savings, no panic
+        let (saved, pct) = calculate_savings(0, 0);
+        assert_eq!(saved, 0);
+        assert!((pct - 0.0).abs() < f64::EPSILON);
+
+        // Raw empty but mycelium non-empty → 0%
+        let (saved, pct) = calculate_savings(0, 50);
+        assert_eq!(saved, 0);
+        assert!((pct - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_savings_complete_reduction() {
+        // mycelium returns nothing → 100% savings
+        let (saved, pct) = calculate_savings(500, 0);
+        assert_eq!(saved, 500);
+        assert!((pct - 100.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_savings_calculation_precision() {
+        // 1/3 savings: 999 raw, 666 mycelium → 33.33..%
+        let (saved, pct) = calculate_savings(999, 666);
+        assert_eq!(saved, 333);
+        assert!((pct - 33.333333333333336).abs() < 1e-10);
+
+        // Very large values — no overflow
+        let (saved, pct) = calculate_savings(usize::MAX / 2, usize::MAX / 4);
+        assert_eq!(saved, usize::MAX / 2 - usize::MAX / 4);
+        assert!(pct > 49.0 && pct < 51.0);
+
+        // Single token
+        let (saved, pct) = calculate_savings(1, 0);
+        assert_eq!(saved, 1);
+        assert!((pct - 100.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_savings_with_estimate_tokens() {
+        // Integration: use estimate_tokens to verify end-to-end
+        let raw = "a]".repeat(200); // 400 chars → 100 tokens
+        let filtered = "a]".repeat(60); // 120 chars → 30 tokens
+        let raw_tokens = estimate_tokens(&raw);
+        let filtered_tokens = estimate_tokens(&filtered);
+        let (saved, pct) = calculate_savings(raw_tokens, filtered_tokens);
+        assert_eq!(saved, raw_tokens - filtered_tokens);
+        assert!((pct - 70.0).abs() < f64::EPSILON);
+    }
+
+    // ── compare_bar tests (existing + retained) ─────────────────────
 
     #[test]
     fn test_compare_bar_full_savings() {

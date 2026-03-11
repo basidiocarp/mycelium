@@ -84,7 +84,7 @@ pub fn write_rules_file(rules: &[CorrectionRule], path: &str) -> Result<()> {
     base_commands.sort();
 
     for base_cmd in base_commands {
-        let rules_for_cmd = grouped.get(&base_cmd).unwrap();
+        let rules_for_cmd = &grouped[&base_cmd];
 
         // Capitalize first letter for section header
         let section_header = capitalize_first(&base_cmd);
@@ -121,7 +121,7 @@ fn capitalize_first(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::learn::detector::ErrorType;
+    use crate::learn::types::ErrorType;
 
     #[test]
     fn test_format_console_report_empty() {

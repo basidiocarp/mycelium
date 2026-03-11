@@ -1,0 +1,39 @@
+---
+source: src/lint_cmd/eslint.rs
+assertion_line: 223
+expression: output
+---
+ESLint: 8 errors, 7 warnings in 5 files
+═══════════════════════════════════════
+Top rules:
+  @typescript-eslint/no-explicit-any (1x)
+  eqeqeq (1x)
+  header/header (1x)
+  import/no-extraneous-dependencies (1x)
+  no-console (1x)
+  no-trailing-spaces (1x)
+  no-undef (1x)
+  no-undefined (1x)
+  no-var (1x)
+  prefer-const (1x)
+
+Top files:
+  src/hooks/useData.ts (4 issues)
+    @typescript-eslint/no-explicit-any (1)
+    import/no-extraneous-dependencies (1)
+    prefer-const (1)
+  src/components/Button.tsx (3 issues)
+    no-undefined (1)
+    no-var (1)
+    semi (1)
+  src/pages/index.tsx (3 issues)
+    header/header (1)
+    react/jsx-filename-extension (1)
+    react/no-array-index-key (1)
+  src/utils/helpers.ts (3 issues)
+    eqeqeq (1)
+    no-console (1)
+    no-trailing-spaces (1)
+  src/api/client.ts (2 issues)
+    no-undef (1)
+    unknown (1)

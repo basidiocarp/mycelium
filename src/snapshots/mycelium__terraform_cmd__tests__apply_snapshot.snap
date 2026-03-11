@@ -1,0 +1,9 @@
+---
+source: src/terraform_cmd.rs
+assertion_line: 369
+expression: output
+---
+aws_security_group.allow_tls: Modifications complete after 2s [id=sg-12345678]
+aws_instance.web: Creation complete after 35s [id=i-0123456789abcdef0]
+aws_s3_bucket.data: Destruction complete after 1s
+Apply complete! Resources: 1 added, 1 changed, 1 destroyed.

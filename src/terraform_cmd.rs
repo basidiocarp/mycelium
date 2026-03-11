@@ -9,13 +9,17 @@ use std::process::Command;
 
 fn re_plan_resource() -> &'static regex::Regex {
     static RE: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
-    RE.get_or_init(|| regex::Regex::new(r"^\s+#\s+(\S+)\s+will be\s+(\w[\w -]+)").unwrap())
+    RE.get_or_init(|| {
+        regex::Regex::new(r"^\s+#\s+(\S+)\s+will be\s+(\w[\w -]+)")
+            .expect("regex: terraform plan resource")
+    })
 }
 
 fn re_plan_summary() -> &'static regex::Regex {
     static RE: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
     RE.get_or_init(|| {
-        regex::Regex::new(r"^Plan:\s+\d+ to add,\s+\d+ to change,\s+\d+ to destroy\.").unwrap()
+        regex::Regex::new(r"^Plan:\s+\d+ to add,\s+\d+ to change,\s+\d+ to destroy\.")
+            .expect("regex: terraform plan summary")
     })
 }
 
@@ -23,19 +27,22 @@ fn re_apply_complete() -> &'static regex::Regex {
     static RE: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
     RE.get_or_init(|| {
         regex::Regex::new(r"^\S+:\s+(Creation|Modification|Destruction|Modifications) complete")
-            .unwrap()
+            .expect("regex: terraform apply complete")
     })
 }
 
 fn re_apply_summary() -> &'static regex::Regex {
     static RE: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
-    RE.get_or_init(|| regex::Regex::new(r"^Apply complete!").unwrap())
+    RE.get_or_init(|| {
+        regex::Regex::new(r"^Apply complete!").expect("regex: terraform apply summary")
+    })
 }
 
 fn re_init_progress() -> &'static regex::Regex {
     static RE: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
     RE.get_or_init(|| {
-        regex::Regex::new(r"^- (Downloading|Installing|Finding|Reusing|Using previously)").unwrap()
+        regex::Regex::new(r"^- (Downloading|Installing|Finding|Reusing|Using previously)")
+            .expect("regex: terraform init progress")
     })
 }
 
@@ -353,5 +360,47 @@ mod tests {
         assert_eq!(action_symbol("destroyed"), "-");
         assert_eq!(action_symbol("replaced"), "-/+");
         assert_eq!(action_symbol("updated in-place"), "~");
+    }
+
+    #[test]
+    fn test_plan_snapshot() {
+        let input = include_str!("../tests/fixtures/terraform_plan_raw.txt");
+        let output = filter_plan(input);
+        insta::assert_snapshot!(output);
+    }
+
+    #[test]
+    fn test_apply_snapshot() {
+        let input = include_str!("../tests/fixtures/terraform_apply_raw.txt");
+        let output = filter_apply(input);
+        insta::assert_snapshot!(output);
+    }
+
+    #[test]
+    fn test_plan_token_savings() {
+        let input = include_str!("../tests/fixtures/terraform_plan_raw.txt");
+        let output = filter_plan(input);
+        let input_tokens = count_tokens(input);
+        let output_tokens = count_tokens(&output);
+        let savings_pct = 100 - (output_tokens * 100 / input_tokens.max(1));
+        assert!(
+            savings_pct >= 60,
+            "Expected >= 60% token savings, got {}%",
+            savings_pct
+        );
+    }
+
+    #[test]
+    fn test_apply_token_savings() {
+        let input = include_str!("../tests/fixtures/terraform_apply_raw.txt");
+        let output = filter_apply(input);
+        let input_tokens = count_tokens(input);
+        let output_tokens = count_tokens(&output);
+        let savings_pct = 100 - (output_tokens * 100 / input_tokens.max(1));
+        assert!(
+            savings_pct >= 50,
+            "Expected >= 50% token savings, got {}%",
+            savings_pct
+        );
     }
 }

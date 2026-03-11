@@ -20,7 +20,7 @@ pub(crate) fn kubectl_pods(args: &[String], _verbose: u8) -> Result<()> {
     let json: serde_json::Value = match serde_json::from_str(&raw) {
         Ok(v) => v,
         Err(_) => {
-            out.push_str("☸️  No pods found");
+            out.push_str("k8s: No pods found");
             println!("{}", out);
             timer.track("kubectl get pods", "mycelium kubectl pods", &raw, &out);
             return Ok(());
@@ -30,7 +30,7 @@ pub(crate) fn kubectl_pods(args: &[String], _verbose: u8) -> Result<()> {
     let pods = match json["items"].as_array() {
         Some(items) if !items.is_empty() => items,
         _ => {
-            out.push_str("☸️  No pods found");
+            out.push_str("k8s: No pods found");
             println!("{}", out);
             timer.track("kubectl get pods", "mycelium kubectl pods", &raw, &out);
             return Ok(());
@@ -89,9 +89,9 @@ pub(crate) fn kubectl_pods(args: &[String], _verbose: u8) -> Result<()> {
         parts.push(format!("{} restarts", restarts_total));
     }
 
-    out.push_str(&format!("☸️  {} pods: {}\n", pods.len(), parts.join(", ")));
+    out.push_str(&format!("k8s: {} pods: {}\n", pods.len(), parts.join(", ")));
     if !issues.is_empty() {
-        out.push_str("⚠️  Issues:\n");
+        out.push_str("[!] Issues:\n");
         for issue in issues.iter().take(10) {
             out.push_str(&format!("  {}\n", issue));
         }
@@ -121,7 +121,7 @@ pub(crate) fn kubectl_services(args: &[String], _verbose: u8) -> Result<()> {
     let json: serde_json::Value = match serde_json::from_str(&raw) {
         Ok(v) => v,
         Err(_) => {
-            out.push_str("☸️  No services found");
+            out.push_str("k8s: No services found");
             println!("{}", out);
             timer.track("kubectl get svc", "mycelium kubectl svc", &raw, &out);
             return Ok(());
@@ -131,13 +131,13 @@ pub(crate) fn kubectl_services(args: &[String], _verbose: u8) -> Result<()> {
     let services = match json["items"].as_array() {
         Some(items) if !items.is_empty() => items,
         _ => {
-            out.push_str("☸️  No services found");
+            out.push_str("k8s: No services found");
             println!("{}", out);
             timer.track("kubectl get svc", "mycelium kubectl svc", &raw, &out);
             return Ok(());
         }
     };
-    out.push_str(&format!("☸️  {} services:\n", services.len()));
+    out.push_str(&format!("k8s: {} services:\n", services.len()));
 
     for svc in services.iter().take(15) {
         let ns = svc["metadata"]["namespace"].as_str().unwrap_or("-");
@@ -197,7 +197,7 @@ pub(crate) fn kubectl_logs(args: &[String], _verbose: u8) -> Result<()> {
     let output = cmd.output().context("Failed to run kubectl logs")?;
     let raw = String::from_utf8_lossy(&output.stdout).to_string();
     let analyzed = crate::log_cmd::run_stdin_str(&raw);
-    let out = format!("☸️  Logs for {}:\n{}", pod, analyzed);
+    let out = format!("k8s: Logs for {}:\n{}", pod, analyzed);
     println!("{}", out);
     timer.track(
         &format!("kubectl logs {}", pod),

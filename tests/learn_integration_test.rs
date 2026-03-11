@@ -8,9 +8,8 @@ use mycelium::discover::provider::{ClaudeProvider, SessionProvider};
 use mycelium::learn::corrections_store::{
     UserCorrection, apply_correction, load_corrections, write_corrections_json,
 };
-use mycelium::learn::detector::{
-    CommandExecution, deduplicate_corrections, extract_base_command, find_corrections,
-};
+use mycelium::learn::detector::{CommandExecution, deduplicate_corrections, find_corrections};
+use mycelium::learn::types::extract_base_command;
 use std::path::Path;
 use tempfile::tempdir;
 

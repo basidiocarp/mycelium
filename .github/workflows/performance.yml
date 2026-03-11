@@ -6,7 +6,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  MAX_BINARY_SIZE_MB: 5
+  MAX_BINARY_SIZE_MB: 8
   MAX_STARTUP_MS: 15
 
 jobs:

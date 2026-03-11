@@ -1,0 +1,10 @@
+---
+source: src/terraform_cmd.rs
+assertion_line: 362
+expression: output
+---
+  + aws_instance.web
+  - aws_s3_bucket.data
+  ~ aws_security_group.allow_tls
+  -/+ aws_db_instance.postgres
+Plan: 1 to add, 1 to change, 1 to destroy.

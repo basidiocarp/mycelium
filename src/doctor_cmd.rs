@@ -7,7 +7,7 @@ use anyhow::Result;
 use colored::Colorize;
 use std::path::PathBuf;
 
-use crate::{config, integrity, tracking};
+use crate::{config, integrity, plugin, tracking};
 
 pub fn run() -> Result<()> {
     println!("{}", "Mycelium Doctor — Health Check".bold());
@@ -15,9 +15,12 @@ pub fn run() -> Result<()> {
 
     check_version();
     check_hook();
+    check_settings_json();
     check_config();
     check_tracking_db();
+    check_plugin_dir();
     check_binary_collision();
+    check_path();
 
     println!();
     Ok(())
@@ -119,6 +122,85 @@ fn check_tracking_db() {
             }
         }
         Err(e) => fail("tracking db", &format!("cannot open: {e}")),
+    }
+}
+
+fn check_settings_json() {
+    let home = match dirs::home_dir() {
+        Some(h) => h,
+        None => {
+            warn("settings.json", "cannot determine home directory");
+            return;
+        }
+    };
+
+    let settings_path = home.join(".claude").join("settings.json");
+    if !settings_path.exists() {
+        warn(
+            "settings.json",
+            "not found — run `mycelium init -g` to register hook",
+        );
+        return;
+    }
+
+    match std::fs::read_to_string(&settings_path) {
+        Ok(content) => {
+            if content.contains("mycelium-rewrite") {
+                pass("settings.json", "hook registered");
+            } else {
+                warn("settings.json", "exists but mycelium hook not registered");
+            }
+        }
+        Err(e) => fail("settings.json", &format!("cannot read: {e}")),
+    }
+}
+
+fn check_plugin_dir() {
+    let config = plugin::PluginConfig::default();
+    let dir = &config.directory;
+
+    if !dir.exists() {
+        pass(
+            "plugins",
+            &format!("directory not created yet ({})", dir.display()),
+        );
+        return;
+    }
+
+    let count = std::fs::read_dir(dir)
+        .map(|entries| {
+            entries
+                .filter_map(|e| e.ok())
+                .filter(|e| e.path().is_file())
+                .count()
+        })
+        .unwrap_or(0);
+
+    pass(
+        "plugins",
+        &format!("{count} plugin(s) in {}", dir.display()),
+    );
+}
+
+fn check_path() {
+    let current_exe = match std::env::current_exe() {
+        Ok(p) => p,
+        Err(_) => return,
+    };
+
+    let install_dir = current_exe
+        .parent()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_default();
+
+    let path_var = std::env::var("PATH").unwrap_or_default();
+    if path_var.split(':').any(|p| p == install_dir) {
+        pass("PATH", &format!("{install_dir} is in PATH"));
+    } else {
+        warn(
+            "PATH",
+            &format!("{install_dir} is NOT in PATH — add it to your shell profile"),
+        );
     }
 }
 

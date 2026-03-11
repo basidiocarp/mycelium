@@ -278,6 +278,7 @@ After install, **restart Claude Code**.
 | `kubectl get/logs`                         | `mycelium kubectl ...`    |
 | `curl`                                     | `mycelium curl`           |
 | `pnpm list/outdated`                       | `mycelium pnpm ...`       |
+| `atmos terraform/describe/validate/...`    | `mycelium atmos ...`      |
 
 Commands already using `mycelium`, heredocs (`<<`), and unrecognized commands pass through unchanged.
 
@@ -323,10 +324,23 @@ mycelium init -g --uninstall     # Remove hook, Mycelium.md, settings.json entry
 cargo uninstall mycelium          # Remove binary
 ```
 
+## Plugins
+
+Mycelium supports custom filter plugins for tools not built in. See [docs/PLUGINS.md](docs/PLUGINS.md) for the full guide.
+
+Shipped plugins (install with `./scripts/install-plugin.sh <name>`):
+- **atmos** — filters [Atmos](https://atmos.tools/) infrastructure orchestration output
+
 ## Documentation
 
-- **[TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** – Fix common issues
-- **[INSTALL.md](INSTALL.md)** - Detailed installation guide
+- **[FEATURES.md](docs/FEATURES.md)** – Feature overview and savings summary
+- **[COMMANDS.md](docs/COMMANDS.md)** – Complete command reference (45+ commands)
+- **[ANALYTICS.md](docs/ANALYTICS.md)** – Analytics, hooks, configuration, tee system
 - **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** – Technical architecture
+- **[EXTENDING.md](docs/EXTENDING.md)** – Adding new commands, development patterns
+- **[PLUGINS.md](docs/PLUGINS.md)** – Write custom filter plugins
+- **[COST_ANALYSIS.md](docs/COST_ANALYSIS.md)** – Economics math and accuracy
+- **[TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** – Fix common issues
+- **[INSTALL.md](INSTALL.md)** – Detailed installation guide
 - **[SECURITY.md](SECURITY.md)** – Security policy and PR review process
-- **[AUDIT_GUIDE.md](docs/AUDIT_GUIDE.md)** - Token savings analytics guide
+- **[AUDIT_GUIDE.md](docs/AUDIT_GUIDE.md)** – Token savings analytics guide

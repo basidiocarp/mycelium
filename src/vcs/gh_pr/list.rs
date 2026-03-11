@@ -40,8 +40,8 @@ pub fn list_prs(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()
             filtered.push_str("PRs\n");
             println!("PRs");
         } else {
-            filtered.push_str("📋 Pull Requests\n");
-            println!("📋 Pull Requests");
+            filtered.push_str("Pull Requests\n");
+            println!("Pull Requests");
         }
 
         for pr in prs.iter().take(20) {
@@ -59,10 +59,10 @@ pub fn list_prs(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()
                 }
             } else {
                 match state {
-                    "OPEN" => "🟢",
-                    "MERGED" => "🟣",
-                    "CLOSED" => "🔴",
-                    _ => "⚪",
+                    "OPEN" => "open",
+                    "MERGED" => "merged",
+                    "CLOSED" => "closed",
+                    _ => "-",
                 }
             };
 

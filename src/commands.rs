@@ -27,7 +27,7 @@ use crate::filter;
   \x1b[1mInfrastructure:\x1b[0m     docker, kubectl, terraform, aws
   \x1b[1mLogs & Data:\x1b[0m        json, log, err, summary, env, deps
   \x1b[1mAnalytics:\x1b[0m          gain, discover, learn
-  \x1b[1mSetup:\x1b[0m              init, config, doctor, verify, self-update, completions, proxy
+  \x1b[1mSetup:\x1b[0m              init, config, doctor, verify, self-update, completions, proxy, benchmark, plugin
 
 \x1b[1;4mOptions:\x1b[0m
 {options}
@@ -470,6 +470,12 @@ pub enum Commands {
         /// Filter statistics to current project (current working directory)
         #[arg(short, long)]
         project: bool,
+        /// Filter to a specific project path (use '.' for current directory)
+        #[arg(long = "project-path", value_name = "PATH")]
+        project_path: Option<String>,
+        /// Show per-project breakdown table
+        #[arg(long)]
+        projects: bool,
         /// Show ASCII graph of daily savings
         #[arg(short, long)]
         graph: bool,
@@ -623,6 +629,21 @@ pub enum Commands {
         args: Vec<OsString>,
     },
 
+    /// Measure token savings across available commands
+    #[command(display_order = 117)]
+    Benchmark {
+        /// CI mode: exit non-zero if <80% of tests show savings
+        #[arg(long)]
+        ci: bool,
+    },
+
+    /// Manage filter plugins
+    #[command(display_order = 118)]
+    Plugin {
+        #[command(subcommand)]
+        command: PluginCommands,
+    },
+
     // ── Hidden (internal/debug) ──────────────────────────────────────────────
     /// Word/line/byte count with compact output (strips paths and padding)
     #[command(hide = true)]
@@ -673,6 +694,20 @@ pub enum Commands {
     Rewrite {
         /// Raw command to rewrite (e.g. "git status", "cargo test && git push")
         cmd: String,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum PluginCommands {
+    /// List available and installed plugins
+    List,
+    /// Install a shipped plugin to the plugin directory
+    Install {
+        /// Plugin name (e.g. "atmos") or "--all" to install all
+        name: String,
+        /// Overwrite existing plugin without prompting
+        #[arg(long)]
+        force: bool,
     },
 }
 

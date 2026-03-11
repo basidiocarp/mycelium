@@ -13,10 +13,10 @@ pub fn format_compose_ps(raw: &str) -> String {
     let lines: Vec<&str> = raw.lines().filter(|l| !l.trim().is_empty()).collect();
 
     if lines.is_empty() {
-        return "🐳 0 compose services".to_string();
+        return "docker: 0 compose services".to_string();
     }
 
-    let mut result = format!("🐳 {} compose services:\n", lines.len());
+    let mut result = format!("docker: {} compose services:\n", lines.len());
 
     for line in lines.iter().take(20) {
         let parts: Vec<&str> = line.split('\t').collect();
@@ -55,19 +55,19 @@ pub fn format_compose_ps(raw: &str) -> String {
 /// Format `docker compose logs` output into compact form
 pub fn format_compose_logs(raw: &str) -> String {
     if raw.trim().is_empty() {
-        return "🐳 No logs".to_string();
+        return "docker: No logs".to_string();
     }
 
     // docker compose logs prefixes each line with "service-N  | "
     // Use the existing log deduplication engine
     let analyzed = crate::log_cmd::run_stdin_str(raw);
-    format!("🐳 Compose logs:\n{}", analyzed)
+    format!("docker: Compose logs:\n{}", analyzed)
 }
 
 /// Format `docker compose build` output into compact summary
 pub fn format_compose_build(raw: &str) -> String {
     if raw.trim().is_empty() {
-        return "🐳 Build: no output".to_string();
+        return "docker: Build: no output".to_string();
     }
 
     let mut result = String::new();
@@ -75,7 +75,7 @@ pub fn format_compose_build(raw: &str) -> String {
     // Extract the summary line: "[+] Building 12.3s (8/8) FINISHED"
     for line in raw.lines() {
         if line.contains("Building") && line.contains("FINISHED") {
-            result.push_str(&format!("🐳 {}\n", line.trim()));
+            result.push_str(&format!("docker: {}\n", line.trim()));
             break;
         }
     }
@@ -83,9 +83,9 @@ pub fn format_compose_build(raw: &str) -> String {
     if result.is_empty() {
         // No FINISHED line found — might still be building or errored
         if let Some(line) = raw.lines().find(|l| l.contains("Building")) {
-            result.push_str(&format!("🐳 {}\n", line.trim()));
+            result.push_str(&format!("docker: {}\n", line.trim()));
         } else {
-            result.push_str("🐳 Build:\n");
+            result.push_str("docker: Build:\n");
         }
     }
 

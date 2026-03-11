@@ -244,7 +244,7 @@ fn func_signature() -> &'static Regex {
     RE.get_or_init(|| {
         Regex::new(
         r"^(pub\s+)?(async\s+)?(fn|def|function|func|class|struct|enum|trait|interface|type)\s+\w+"
-    ).unwrap()
+    ).expect("regex: definition detection")
     })
 }
 

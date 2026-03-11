@@ -23,7 +23,7 @@ pub fn run(file1: &Path, file2: &Path, verbose: u8) -> Result<()> {
     let mut out = String::new();
 
     if diff.added == 0 && diff.removed == 0 {
-        out.push_str("✅ Files are identical");
+        out.push_str("✓ Files are identical");
         println!("{}", out);
         timer.track(
             &format!("diff {} {}", file1.display(), file2.display()),
@@ -34,7 +34,7 @@ pub fn run(file1: &Path, file2: &Path, verbose: u8) -> Result<()> {
         return Ok(());
     }
 
-    out.push_str(&format!("📊 {} → {}\n", file1.display(), file2.display()));
+    out.push_str(&format!("{} → {}\n", file1.display(), file2.display()));
     out.push_str(&format!(
         "   +{} added, -{} removed, ~{} modified\n\n",
         diff.added, diff.removed, diff.modified
@@ -169,7 +169,7 @@ fn condense_unified_diff(diff: &str) -> String {
             // File header
             if line.starts_with("+++ ") {
                 if !current_file.is_empty() && (added > 0 || removed > 0) {
-                    result.push(format!("📄 {} (+{} -{})", current_file, added, removed));
+                    result.push(format!("{} (+{} -{})", current_file, added, removed));
                     for c in changes.iter().take(10) {
                         result.push(format!("  {}", c));
                     }
@@ -200,7 +200,7 @@ fn condense_unified_diff(diff: &str) -> String {
 
     // Last file
     if !current_file.is_empty() && (added > 0 || removed > 0) {
-        result.push(format!("📄 {} (+{} -{})", current_file, added, removed));
+        result.push(format!("{} (+{} -{})", current_file, added, removed));
         for c in changes.iter().take(10) {
             result.push(format!("  {}", c));
         }

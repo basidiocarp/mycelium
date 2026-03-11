@@ -26,14 +26,14 @@ pub(crate) fn docker_ps(_verbose: u8) -> Result<()> {
     let mut out = String::new();
 
     if stdout.trim().is_empty() {
-        out.push_str("🐳 0 containers");
+        out.push_str("docker: 0 containers");
         println!("{}", out);
         timer.track("docker ps", "mycelium docker ps", &raw, &out);
         return Ok(());
     }
 
     let count = stdout.lines().count();
-    out.push_str(&format!("🐳 {} containers:\n", count));
+    out.push_str(&format!("docker: {} containers:\n", count));
 
     for line in stdout.lines().take(15) {
         let parts: Vec<&str> = line.split('\t').collect();
@@ -85,7 +85,7 @@ pub(crate) fn docker_images(_verbose: u8) -> Result<()> {
     let mut out = String::new();
 
     if lines.is_empty() {
-        out.push_str("🐳 0 images");
+        out.push_str("docker: 0 images");
         println!("{}", out);
         timer.track("docker images", "mycelium docker images", &raw, &out);
         return Ok(());
@@ -112,7 +112,11 @@ pub(crate) fn docker_images(_verbose: u8) -> Result<()> {
     } else {
         format!("{:.0}MB", total_size_mb)
     };
-    out.push_str(&format!("🐳 {} images ({})\n", lines.len(), total_display));
+    out.push_str(&format!(
+        "docker: {} images ({})\n",
+        lines.len(),
+        total_display
+    ));
 
     for line in lines.iter().take(15) {
         let parts: Vec<&str> = line.split('\t').collect();
@@ -155,7 +159,7 @@ pub(crate) fn docker_logs(args: &[String], _verbose: u8) -> Result<()> {
     let raw = format!("{}\n{}", stdout, stderr);
 
     let analyzed = crate::log_cmd::run_stdin_str(&raw);
-    let out = format!("🐳 Logs for {}:\n{}", container, analyzed);
+    let out = format!("docker: Logs for {}:\n{}", container, analyzed);
     println!("{}", out);
     timer.track(
         &format!("docker logs {}", container),

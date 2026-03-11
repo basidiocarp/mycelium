@@ -2,6 +2,7 @@
 pub mod corrections_store;
 pub mod detector;
 pub mod report;
+pub mod types;
 
 use crate::discover::provider::{ClaudeProvider, SessionProvider};
 use anyhow::Result;

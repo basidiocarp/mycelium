@@ -1,7 +1,7 @@
 //! Detects outdated Claude Code hooks and warns the user once per day.
 use std::path::PathBuf;
 
-const CURRENT_HOOK_VERSION: u8 = 2;
+const CURRENT_HOOK_VERSION: u8 = 3;
 const WARN_INTERVAL_SECS: u64 = 24 * 3600;
 
 /// Check if the installed hook is outdated, warn once per day.

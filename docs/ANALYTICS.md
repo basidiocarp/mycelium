@@ -1,0 +1,327 @@
+# Mycelium Analytics, Hooks, and Configuration
+
+> Analytics commands, hook system, configuration options, and the tee system. For command reference, see [COMMANDS.md](COMMANDS.md).
+
+---
+
+## Table of Contents
+
+1. [Analytics and Tracking](#analytics-and-tracking)
+2. [Hook System](#hook-system)
+3. [Configuration](#configuration)
+4. [Tee System (Output Recovery)](#tee-system)
+
+---
+
+## Analytics and Tracking
+
+### Tracking System
+
+Mycelium records each command execution in a SQLite database:
+
+- **Location:** `~/.local/share/mycelium/history.db` (Linux), `~/Library/Application Support/mycelium/history.db` (macOS)
+- **Retention:** 90-day automatic cleanup
+- **Metrics:** input/output tokens, savings percentage, execution time, project
+
+---
+
+### `mycelium gain` -- Savings Statistics
+
+```bash
+mycelium gain                        # Global summary
+mycelium gain -p                     # Filter by current project
+mycelium gain --graph                # ASCII graph (last 30 days)
+mycelium gain --history              # Recent command history
+mycelium gain --daily                # Day-by-day breakdown
+mycelium gain --weekly               # Week-by-week breakdown
+mycelium gain --monthly              # Month-by-month breakdown
+mycelium gain --all                  # All breakdowns
+mycelium gain --quota -t pro         # Estimated savings on monthly quota
+mycelium gain --failures             # Parsing failure log (fallback commands)
+mycelium gain --format json          # JSON export (for dashboards)
+mycelium gain --format csv           # CSV export
+```
+
+**Options:**
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--project` | `-p` | Filter by current directory |
+| `--graph` | `-g` | ASCII graph of last 30 days |
+| `--history` | `-H` | Recent command history |
+| `--quota` | `-q` | Estimated savings on monthly quota |
+| `--tier` | `-t` | Subscription tier: `pro`, `5x`, `20x` (default: `20x`) |
+| `--daily` | `-d` | Daily breakdown |
+| `--weekly` | `-w` | Weekly breakdown |
+| `--monthly` | `-m` | Monthly breakdown |
+| `--all` | `-a` | All breakdowns |
+| `--format` | `-f` | Output format: `text`, `json`, `csv` |
+| `--failures` | `-F` | Show fallback commands |
+
+**Example output:**
+```
+$ mycelium gain
+Mycelium Token Savings Summary
+  Total commands:     1,247
+  Total input:        2,341,000 tokens
+  Total output:       468,200 tokens
+  Total saved:        1,872,800 tokens (80%)
+  Avg per command:    1,501 tokens saved
+
+Top commands:
+  git status    312x  -82%
+  cargo test    156x  -91%
+  git diff       98x  -76%
+```
+
+---
+
+### `mycelium discover` -- Missed Opportunities
+
+**Purpose:** Analyzes Claude Code history to find commands that could have been optimized by mycelium.
+
+```bash
+mycelium discover                          # Current project, last 30 days
+mycelium discover --all --since 7          # All projects, last 7 days
+mycelium discover -p /path/to/project      # Filter by project
+mycelium discover --limit 20              # Max commands per section
+mycelium discover --format json            # JSON export
+```
+
+**Options:**
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--project` | `-p` | Filter by project path |
+| `--limit` | `-l` | Max commands per section (default: 15) |
+| `--all` | `-a` | Scan all projects |
+| `--since` | `-s` | Last N days (default: 30) |
+| `--format` | `-f` | Format: `text`, `json` |
+
+---
+
+### `mycelium learn` -- Learn from Errors
+
+**Purpose:** Analyzes Claude Code CLI error history to detect recurring corrections.
+
+```bash
+mycelium learn                             # Current project
+mycelium learn --all --since 7             # All projects
+mycelium learn --write-rules               # Generate .claude/rules/cli-corrections.md
+mycelium learn --min-confidence 0.8        # Confidence threshold (default: 0.6)
+mycelium learn --min-occurrences 3         # Minimum occurrences (default: 1)
+mycelium learn --format json               # JSON export
+```
+
+---
+
+### `mycelium cc-economics` -- Claude Code Economic Analysis
+
+**Purpose:** Compares Claude Code spending (via ccusage) with Mycelium savings.
+
+```bash
+mycelium cc-economics                      # Summary
+mycelium cc-economics --daily              # Daily breakdown
+mycelium cc-economics --weekly             # Weekly breakdown
+mycelium cc-economics --monthly            # Monthly breakdown
+mycelium cc-economics --all                # All breakdowns
+mycelium cc-economics --format json        # JSON export
+```
+
+---
+
+### `mycelium hook-audit` -- Hook Metrics
+
+**Prerequisite:** Requires `MYCELIUM_HOOK_AUDIT=1` in the environment.
+
+```bash
+mycelium hook-audit                        # Last 7 days (default)
+mycelium hook-audit --since 30             # Last 30 days
+mycelium hook-audit --since 0              # Full history
+```
+
+---
+
+## Hook System
+
+### How It Works
+
+The Mycelium hook intercepts Bash commands in Claude Code **before execution** and automatically rewrites them into their Mycelium equivalent.
+
+**Flow:**
+```mermaid
+sequenceDiagram
+    participant CC as Claude Code
+    participant SJ as settings.json
+    participant HK as mycelium-rewrite.sh
+    participant MY as Mycelium
+
+    CC->>SJ: Bash: "git status"
+    SJ->>HK: PreToolUse hook
+    HK->>MY: mycelium rewrite "git status"
+    MY-->>HK: "mycelium git status"
+    HK-->>SJ: updatedInput
+    SJ->>MY: execute: mycelium git status
+    MY-->>CC: Filtered output (~10 tokens vs ~200)
+```
+
+**Key points:**
+- Claude never sees the rewrite -- it simply receives optimized output
+- The hook is a lightweight delegator (~50 lines of bash) that calls `mycelium rewrite`
+- All rewrite logic lives in the Rust registry (`src/discover/registry.rs`)
+- Commands already prefixed with `mycelium` pass through unchanged
+- Heredocs (`<<`) are not modified
+- Unrecognized commands pass through unchanged
+
+### Installation
+
+```bash
+mycelium init -g                     # Recommended installation (hook + Mycelium.md)
+mycelium init -g --auto-patch        # Non-interactive (CI/CD)
+mycelium init -g --hook-only         # Hook only, without Mycelium.md
+mycelium init --show                 # Check installation
+mycelium init -g --uninstall         # Uninstall
+```
+
+### Installed Files
+
+| File | Description |
+|------|-------------|
+| `~/.claude/hooks/mycelium-rewrite.sh` | Hook script (delegates to `mycelium rewrite`) |
+| `~/.claude/Mycelium.md` | Minimal instructions for the LLM |
+| `~/.claude/settings.json` | PreToolUse hook registration |
+
+### `mycelium rewrite` -- Command Rewriting
+
+Internal command used by the hook. Prints the rewritten command to stdout (exit 0) or exits with exit 1 if no Mycelium equivalent exists.
+
+```bash
+mycelium rewrite "git status"           # -> "mycelium git status" (exit 0)
+mycelium rewrite "terraform plan"       # -> (exit 1, no rewrite)
+mycelium rewrite "mycelium git status"       # -> "mycelium git status" (exit 0, unchanged)
+```
+
+### `mycelium verify` -- Integrity Check
+
+Verifies the integrity of the installed hook via SHA-256 checksum.
+
+```bash
+mycelium verify
+```
+
+### Automatically Rewritten Commands
+
+| Raw command | Rewritten to |
+|-------------|--------------|
+| `git status/diff/log/add/commit/push/pull` | `mycelium git ...` |
+| `gh pr/issue/run` | `mycelium gh ...` |
+| `cargo test/build/clippy/check` | `mycelium cargo ...` |
+| `cat/head/tail <file>` | `mycelium read <file>` |
+| `rg/grep <pattern>` | `mycelium grep <pattern>` |
+| `ls` | `mycelium ls` |
+| `tree` | `mycelium tree` |
+| `wc` | `mycelium wc` |
+| `vitest/jest` | `mycelium vitest run` |
+| `tsc` | `mycelium tsc` |
+| `eslint/biome` | `mycelium lint` |
+| `prettier` | `mycelium prettier` |
+| `playwright` | `mycelium playwright` |
+| `prisma` | `mycelium prisma` |
+| `ruff check/format` | `mycelium ruff ...` |
+| `pytest` | `mycelium pytest` |
+| `mypy` | `mycelium mypy` |
+| `pip list/install` | `mycelium pip ...` |
+| `go test/build/vet` | `mycelium go ...` |
+| `golangci-lint` | `mycelium golangci-lint` |
+| `docker ps/images/logs` | `mycelium docker ...` |
+| `kubectl get/logs` | `mycelium kubectl ...` |
+| `curl` | `mycelium curl` |
+| `pnpm list/outdated` | `mycelium pnpm ...` |
+
+### Command Exclusion
+
+To prevent certain commands from being rewritten, add them to `config.toml`:
+
+```toml
+[hooks]
+exclude_commands = ["curl", "playwright"]
+```
+
+---
+
+## Configuration
+
+### Configuration File
+
+**Location:** `~/.config/mycelium/config.toml` (Linux) or `~/Library/Application Support/mycelium/config.toml` (macOS)
+
+**Commands:**
+```bash
+mycelium config                # Show current configuration
+mycelium config --create       # Create file with default values
+```
+
+### Full Structure
+
+```toml
+[tracking]
+enabled = true              # Enable/disable tracking
+history_days = 90           # Retention days (automatic cleanup)
+database_path = "/custom/path/history.db"  # Custom path (optional)
+
+[display]
+colors = true               # Colored output
+emoji = true                # Use emojis
+max_width = 120             # Maximum output width
+
+[filters]
+ignore_dirs = [".git", "node_modules", "target", "__pycache__", ".venv", "vendor"]
+ignore_files = ["*.lock", "*.min.js", "*.min.css"]
+
+[tee]
+enabled = true              # Enable raw output saving
+mode = "failures"           # "failures" (default), "always", or "never"
+max_files = 20              # Rotation: keep the last N files
+# directory = "/custom/tee/path"  # Custom path (optional)
+
+[hooks]
+exclude_commands = []       # Commands to exclude from automatic rewriting
+```
+
+### Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `MYCELIUM_TEE_DIR` | Override the tee directory |
+| `MYCELIUM_HOOK_AUDIT=1` | Enable hook auditing |
+| `SKIP_ENV_VALIDATION=1` | Disable env validation (Next.js, etc.) |
+
+---
+
+## Tee System
+
+### Raw Output Recovery
+
+When a command fails, Mycelium automatically saves the complete raw output to a log file. This allows the LLM to read the output without re-executing the command.
+
+**How it works:**
+1. The command fails (exit code != 0)
+2. Mycelium saves the raw output to `~/.local/share/mycelium/tee/`
+3. The file path is displayed in the filtered output
+4. The LLM can read the file if more details are needed
+
+**Output:**
+```
+FAILED: 2/15 tests
+[full output: ~/.local/share/mycelium/tee/1707753600_cargo_test.log]
+```
+
+**Configuration:**
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `tee.enabled` | `true` | Enable/disable |
+| `tee.mode` | `"failures"` | `"failures"`, `"always"`, `"never"` |
+| `tee.max_files` | `20` | Rotation: keep the last N files |
+| Min size | 500 bytes | Outputs that are too short are not saved |
+| Max file size | 1 MB | Truncated beyond this |

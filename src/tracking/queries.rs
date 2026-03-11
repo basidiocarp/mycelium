@@ -8,7 +8,8 @@ use jiff::Timestamp;
 use rusqlite::params;
 
 use super::{
-    CommandRecord, DayStats, GainSummary, MonthStats, Tracker, WeekStats, project_filter_params,
+    CommandRecord, DayStats, GainSummary, MonthStats, ProjectStats, Tracker, WeekStats,
+    project_filter_params,
 };
 
 /// A row from the parse health query.
@@ -411,6 +412,33 @@ impl Tracker {
                 mycelium_cmd: row.get(1)?,
                 saved_tokens: row.get::<_, i64>(2)? as usize,
                 savings_pct: row.get(3)?,
+            })
+        })?;
+
+        Ok(rows.collect::<Result<Vec<_>, _>>()?)
+    }
+
+    /// Get per-project aggregated statistics.
+    ///
+    /// Returns one [`ProjectStats`] per distinct `project_path`, ordered by
+    /// total tokens saved (descending). Rows with empty or NULL project paths
+    /// are excluded.
+    pub fn get_by_project(&self) -> Result<Vec<ProjectStats>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT project_path, COUNT(*), SUM(saved_tokens), AVG(savings_pct), MAX(timestamp)
+             FROM commands
+             WHERE project_path IS NOT NULL AND project_path != ''
+             GROUP BY project_path
+             ORDER BY SUM(saved_tokens) DESC",
+        )?;
+
+        let rows = stmt.query_map([], |row| {
+            Ok(ProjectStats {
+                project_path: row.get(0)?,
+                commands: row.get(1)?,
+                saved_tokens: row.get(2)?,
+                avg_savings_pct: row.get(3)?,
+                last_used: row.get(4)?,
             })
         })?;
 

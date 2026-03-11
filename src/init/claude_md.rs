@@ -278,7 +278,7 @@ pub(crate) fn remove_mycelium_block(content: &str) -> (String, bool) {
 
         (result, true) // migrated
     } else if content.contains("<!-- mycelium-instructions") {
-        eprintln!("⚠️  Warning: Found '<!-- mycelium-instructions' without closing marker.");
+        eprintln!("[!] Warning: Found '<!-- mycelium-instructions' without closing marker.");
         eprintln!("    This can happen if CLAUDE.md was manually edited.");
 
         // Find line number

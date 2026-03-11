@@ -43,7 +43,7 @@ impl FileGrouper {
         let mut out = Vec::new();
         for file in files.iter().take(self.max_files) {
             let items = &self.by_file[*file];
-            out.push(format!("📄 {} ({}):", file, items.len()));
+            out.push(format!("{} ({}):", file, items.len()));
             for (line, content) in items.iter().take(self.max_items_per_file) {
                 out.push(format!("  {}: {}", line, content));
             }
