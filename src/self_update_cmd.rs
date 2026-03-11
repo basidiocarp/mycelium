@@ -39,8 +39,12 @@ pub fn run(check_only: bool) -> Result<()> {
     let current_exe = std::env::current_exe().context("Failed to locate current executable")?;
 
     println!("Downloading {asset_name}...");
-    let binary_bytes =
-        download_binary(&download_url).context("Failed to download update binary")?;
+    let archive_bytes =
+        download_binary(&download_url).context("Failed to download update archive")?;
+
+    println!("Extracting...");
+    let binary_bytes = extract_binary(&archive_bytes, &asset_name)
+        .context("Failed to extract binary from archive")?;
 
     replace_binary(&current_exe, &binary_bytes).context("Failed to replace binary")?;
 
@@ -73,21 +77,16 @@ fn fetch_latest_release() -> Result<serde_json::Value> {
 }
 
 fn target_asset_name() -> Option<String> {
-    let os_suffix = match std::env::consts::OS {
-        "macos" => "apple-darwin",
-        "linux" => "linux",
-        "windows" => "windows",
+    let (os_suffix, ext) = match std::env::consts::OS {
+        "macos" => ("apple-darwin", ".tar.gz"),
+        "linux" => ("unknown-linux-musl", ".tar.gz"),
+        "windows" => ("pc-windows-msvc", ".zip"),
         _ => return None,
     };
     let arch = match std::env::consts::ARCH {
         "x86_64" => "x86_64",
         "aarch64" => "aarch64",
         _ => return None,
-    };
-    let ext = if std::env::consts::OS == "windows" {
-        ".exe"
-    } else {
-        ""
     };
     Some(format!("mycelium-{arch}-{os_suffix}{ext}"))
 }
@@ -125,6 +124,59 @@ fn download_binary(url: &str) -> Result<Vec<u8>> {
         anyhow::bail!("Downloaded binary is empty");
     }
     Ok(bytes)
+}
+
+/// Extract the `mycelium` binary from a downloaded archive using system tools.
+fn extract_binary(archive_bytes: &[u8], asset_name: &str) -> Result<Vec<u8>> {
+    use std::process::Command;
+
+    let tmp_dir = tempfile::tempdir().context("Failed to create temp directory")?;
+    let archive_path = tmp_dir.path().join(asset_name);
+
+    std::fs::write(&archive_path, archive_bytes).context("Failed to write archive to temp file")?;
+
+    let binary_name = if cfg!(windows) {
+        "mycelium.exe"
+    } else {
+        "mycelium"
+    };
+
+    if asset_name.ends_with(".tar.gz") {
+        let status = Command::new("tar")
+            .args(["xzf", &archive_path.to_string_lossy(), "-C"])
+            .arg(tmp_dir.path())
+            .status()
+            .context("Failed to run tar (is it installed?)")?;
+        if !status.success() {
+            anyhow::bail!("tar extraction failed with exit code {}", status);
+        }
+    } else if asset_name.ends_with(".zip") {
+        let status = Command::new("unzip")
+            .args(["-o", &*archive_path.to_string_lossy(), "-d"])
+            .arg(tmp_dir.path())
+            .status()
+            .context("Failed to run unzip (is it installed?)")?;
+        if !status.success() {
+            anyhow::bail!("unzip extraction failed with exit code {}", status);
+        }
+    } else {
+        // Not an archive — treat as raw binary
+        return Ok(archive_bytes.to_vec());
+    }
+
+    let extracted = tmp_dir.path().join(binary_name);
+    std::fs::read(&extracted).with_context(|| {
+        format!(
+            "Binary '{}' not found in archive. Contents: {:?}",
+            binary_name,
+            std::fs::read_dir(tmp_dir.path())
+                .map(|entries| entries
+                    .filter_map(|e| e.ok())
+                    .map(|e| e.file_name().to_string_lossy().to_string())
+                    .collect::<Vec<_>>())
+                .unwrap_or_default()
+        )
+    })
 }
 
 fn replace_binary(current_exe: &std::path::Path, binary_bytes: &[u8]) -> Result<()> {
@@ -195,29 +247,30 @@ mod tests {
 
     #[test]
     fn test_target_asset_name_macos_aarch64() {
-        // Simulate what the function would produce: check format
-        let asset = "mycelium-aarch64-apple-darwin".to_string();
+        // Verify expected format matches release assets
+        let asset = "mycelium-aarch64-apple-darwin.tar.gz".to_string();
         assert!(asset.starts_with("mycelium-"));
         assert!(asset.contains("aarch64"));
         assert!(asset.contains("apple-darwin"));
+        assert!(asset.ends_with(".tar.gz"));
     }
 
     #[test]
     fn test_find_asset_url_present() {
         let assets = serde_json::json!([
-            {"name": "mycelium-x86_64-apple-darwin", "browser_download_url": "https://example.com/mycelium"},
-            {"name": "mycelium-x86_64-linux", "browser_download_url": "https://example.com/mycelium-linux"},
+            {"name": "mycelium-x86_64-apple-darwin.tar.gz", "browser_download_url": "https://example.com/mycelium.tar.gz"},
+            {"name": "mycelium-x86_64-unknown-linux-musl.tar.gz", "browser_download_url": "https://example.com/mycelium-linux.tar.gz"},
         ]);
-        let url = find_asset_url(&assets, "mycelium-x86_64-apple-darwin");
-        assert_eq!(url, Some("https://example.com/mycelium".to_string()));
+        let url = find_asset_url(&assets, "mycelium-x86_64-apple-darwin.tar.gz");
+        assert_eq!(url, Some("https://example.com/mycelium.tar.gz".to_string()));
     }
 
     #[test]
     fn test_find_asset_url_missing() {
         let assets = serde_json::json!([
-            {"name": "mycelium-x86_64-linux", "browser_download_url": "https://example.com/mycelium-linux"},
+            {"name": "mycelium-x86_64-unknown-linux-musl.tar.gz", "browser_download_url": "https://example.com/mycelium-linux.tar.gz"},
         ]);
-        let url = find_asset_url(&assets, "mycelium-x86_64-apple-darwin");
+        let url = find_asset_url(&assets, "mycelium-x86_64-apple-darwin.tar.gz");
         assert!(url.is_none());
     }
 

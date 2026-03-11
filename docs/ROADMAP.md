@@ -3,12 +3,14 @@
 ## Completed
 
 ### Language Ecosystem Coverage
-- Git, GitHub CLI, Graphite (stacked PRs)
-- Rust (cargo test/build/clippy/check/nextest)
-- JavaScript/TypeScript (vitest, playwright, tsc, eslint, biome, prettier, next.js, prisma, pnpm, npm)
-- Python (ruff, pytest, pip/uv, mypy, pylint)
-- Go (go test/build/vet, golangci-lint)
-- Infrastructure (docker, kubectl, aws, terraform, psql)
+- **VCS**: Git, GitHub CLI (gh), Graphite (gt) stacked PRs
+- **Rust**: cargo test/build/clippy/check/install/nextest
+- **JavaScript/TypeScript**: vitest, playwright, tsc, eslint, biome, prettier, next.js, prisma, pnpm, npm, npx
+- **Python**: ruff check/format, pytest, pip/uv, mypy
+- **Go**: go test/build/vet, golangci-lint
+- **Infrastructure**: docker, kubectl, aws (sts/s3/ec2/ecs/rds/cloudformation), terraform (plan/apply/init)
+- **Databases & APIs**: psql, curl (auto-JSON + schema), wget
+- **General**: ls, tree, read, peek, find, grep, diff, json, log, err, summary, env, deps, wc, format
 
 ### Architecture
 - Hook-based transparent command rewriting (PreToolUse)
@@ -18,41 +20,45 @@
 - Discover: analyze Claude Code history for missed optimization opportunities
 - Learn: detect recurring CLI error patterns and generate correction rules
 - CC-Economics: compare Claude Code spending with Mycelium savings
-- Modular directory structure (vcs/, js/, python/, go_eco/, etc.)
+- Modular directory structure (vcs/, js/, python/, go_eco/, fileops/)
+- Categorized CLI help output (11 command groups)
+- Self-update from GitHub releases (archive extraction, cross-platform)
+- Release script for version bumping + quality gates (`scripts/release.sh`)
+- Rewrite command (single source of truth for hook rewrites)
+- Proxy command with metric tracking
+- JSON envelope output mode (`--json` global flag)
+- Ultra-compact mode (`-u` flag)
+- Shell completions (bash, zsh, fish)
 
 ### Quality
-- 105+ unit tests across 25+ files
-- Smoke test suite (69 assertions)
+- 1000+ unit tests across 25+ files
+- Smoke test suite (scripts/test-all.sh, 600+ lines)
 - Hook integrity verification (SHA-256)
 - Parse-health command for parser diagnostics
+- Doctor command for installation health checks
+
+### Distribution
+- Pre-compiled binaries for all platforms (macOS x86/ARM, Linux x86/ARM, Windows)
+- GitHub Actions release pipeline (DEB/RPM packages, checksums)
+- Quick install script (`install.sh`)
 
 ---
 
 ## In Progress
 
-### Parser Migration (Phase 4-5)
-- Migrate remaining filters to OutputParser trait (tsc, lint, gh)
-- Add parse_tier tracking to SQLite schema
-- Parse-health diagnostics command
-
 ### Codebase Health
-- Splitting large files (>400 lines) into focused modules
-- Discover pattern gap coverage (bun, podman, python3 -m, etc.)
+- Splitting large files (>400 lines) into focused modules (see `.plans/split-large-files-v2.md`)
+- Parser migration: remaining filters to OutputParser trait (tsc, lint, gh)
 
 ---
 
 ## Planned
 
-### Stability & Distribution
-- Homebrew formula for one-click install
-- Pre-compiled binaries for all platforms
-- Automated release pipeline improvements
-
 ### New Filters
 - diffsitter (AST-aware diffs)
 - ripgrep (rg) dedicated filter
-- cargo nextest improvements
 - bun package manager support
+- podman container support
 
 ### Analytics
 - Per-project tracking isolation

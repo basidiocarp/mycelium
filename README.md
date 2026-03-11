@@ -5,13 +5,13 @@ mycelium filters and compresses command outputs before they reach your LLM conte
 
 ## The Ecosystem
 
-Mycelium is part of a fungal-themed suite of developer tools, named after the biology of fungi — a fitting metaphor for software that works quietly underground to connect and support what's above.
+Mycelium is part of a fungal-themed suite of developer tools, named after the biology of fungi; a fitting metaphor for software that works quietly underground to connect and support what's above.
 
 - **mycelium** — the vast underground network of filaments that feeds and connects. This tool: the connective tissue between your LLM and your dev environment, silently filtering everything that flows through.
 - **[hyphae](https://github.com/basidiocarp/hyphae)** — the individual thread-like filaments that form mycelium. Fine-grained instrumentation and tracing.
 - **[cap](https://github.com/basidiocarp/cap)** — the visible fruiting body above ground. The surface layer: dashboards, analytics, the part you actually see.
 
-The tooling is written in Rust — a language that shares its name with another form of fungal life. Coincidence, but a good one.
+The tooling is written in Rust — a language that shares its name with another form of fungal life. Hence why it's called mycelium.
 
 ## Savings (30-min Claude Code Session)
 
@@ -325,8 +325,8 @@ cargo uninstall mycelium          # Remove binary
 
 ## Documentation
 
-- **[TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** - Fix common issues
+- **[TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** – Fix common issues
 - **[INSTALL.md](INSTALL.md)** - Detailed installation guide
-- **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** - Technical architecture
-- **[SECURITY.md](SECURITY.md)** - Security policy and PR review process
+- **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** – Technical architecture
+- **[SECURITY.md](SECURITY.md)** – Security policy and PR review process
 - **[AUDIT_GUIDE.md](docs/AUDIT_GUIDE.md)** - Token savings analytics guide
