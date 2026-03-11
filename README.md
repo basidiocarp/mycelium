@@ -62,7 +62,7 @@ Download from [releases](https://github.com/basidiocarp/mycelium):
 ### Verify Installation
 
 ```bash
-mycelium --version   # Should show "mycelium 0.1.0"
+mycelium --version   # Should show "mycelium 0.1.2"
 mycelium gain        # Should show token savings stats
 ```
 ## Quick Start
@@ -301,6 +301,20 @@ max_files = 20          # rotation limit
 ```
 
 
+
+### Releasing
+
+Use the release script to bump the version, run quality checks, and tag:
+
+```bash
+./scripts/release.sh v0.1.3
+```
+
+This will:
+1. Update `Cargo.toml` and `Cargo.lock` with the new version
+2. Run `cargo fmt --check`, `clippy`, and `test` as a gate
+3. Commit the version bump and create an annotated git tag
+4. Print the push command (does not push automatically)
 
 ### Uninstall
 

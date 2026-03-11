@@ -51,7 +51,11 @@ info "New version:     ${BOLD}$VERSION${RESET}"
 # ── Bump version ────────────────────────────────────────────────────────────
 
 # Update Cargo.toml (first version = line in [package])
-sed -i '' "0,/^version = \"$CURRENT_VERSION\"/s//version = \"$VERSION\"/" Cargo.toml
+# Use awk to replace only the first occurrence (works on macOS and Linux)
+awk -v old="$CURRENT_VERSION" -v new="$VERSION" '
+    done == 0 && /^version = "/ { sub(old, new); done=1 }
+    { print }
+' Cargo.toml > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
 info "Updated Cargo.toml"
 
 # Update Cargo.lock
