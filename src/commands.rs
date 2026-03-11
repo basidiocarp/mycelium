@@ -10,7 +10,29 @@ use crate::filter;
     name = "mycelium",
     version,
     about = "Mycelium - Minimize LLM token consumption",
-    long_about = "A high-performance CLI proxy designed to filter and summarize system outputs before they reach your LLM context."
+    long_about = "A high-performance CLI proxy designed to filter and summarize system outputs before they reach your LLM context.",
+    help_template = "\
+{before-help}{about-with-newline}
+{usage-heading} {usage}
+
+\x1b[1;4mCommands:\x1b[0m
+
+  \x1b[1mFiles & Search:\x1b[0m     ls, tree, read, peek, find, grep, diff
+  \x1b[1mVCS & Code Review:\x1b[0m  git, gh, gt
+  \x1b[1mBuild & Compile:\x1b[0m    cargo, tsc, next, go
+  \x1b[1mLint & Format:\x1b[0m      lint, prettier, format, ruff, mypy, golangci-lint
+  \x1b[1mTest:\x1b[0m               test, vitest, playwright, pytest
+  \x1b[1mPackage Managers:\x1b[0m   pnpm, pip, npm, npx
+  \x1b[1mDatabases & APIs:\x1b[0m   psql, prisma, curl, wget
+  \x1b[1mInfrastructure:\x1b[0m     docker, kubectl, terraform, aws
+  \x1b[1mLogs & Data:\x1b[0m        json, log, err, summary, env, deps
+  \x1b[1mAnalytics:\x1b[0m          gain, discover, learn
+  \x1b[1mSetup:\x1b[0m              init, config, doctor, verify, self-update, completions, proxy
+
+\x1b[1;4mOptions:\x1b[0m
+{options}
+Run \x1b[36mmycelium <command> --help\x1b[0m for details on any command.
+{after-help}"
 )]
 pub struct Cli {
     #[command(subcommand)]
