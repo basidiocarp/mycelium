@@ -109,24 +109,24 @@ fn error_patterns() -> &'static Vec<Regex> {
     RE.get_or_init(|| {
         vec![
             // Generic errors
-            Regex::new(r"(?i)^.*error[\s:\[].*$").unwrap(),
-            Regex::new(r"(?i)^.*\berr\b.*$").unwrap(),
-            Regex::new(r"(?i)^.*warning[\s:\[].*$").unwrap(),
-            Regex::new(r"(?i)^.*\bwarn\b.*$").unwrap(),
-            Regex::new(r"(?i)^.*failed.*$").unwrap(),
-            Regex::new(r"(?i)^.*failure.*$").unwrap(),
-            Regex::new(r"(?i)^.*exception.*$").unwrap(),
-            Regex::new(r"(?i)^.*panic.*$").unwrap(),
+            Regex::new(r"(?i)^.*error[\s:\[].*$").expect("valid regex"),
+            Regex::new(r"(?i)^.*\berr\b.*$").expect("valid regex"),
+            Regex::new(r"(?i)^.*warning[\s:\[].*$").expect("valid regex"),
+            Regex::new(r"(?i)^.*\bwarn\b.*$").expect("valid regex"),
+            Regex::new(r"(?i)^.*failed.*$").expect("valid regex"),
+            Regex::new(r"(?i)^.*failure.*$").expect("valid regex"),
+            Regex::new(r"(?i)^.*exception.*$").expect("valid regex"),
+            Regex::new(r"(?i)^.*panic.*$").expect("valid regex"),
             // Rust specific
-            Regex::new(r"^error\[E\d+]:.*$").unwrap(),
-            Regex::new(r"^\s*--> .*:\d+:\d+$").unwrap(),
+            Regex::new(r"^error\[E\d+]:.*$").expect("valid regex"),
+            Regex::new(r"^\s*--> .*:\d+:\d+$").expect("valid regex"),
             // Python
-            Regex::new(r"^Traceback.*$").unwrap(),
-            Regex::new(r#"^\s*File ".*", line \d+.*$"#).unwrap(),
+            Regex::new(r"^Traceback.*$").expect("valid regex"),
+            Regex::new(r#"^\s*File ".*", line \d+.*$"#).expect("valid regex"),
             // JavaScript/TypeScript
-            Regex::new(r"^\s*at .*:\d+:\d+.*$").unwrap(),
+            Regex::new(r"^\s*at .*:\d+:\d+.*$").expect("valid regex"),
             // Go
-            Regex::new(r"^.*\.go:\d+:.*$").unwrap(),
+            Regex::new(r"^.*\.go:\d+:.*$").expect("valid regex"),
         ]
     })
 }

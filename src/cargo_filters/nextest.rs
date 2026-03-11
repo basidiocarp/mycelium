@@ -484,4 +484,28 @@ error: test run failed
             result
         );
     }
+
+    fn count_tokens(text: &str) -> usize {
+        text.split_whitespace().count()
+    }
+
+    #[test]
+    fn test_cargo_nextest_token_savings() {
+        let input = include_str!("../../tests/fixtures/cargo_nextest_raw.txt");
+        let output = filter_cargo_nextest(input);
+        let input_tokens = count_tokens(input);
+        let output_tokens = count_tokens(&output);
+        let savings = if input_tokens > 0 {
+            (input_tokens.saturating_sub(output_tokens)) * 100 / input_tokens
+        } else {
+            0
+        };
+        assert!(
+            savings >= 60,
+            "Expected >= 60% token savings, got {}% ({} -> {} tokens)",
+            savings,
+            input_tokens,
+            output_tokens
+        );
+    }
 }

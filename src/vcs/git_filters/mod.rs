@@ -188,4 +188,88 @@ mod tests {
             savings
         );
     }
+
+    #[test]
+    fn test_filter_log_output_token_savings() {
+        fn count_tokens(text: &str) -> usize {
+            text.split_whitespace().count()
+        }
+
+        // Each line is intentionally long (25-30 tokens). The filter truncates every line
+        // >80 chars to 77 chars + "...", keeping only ~10 tokens per line, giving >60% savings.
+        let input = (0..20)
+            .map(|i| {
+                format!(
+                    "abc{i:04x}def{i:04x}aabb commit message about feature implementation {i} \
+                     which adds comprehensive functionality to the codebase with many technical \
+                     details about the approach and architectural decisions by developer{i}"
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        let output = filter_log_output(&input, 100);
+        let savings = (count_tokens(&input).saturating_sub(count_tokens(&output))) * 100
+            / count_tokens(&input).max(1);
+        assert!(
+            savings >= 60,
+            "Git log filter: expected >= 60% token savings, got {}%",
+            savings
+        );
+    }
+
+    #[test]
+    fn test_filter_worktree_list_token_savings() {
+        // The worktree filter replaces the $HOME prefix with "~", which reduces character
+        // count but not token count (paths have no spaces so each path is a single token).
+        // This test validates that the filter produces shorter output in terms of characters,
+        // which is the meaningful measure for this filter's compression goal.
+        let home = dirs::home_dir()
+            .map(|h| h.to_string_lossy().to_string())
+            .unwrap_or_else(|| "/home/user".to_string());
+
+        let input = [
+            ("projects/myapp/main", "abc1234567890abcdef", "[main]"),
+            (
+                "projects/myapp/feature-auth",
+                "def2345678901bcdef",
+                "[feature/authentication]",
+            ),
+            (
+                "projects/myapp/hotfix-db",
+                "ghi3456789012cdef",
+                "[hotfix/database-perf]",
+            ),
+            (
+                "projects/myapp/experimental",
+                "jkl4567890123def",
+                "[experimental/new-ui]",
+            ),
+            (
+                "projects/myapp/release-v2",
+                "mno5678901234ef5a",
+                "[release/v2.0]",
+            ),
+        ]
+        .iter()
+        .map(|(rel, hash, branch)| format!("{home}/{rel}  {hash} {branch}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+        let output = filter_worktree_list(&input);
+
+        // Verify the filter shortened the output (character-level compression via "~" prefix)
+        // and preserved all entries.
+        assert!(
+            output.len() < input.len(),
+            "Worktree filter should produce shorter output (got {} chars, input was {} chars)",
+            output.len(),
+            input.len(),
+        );
+        assert_eq!(
+            output.lines().count(),
+            input.lines().count(),
+            "Worktree filter should preserve all entries"
+        );
+    }
 }

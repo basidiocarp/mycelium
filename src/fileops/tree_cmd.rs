@@ -202,4 +202,27 @@ mod tests {
         assert!(NOISE_DIRS.contains(&"dist"));
         assert!(NOISE_DIRS.contains(&"build"));
     }
+
+    #[test]
+    fn test_tree_token_savings() {
+        fn count_tokens(text: &str) -> usize {
+            text.split_whitespace().count()
+        }
+
+        let input = include_str!("../../tests/fixtures/tree_output_raw.txt");
+        let output = filter_tree_output(input);
+
+        let input_tokens = count_tokens(input);
+        let output_tokens = count_tokens(&output);
+        let savings = (input_tokens.saturating_sub(output_tokens)) * 100 / input_tokens.max(1);
+
+        // tree filter primarily removes the summary line ("X directories, Y files")
+        // Token savings are minimal because the tree structure itself must be preserved
+        // This filter focuses on readability, not compression (unlike git log or cargo filters)
+        assert!(
+            savings >= 1,
+            "tree filter: expected >= 1% token savings, got {}%",
+            savings
+        );
+    }
 }

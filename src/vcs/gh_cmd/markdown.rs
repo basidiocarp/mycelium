@@ -8,27 +8,29 @@ use std::sync::OnceLock;
 
 fn html_comment_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"(?s)<!--.*?-->").unwrap())
+    RE.get_or_init(|| Regex::new(r"(?s)<!--.*?-->").expect("valid regex"))
 }
 
 fn badge_line_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"(?m)^\s*\[!\[[^]]*]\([^)]*\)]\([^)]*\)\s*$").unwrap())
+    RE.get_or_init(|| {
+        Regex::new(r"(?m)^\s*\[!\[[^]]*]\([^)]*\)]\([^)]*\)\s*$").expect("valid regex")
+    })
 }
 
 fn image_only_line_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"(?m)^\s*!\[[^]]*]\([^)]*\)\s*$").unwrap())
+    RE.get_or_init(|| Regex::new(r"(?m)^\s*!\[[^]]*]\([^)]*\)\s*$").expect("valid regex"))
 }
 
 fn horizontal_rule_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"(?m)^\s*(?:---+|\*\*\*+|___+)\s*$").unwrap())
+    RE.get_or_init(|| Regex::new(r"(?m)^\s*(?:---+|\*\*\*+|___+)\s*$").expect("valid regex"))
 }
 
 fn multi_blank_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"\n{3,}").unwrap())
+    RE.get_or_init(|| Regex::new(r"\n{3,}").expect("valid regex"))
 }
 
 /// Filter markdown body to remove noise while preserving meaningful content.

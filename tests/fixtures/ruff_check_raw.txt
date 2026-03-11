@@ -1,0 +1,82 @@
+[
+  {
+    "code": "F401",
+    "message": "`os` imported but unused",
+    "location": {"row": 1, "column": 8},
+    "end_location": {"row": 1, "column": 10},
+    "filename": "src/main.py",
+    "fix": {"applicability": "safe"}
+  },
+  {
+    "code": "F401",
+    "message": "`sys` imported but unused",
+    "location": {"row": 2, "column": 8},
+    "end_location": {"row": 2, "column": 11},
+    "filename": "src/main.py",
+    "fix": {"applicability": "safe"}
+  },
+  {
+    "code": "E501",
+    "message": "Line too long (125 > 88 characters)",
+    "location": {"row": 15, "column": 89},
+    "end_location": {"row": 15, "column": 125},
+    "filename": "src/main.py",
+    "fix": null
+  },
+  {
+    "code": "F841",
+    "message": "local variable `result` is assigned to but never used",
+    "location": {"row": 25, "column": 5},
+    "end_location": {"row": 25, "column": 11},
+    "filename": "src/utils.py",
+    "fix": {"applicability": "safe"}
+  },
+  {
+    "code": "W292",
+    "message": "no newline at end of file",
+    "location": {"row": 42, "column": 0},
+    "end_location": {"row": 42, "column": 0},
+    "filename": "src/utils.py",
+    "fix": {"applicability": "safe"}
+  },
+  {
+    "code": "E501",
+    "message": "Line too long (100 > 88 characters)",
+    "location": {"row": 8, "column": 89},
+    "end_location": {"row": 8, "column": 100},
+    "filename": "tests/test_api.py",
+    "fix": null
+  },
+  {
+    "code": "F401",
+    "message": "`json` imported but unused",
+    "location": {"row": 1, "column": 8},
+    "end_location": {"row": 1, "column": 12},
+    "filename": "tests/test_api.py",
+    "fix": {"applicability": "safe"}
+  },
+  {
+    "code": "E501",
+    "message": "Line too long (95 > 88 characters)",
+    "location": {"row": 20, "column": 89},
+    "end_location": {"row": 20, "column": 95},
+    "filename": "src/models.py",
+    "fix": null
+  },
+  {
+    "code": "F401",
+    "message": "`typing` imported but unused",
+    "location": {"row": 1, "column": 8},
+    "end_location": {"row": 1, "column": 14},
+    "filename": "src/models.py",
+    "fix": {"applicability": "safe"}
+  },
+  {
+    "code": "E731",
+    "message": "do not assign a lambda expression, use a def",
+    "location": {"row": 35, "column": 5},
+    "end_location": {"row": 35, "column": 25},
+    "filename": "src/models.py",
+    "fix": null
+  }
+]

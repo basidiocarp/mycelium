@@ -78,7 +78,8 @@ impl OutputParser for TscParser {
         fn tsc_error() -> &'static Regex {
             static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
             RE.get_or_init(|| {
-                Regex::new(r"^(.+?)\((\d+),(\d+)\):\s+(error|warning)\s+(TS\d+):\s+(.+)$").unwrap()
+                Regex::new(r"^(.+?)\((\d+),(\d+)\):\s+(error|warning)\s+(TS\d+):\s+(.+)$")
+                    .expect("valid regex")
             })
         }
 

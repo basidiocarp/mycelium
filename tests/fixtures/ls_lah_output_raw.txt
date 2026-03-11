@@ -1,0 +1,26 @@
+total 512
+drwxr-xr-x   23 user  staff   736 Jan 15 12:34 .
+drwxr-xr-x   10 user  staff   320 Jan 15 10:00 ..
+drwxr-xr-x   28 user  staff   896 Jan 15 12:00 .git
+-rw-r--r--    1 user  staff  2048 Jan 15 12:00 .gitignore
+-rw-r--r--    1 user  staff   512 Jan 15 12:00 .env.example
+-rw-r--r--    1 user  staff  8456 Jan 15 12:00 README.md
+-rw-r--r--    1 user  staff  1024 Jan 15 12:00 package.json
+-rw-r--r--    1 user  staff  5678 Jan 15 12:00 package-lock.json
+-rw-r--r--    1 user  staff  2345 Jan 15 12:00 .npmrc
+drwxr-xr-x  234 user  staff  7488 Jan 15 12:00 node_modules
+drwxr-xr-x    8 user  staff   256 Jan 15 12:00 src
+drwxr-xr-x    5 user  staff   160 Jan 15 12:00 dist
+drwxr-xr-x    4 user  staff   128 Jan 15 12:00 build
+drwxr-xr-x    3 user  staff    96 Jan 15 11:00 tests
+drwxr-xr-x    3 user  staff    96 Jan 15 11:00 examples
+drwxr-xr-x    3 user  staff    96 Jan 15 11:00 scripts
+drwxr-xr-x    3 user  staff    96 Jan 15 11:00 docs
+-rw-r--r--    1 user  staff  1234 Jan 15 12:00 Makefile
+-rw-r--r--    1 user  staff  2048 Jan 15 12:00 tsconfig.json
+-rw-r--r--    1 user  staff  1024 Jan 15 12:00 jest.config.js
+-rw-r--r--    1 user  staff  512 Jan 15 12:00 prettier.config.js
+-rw-r--r--    1 user  staff  256 Jan 15 12:00 .eslintrc.json
+-rw-r--r--    1 user  staff  1500 Jan 15 12:00 webpack.config.js
+-rw-r--r--    1 user  staff  2200 Jan 15 12:00 vite.config.ts
+lrwxr-xr-x    1 user  staff    15 Jan 15 12:00 current -> releases/v1.0.0

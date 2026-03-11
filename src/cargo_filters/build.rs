@@ -252,4 +252,48 @@ warning: `mycelium` (bin) generated 2 warnings
         assert!(result.contains("unused_variables"));
         assert!(result.contains("clippy::too_many_arguments"));
     }
+
+    fn count_tokens(text: &str) -> usize {
+        text.split_whitespace().count()
+    }
+
+    #[test]
+    fn test_cargo_build_token_savings() {
+        let input = include_str!("../../tests/fixtures/cargo_build_raw.txt");
+        let output = filter_cargo_build(input);
+        let input_tokens = count_tokens(input);
+        let output_tokens = count_tokens(&output);
+        let savings = if input_tokens > 0 {
+            (input_tokens.saturating_sub(output_tokens)) * 100 / input_tokens
+        } else {
+            0
+        };
+        assert!(
+            savings >= 60,
+            "Expected >= 60% token savings, got {}% ({} -> {} tokens)",
+            savings,
+            input_tokens,
+            output_tokens
+        );
+    }
+
+    #[test]
+    fn test_cargo_clippy_token_savings() {
+        let input = include_str!("../../tests/fixtures/cargo_clippy_raw.txt");
+        let output = filter_cargo_clippy(input);
+        let input_tokens = count_tokens(input);
+        let output_tokens = count_tokens(&output);
+        let savings = if input_tokens > 0 {
+            (input_tokens.saturating_sub(output_tokens)) * 100 / input_tokens
+        } else {
+            0
+        };
+        assert!(
+            savings >= 60,
+            "Expected >= 60% token savings, got {}% ({} -> {} tokens)",
+            savings,
+            input_tokens,
+            output_tokens
+        );
+    }
 }

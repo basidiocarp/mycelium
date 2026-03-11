@@ -244,4 +244,23 @@ Code style issues found in the above file(s). Forgot to run Prettier?
         assert!(result.contains("Error"));
         assert!(!result.contains("All files formatted"));
     }
+
+    #[test]
+    fn test_prettier_token_savings() {
+        fn count_tokens(text: &str) -> usize {
+            text.split_whitespace().count()
+        }
+
+        let input = include_str!("../../tests/fixtures/prettier_check_raw.txt");
+        let output = filter_prettier_output(input);
+        let input_tokens = count_tokens(input);
+        let output_tokens = count_tokens(&output);
+        let savings = (input_tokens.saturating_sub(output_tokens)) * 100 / input_tokens.max(1);
+
+        assert!(
+            savings >= 60,
+            "prettier filter: expected >= 60% token savings, got {}%",
+            savings
+        );
+    }
 }

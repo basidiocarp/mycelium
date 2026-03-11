@@ -314,4 +314,24 @@ mod tests {
         let output = compact_ls(input, false);
         assert!(output.contains("link -> target"));
     }
+
+    #[test]
+    fn test_ls_token_savings() {
+        fn count_tokens(text: &str) -> usize {
+            text.split_whitespace().count()
+        }
+
+        let input = include_str!("../../tests/fixtures/ls_lah_output_raw.txt");
+        let output = compact_ls(input, false);
+
+        let input_tokens = count_tokens(input);
+        let output_tokens = count_tokens(&output);
+        let savings = (input_tokens.saturating_sub(output_tokens)) * 100 / input_tokens.max(1);
+
+        assert!(
+            savings >= 60,
+            "ls filter: expected >= 60% token savings, got {}%",
+            savings
+        );
+    }
 }

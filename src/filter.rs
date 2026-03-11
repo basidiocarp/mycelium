@@ -149,13 +149,13 @@ pub struct MinimalFilter;
 
 fn multiple_blank_lines() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"\n{3,}").unwrap())
+    RE.get_or_init(|| Regex::new(r"\n{3,}").expect("valid regex"))
 }
 
 #[allow(dead_code)]
 fn trailing_whitespace() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"[ \t]+$").unwrap())
+    RE.get_or_init(|| Regex::new(r"[ \t]+$").expect("valid regex"))
 }
 
 impl FilterStrategy for MinimalFilter {
@@ -236,7 +236,7 @@ pub struct AggressiveFilter;
 
 fn import_pattern() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"^(use |import |from |require\(|#include)").unwrap())
+    RE.get_or_init(|| Regex::new(r"^(use |import |from |require\(|#include)").expect("valid regex"))
 }
 
 fn func_signature() -> &'static Regex {

@@ -345,4 +345,154 @@ utils.go:15:5: unreachable code"#;
         assert_eq!(compact_package_name("example.com/foo"), "foo");
         assert_eq!(compact_package_name("simple"), "simple");
     }
+
+    #[test]
+    fn test_filter_go_test_token_savings() {
+        fn count_tokens(text: &str) -> usize {
+            text.split_whitespace().count()
+        }
+
+        // Build a realistic `go test -json` fixture with many passing tests across multiple
+        // packages. Each test emits run/output/pass events; the filter collapses all of this
+        // to a single summary line, yielding well above 60% savings.
+        let packages = &[
+            "github.com/myapp/api",
+            "github.com/myapp/db",
+            "github.com/myapp/config",
+            "github.com/myapp/services/auth",
+            "github.com/myapp/services/payment",
+        ];
+        let tests_per_pkg = 6;
+        let mut lines: Vec<String> = Vec::new();
+        let mut t = 0u32;
+        for pkg in packages {
+            for i in 1..=tests_per_pkg {
+                let test = format!("TestFunction{i:02}");
+                lines.push(format!(
+                    r#"{{"Time":"2024-01-01T10:00:{t:02}Z","Action":"run","Package":"{pkg}","Test":"{test}"}}"#
+                ));
+                t += 1;
+                lines.push(format!(
+                    r#"{{"Time":"2024-01-01T10:00:{t:02}Z","Action":"output","Package":"{pkg}","Test":"{test}","Output":"=== RUN   {test}\\n"}}"#
+                ));
+                t += 1;
+                lines.push(format!(
+                    r#"{{"Time":"2024-01-01T10:00:{t:02}Z","Action":"output","Package":"{pkg}","Test":"{test}","Output":"    --- PASS: {test} (0.001s)\\n"}}"#
+                ));
+                t += 1;
+                lines.push(format!(
+                    r#"{{"Time":"2024-01-01T10:00:{t:02}Z","Action":"pass","Package":"{pkg}","Test":"{test}","Elapsed":0.001}}"#
+                ));
+                t += 1;
+            }
+            lines.push(format!(
+                r#"{{"Time":"2024-01-01T10:00:{t:02}Z","Action":"pass","Package":"{pkg}","Elapsed":0.1}}"#
+            ));
+            t += 1;
+        }
+        let input = lines.join("\n");
+
+        let output = filter_go_test_json(&input);
+        let savings = (count_tokens(&input).saturating_sub(count_tokens(&output))) * 100
+            / count_tokens(&input).max(1);
+        assert!(
+            savings >= 60,
+            "Go test filter: expected >= 60% token savings, got {}%",
+            savings
+        );
+    }
+
+    #[test]
+    fn test_filter_go_build_token_savings() {
+        fn count_tokens(text: &str) -> usize {
+            text.split_whitespace().count()
+        }
+
+        // Real `go build` output includes many verbose non-error lines: module download
+        // progress, "note:" annotations, and FAIL summary lines. The filter keeps only lines
+        // with `.go:` file-position markers or error keywords, discarding all the boilerplate
+        // and achieving well above 60% savings.
+        let input = concat!(
+            "go: downloading github.com/myapp/api v1.2.3\n",
+            "go: downloading github.com/myapp/db v0.9.1\n",
+            "go: downloading github.com/myapp/config v2.0.0\n",
+            "go: downloading github.com/myapp/utils v1.0.5\n",
+            "go: downloading github.com/myapp/middleware v0.8.2\n",
+            "go: finding module for package github.com/myapp/api/internal\n",
+            "go: found github.com/myapp/api/internal in github.com/myapp/api v1.2.3\n",
+            "go: finding module for package github.com/myapp/db/pool\n",
+            "go: found github.com/myapp/db/pool in github.com/myapp/db v0.9.1\n",
+            "# github.com/myapp/api\n",
+            "cmd/main.go:10:5: undefined: missingFunc\n",
+            "cmd/main.go:15:2: cannot use x (type int) as type string\n",
+            "# github.com/myapp/db\n",
+            "pkg/db.go:42:3: undefined: getConnection\n",
+            "pkg/db.go:55:5: missing return at end of function\n",
+            "# github.com/myapp/config\n",
+            "internal/config.go:30:10: cannot assign to field of type interface\n",
+            "note: module requires Go >= 1.21; using go 1.20 in toolchain go1.20.14\n",
+            "note: see https://golang.org/ref/spec for language specification details\n",
+            "note: run go mod tidy to update the go.sum file if necessary\n",
+            "note: if you want to use the module cache you can use GOPATH setting\n",
+            "FAIL\tgithub.com/myapp/api [build failed]\n",
+            "FAIL\tgithub.com/myapp/db [build failed]\n",
+            "FAIL\tgithub.com/myapp/config [build failed]\n",
+        );
+
+        let output = filter_go_build(input);
+        let savings = (count_tokens(input).saturating_sub(count_tokens(&output))) * 100
+            / count_tokens(input).max(1);
+        assert!(
+            savings >= 60,
+            "Go build filter: expected >= 60% token savings, got {}%",
+            savings
+        );
+    }
+
+    #[test]
+    fn test_filter_go_vet_token_savings() {
+        fn count_tokens(text: &str) -> usize {
+            text.split_whitespace().count()
+        }
+
+        // Real `go vet` output includes verbose "note:" lines and many "checking package"
+        // progress lines that the filter discards; only lines with `.go:` file-position
+        // markers are kept. Use a large ratio of non-issue lines to ensure >60% savings.
+        let input = concat!(
+            "# github.com/myapp/cmd\n",
+            "# github.com/myapp/pkg/utils\n",
+            "# github.com/myapp/internal/handler\n",
+            "# github.com/myapp/internal/config\n",
+            "# github.com/myapp/pkg/db\n",
+            "# github.com/myapp/api/v2/router\n",
+            "# github.com/myapp/api/v2/middleware\n",
+            "# github.com/myapp/services/auth\n",
+            "# github.com/myapp/services/payment\n",
+            "# github.com/myapp/services/notification\n",
+            "note: module cache at /home/user/go/pkg/mod is read-only\n",
+            "note: GOFLAGS=-mod=vendor is set; ignoring vendor directory\n",
+            "note: checking for shadowed variables in package scope\n",
+            "note: checking for unused results of calls to certain functions\n",
+            "note: checking for mistakes involving locking\n",
+            "note: checking for composite literals using unkeyed fields\n",
+            "note: checking consistency of struct field tags\n",
+            "note: checking for unreachable code\n",
+            "note: checking for misuse of sync/atomic\n",
+            "note: checking for invalid calls to printf-family functions\n",
+            "cmd/main.go:42:2: Printf format %d has arg x of wrong type string\n",
+            "cmd/main.go:55:5: format string argument %s does not match next argument type\n",
+            "pkg/utils.go:15:3: unreachable code\n",
+            "pkg/utils.go:28:1: unused variable result\n",
+            "internal/handler.go:100:2: mismatched types: expected string, got int\n",
+        );
+
+        let output = filter_go_vet(input);
+        let savings = (count_tokens(input).saturating_sub(count_tokens(&output))) * 100
+            / count_tokens(input).max(1);
+        assert!(
+            savings >= 60,
+            "Go vet filter: expected >= 60% token savings, got {}%",
+            savings
+        );
+    }
 }

@@ -113,8 +113,8 @@ pub struct GainSummary {
     pub total_time_ms: u64,
     /// Average execution time per command (milliseconds)
     pub avg_time_ms: u64,
-    /// Top 10 commands by tokens saved: (cmd, count, saved, avg_pct, avg_time_ms)
-    pub by_command: Vec<(String, usize, usize, f64, u64)>,
+    /// Top 10 commands by tokens saved
+    pub by_command: Vec<CommandStats>,
     /// Last 30 days of activity: (date, saved_tokens)
     pub by_day: Vec<(String, usize)>,
 }
@@ -219,6 +219,23 @@ pub struct ProjectStats {
     pub avg_savings_pct: f64,
     /// ISO timestamp of most recent command in this project
     pub last_used: String,
+}
+
+/// Statistics for a single command aggregated across all executions.
+///
+/// Used in `GainSummary::by_command` to break down token savings by command type.
+#[derive(Debug, Clone)]
+pub struct CommandStats {
+    /// The Mycelium command (e.g., "mycelium ls", "mycelium gh pr view")
+    pub command: String,
+    /// Number of times this command was executed
+    pub count: usize,
+    /// Total tokens saved across all executions of this command
+    pub tokens_saved: usize,
+    /// Average savings percentage for this command
+    pub savings_pct: f64,
+    /// Average execution time in milliseconds
+    pub exec_time_ms: u64,
 }
 
 /// Individual parse failure record.

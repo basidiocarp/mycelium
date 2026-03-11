@@ -101,4 +101,58 @@ mod tests {
         let result = filter_rds_instances(&json).unwrap();
         assert!(result.contains("... +5 more instances"));
     }
+
+    #[test]
+    fn test_filter_rds_instances_token_savings() {
+        fn count_tokens(text: &str) -> usize {
+            text.split_whitespace().count()
+        }
+
+        let input = r#"{
+            "DBInstances": [
+                {
+                    "DBInstanceIdentifier": "production-db",
+                    "Engine": "postgres",
+                    "EngineVersion": "15.4",
+                    "DBInstanceClass": "db.r6g.2xlarge",
+                    "DBInstanceStatus": "available",
+                    "BackupRetentionPeriod": 30,
+                    "AllocatedStorage": 500,
+                    "StorageType": "gp3",
+                    "Endpoint": {"Address":"prod.abc123.us-east-1.rds.amazonaws.com","Port":5432}
+                },
+                {
+                    "DBInstanceIdentifier": "staging-db",
+                    "Engine": "mysql",
+                    "EngineVersion": "8.0.35",
+                    "DBInstanceClass": "db.t3.large",
+                    "DBInstanceStatus": "available",
+                    "BackupRetentionPeriod": 7,
+                    "AllocatedStorage": 100,
+                    "StorageType": "gp2",
+                    "Endpoint": {"Address":"staging.xyz789.us-east-1.rds.amazonaws.com","Port":3306}
+                },
+                {
+                    "DBInstanceIdentifier": "analytics-db",
+                    "Engine": "postgres",
+                    "EngineVersion": "14.7",
+                    "DBInstanceClass": "db.r6g.4xlarge",
+                    "DBInstanceStatus": "available",
+                    "BackupRetentionPeriod": 90,
+                    "AllocatedStorage": 1000,
+                    "StorageType": "gp3",
+                    "Endpoint": {"Address":"analytics.def456.us-east-1.rds.amazonaws.com","Port":5432}
+                }
+            ]
+        }"#;
+
+        let output = filter_rds_instances(input).unwrap();
+        let savings = (count_tokens(input).saturating_sub(count_tokens(&output))) * 100
+            / count_tokens(input).max(1);
+        assert!(
+            savings >= 60,
+            "RDS describe-db-instances filter: expected >= 60% token savings, got {}%",
+            savings
+        );
+    }
 }

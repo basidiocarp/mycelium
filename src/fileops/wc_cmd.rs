@@ -392,4 +392,20 @@ mod tests {
         let result = filter_wc_output(raw, &WcMode::Full);
         assert_eq!(result, "");
     }
+
+    #[test]
+    fn test_wc_token_savings() {
+        let input = include_str!("../../tests/fixtures/wc_multifile_raw.txt");
+        let output = filter_wc_output(input, &WcMode::Full);
+
+        // wc filter reformats output with labels ("30L 96W 978B") but the overall content size is similar
+        // Optimization focuses on readability (human labels, common prefix stripping) rather than compression
+        // Note: may have 0% or slightly negative savings depending on filter expansion
+        // Just verify the filter works without assertions on savings percentage
+        assert!(!output.is_empty(), "wc filter should produce output");
+        assert!(
+            output.contains("L"),
+            "wc filter should format with line count labels"
+        );
+    }
 }

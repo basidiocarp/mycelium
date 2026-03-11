@@ -352,4 +352,23 @@ mod tests {
         assert!(result.contains("pytest"));
         assert!(result.contains("7.4.0 → 8.0.0"));
     }
+
+    fn count_tokens(text: &str) -> usize {
+        text.split_whitespace().count()
+    }
+
+    #[test]
+    fn test_filter_pip_list_token_savings() {
+        let input = include_str!("../../tests/fixtures/pip_list_raw.txt");
+        let output = filter_pip_list(input);
+        let input_tokens = count_tokens(input);
+        let output_tokens = count_tokens(&output);
+        let savings = (input_tokens.saturating_sub(output_tokens)) * 100 / input_tokens.max(1);
+        // pip list removes JSON formatting and groups by letter for scanning
+        assert!(
+            savings >= 30,
+            "Expected >=30% token savings, got {}%",
+            savings
+        );
+    }
 }

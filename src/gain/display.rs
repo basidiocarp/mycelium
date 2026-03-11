@@ -69,21 +69,21 @@ pub(crate) fn show_summary(
         let count_width = summary
             .by_command
             .iter()
-            .map(|(_, count, _, _, _)| count.to_string().len())
+            .map(|stat| stat.count.to_string().len())
             .max()
             .unwrap_or(5)
             .max(5);
         let saved_width = summary
             .by_command
             .iter()
-            .map(|(_, _, saved, _, _)| format_tokens(*saved).len())
+            .map(|stat| format_tokens(stat.tokens_saved).len())
             .max()
             .unwrap_or(5)
             .max(5);
         let time_width = summary
             .by_command
             .iter()
-            .map(|(_, _, _, _, avg_time)| format_duration(*avg_time).len())
+            .map(|stat| format_duration(stat.exec_time_ms).len())
             .max()
             .unwrap_or(6)
             .max(6);
@@ -122,27 +122,27 @@ pub(crate) fn show_summary(
         let max_saved = summary
             .by_command
             .iter()
-            .map(|(_, _, saved, _, _)| *saved)
+            .map(|stat| stat.tokens_saved)
             .max()
             .unwrap_or(1);
 
-        for (idx, (cmd, count, saved, pct, avg_time)) in summary.by_command.iter().enumerate() {
+        for (idx, stat) in summary.by_command.iter().enumerate() {
             let row_idx = format!("{:>2}.", idx + 1);
-            let cmd_cell = style_command_cell(&truncate_for_column(cmd, cmd_width));
-            let count_cell = format!("{:>count_width$}", count, count_width = count_width);
+            let cmd_cell = style_command_cell(&truncate_for_column(&stat.command, cmd_width));
+            let count_cell = format!("{:>count_width$}", stat.count, count_width = count_width);
             let saved_cell = format!(
                 "{:>saved_width$}",
-                format_tokens(*saved),
+                format_tokens(stat.tokens_saved),
                 saved_width = saved_width
             );
-            let pct_plain = format!("{:>6}", format!("{pct:.1}%"));
-            let pct_cell = colorize_pct_cell(*pct, &pct_plain);
+            let pct_plain = format!("{:>6}", format!("{:.1}%", stat.savings_pct));
+            let pct_cell = colorize_pct_cell(stat.savings_pct, &pct_plain);
             let time_cell = format!(
                 "{:>time_width$}",
-                format_duration(*avg_time),
+                format_duration(stat.exec_time_ms),
                 time_width = time_width
             );
-            let impact = mini_bar(*saved, max_saved, impact_width);
+            let impact = mini_bar(stat.tokens_saved, max_saved, impact_width);
             println!(
                 "{}  {}  {}  {}  {}  {}  {}",
                 row_idx, cmd_cell, count_cell, saved_cell, pct_cell, time_cell, impact

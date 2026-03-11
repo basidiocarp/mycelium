@@ -389,4 +389,24 @@ api-1  | Connected to database";
             "should produce output even for empty input"
         );
     }
+
+    #[test]
+    fn test_compose_ps_token_savings() {
+        fn count_tokens(text: &str) -> usize {
+            text.split_whitespace().count()
+        }
+
+        let input = include_str!("../../tests/fixtures/docker_compose_ps_raw.txt");
+        let output = format_compose_ps(input);
+
+        let input_tokens = count_tokens(input);
+        let output_tokens = count_tokens(&output);
+        let savings = (input_tokens.saturating_sub(output_tokens)) * 100 / input_tokens.max(1);
+
+        assert!(
+            savings >= 60,
+            "docker compose ps filter: expected >= 60% token savings, got {}%",
+            savings
+        );
+    }
 }

@@ -147,4 +147,86 @@ mod tests {
         let result = filter_ecs_describe_services(json).unwrap();
         assert_eq!(result, "api ACTIVE 3/3 (FARGATE)");
     }
+
+    #[test]
+    fn test_filter_ecs_list_services_token_savings() {
+        fn count_tokens(text: &str) -> usize {
+            text.split_whitespace().count()
+        }
+
+        // Real AWS CLI JSON responses include ResponseMetadata, nextToken, and other verbose
+        // wrapper fields. The filter extracts only the short service name from each ARN,
+        // discarding all the JSON scaffolding and achieving >60% savings.
+        let input = r#"{
+    "serviceArns": [
+        "arn:aws:ecs:us-east-1:123456789:service/production-cluster/api-service",
+        "arn:aws:ecs:us-east-1:123456789:service/production-cluster/worker-service",
+        "arn:aws:ecs:us-east-1:123456789:service/production-cluster/cache-service",
+        "arn:aws:ecs:us-east-1:123456789:service/staging-cluster/api-test",
+        "arn:aws:ecs:us-east-1:123456789:service/staging-cluster/worker-test"
+    ],
+    "nextToken": "eyJlbmNyeXB0ZWREYXRhIjoiQVFJREFIaHFZclhKWGNhRXJCbE45T3",
+    "ResponseMetadata": {
+        "RequestId": "abc123de-f456-7890-abcd-ef1234567890",
+        "HTTPStatusCode": 200,
+        "HTTPHeaders": {
+            "x-amzn-requestid": "abc123de-f456-7890-abcd-ef1234567890",
+            "content-type": "application/x-amz-json-1.1",
+            "content-length": "512",
+            "date": "Mon, 15 Jan 2024 10:30:45 GMT"
+        },
+        "RetryAttempts": 0
+    }
+}"#;
+
+        let output = filter_ecs_list_services(input).unwrap();
+        let savings = (count_tokens(input).saturating_sub(count_tokens(&output))) * 100
+            / count_tokens(input).max(1);
+        assert!(
+            savings >= 60,
+            "ECS list-services filter: expected >= 60% token savings, got {}%",
+            savings
+        );
+    }
+
+    #[test]
+    fn test_filter_ecs_describe_services_token_savings() {
+        fn count_tokens(text: &str) -> usize {
+            text.split_whitespace().count()
+        }
+
+        let input = r#"{
+            "services": [
+                {
+                    "serviceName": "api-service",
+                    "status": "ACTIVE",
+                    "runningCount": 5,
+                    "desiredCount": 5,
+                    "launchType": "FARGATE",
+                    "taskDefinition": "arn:aws:ecs:us-east-1:123456789:task-definition/api:42",
+                    "createdAt": "2024-01-15T10:30:00Z",
+                    "deployments": [{"status":"PRIMARY","runningCount":5,"desiredCount":5}]
+                },
+                {
+                    "serviceName": "worker-service",
+                    "status": "ACTIVE",
+                    "runningCount": 3,
+                    "desiredCount": 3,
+                    "launchType": "EC2",
+                    "taskDefinition": "arn:aws:ecs:us-east-1:123456789:task-definition/worker:18",
+                    "createdAt": "2024-01-10T14:20:00Z",
+                    "deployments": [{"status":"PRIMARY","runningCount":3,"desiredCount":3}]
+                }
+            ]
+        }"#;
+
+        let output = filter_ecs_describe_services(input).unwrap();
+        let savings = (count_tokens(input).saturating_sub(count_tokens(&output))) * 100
+            / count_tokens(input).max(1);
+        assert!(
+            savings >= 60,
+            "ECS describe-services filter: expected >= 60% token savings, got {}%",
+            savings
+        );
+    }
 }

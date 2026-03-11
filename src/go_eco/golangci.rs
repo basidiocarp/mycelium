@@ -255,4 +255,40 @@ mod tests {
         );
         assert_eq!(compact_path("relative/file.go"), "file.go");
     }
+
+    #[test]
+    fn test_filter_golangci_token_savings() {
+        fn count_tokens(text: &str) -> usize {
+            text.split_whitespace().count()
+        }
+
+        // Real golangci-lint JSON output includes SourceLines, Replacement, and other verbose
+        // fields per issue. Adding those fields to each issue creates the bulk that the filter
+        // strips, pushing savings comfortably above 60%.
+        let input = r#"{
+  "Issues": [
+    {"FromLinter": "errcheck", "Text": "Error return value of `os.Remove` is not checked", "SourceLines": ["    os.Remove(tmpFile)"], "Replacement": null, "Pos": {"Filename": "cmd/main/main.go", "Line": 42, "Column": 5}},
+    {"FromLinter": "errcheck", "Text": "Error return value of `db.Close` is not checked", "SourceLines": ["    db.Close()"], "Replacement": null, "Pos": {"Filename": "cmd/main/main.go", "Line": 50, "Column": 10}},
+    {"FromLinter": "errcheck", "Text": "Error return value of `file.Close` is not checked", "SourceLines": ["    file.Close()"], "Replacement": null, "Pos": {"Filename": "pkg/handler/server.go", "Line": 25, "Column": 3}},
+    {"FromLinter": "gosimple", "Text": "Should use strings.Contains(s, ...) instead of strings.Index(s, ...) >= 0", "SourceLines": ["    if strings.Index(s, needle) >= 0 {"], "Replacement": {"NeedOnlyDelete": false, "NewLines": ["    if strings.Contains(s, needle) {"]}, "Pos": {"Filename": "pkg/utils/strings.go", "Line": 15, "Column": 2}},
+    {"FromLinter": "gosimple", "Text": "Redundant type conversion, use string(x) instead of fmt.Sprintf(\"%s\", x)", "SourceLines": ["    result := fmt.Sprintf(\"%s\", value)"], "Replacement": null, "Pos": {"Filename": "pkg/utils/types.go", "Line": 30, "Column": 8}},
+    {"FromLinter": "govet", "Text": "Printf format %d has arg x of wrong type string", "SourceLines": ["    fmt.Printf(\"%d\", stringValue)"], "Replacement": null, "Pos": {"Filename": "internal/logger/log.go", "Line": 60, "Column": 4}},
+    {"FromLinter": "staticcheck", "Text": "SA4006: this value of `err` is never used", "SourceLines": ["    err = doSomething()"], "Replacement": null, "Pos": {"Filename": "cmd/server/server.go", "Line": 100, "Column": 2}},
+    {"FromLinter": "staticcheck", "Text": "SA1006: printf with dynamic first argument and no further arguments", "SourceLines": ["    fmt.Printf(msg)"], "Replacement": null, "Pos": {"Filename": "pkg/handler/handler.go", "Line": 75, "Column": 1}},
+    {"FromLinter": "unused", "Text": "field `InternalID` is unused", "SourceLines": ["    InternalID string `json:\"-\"`"], "Replacement": null, "Pos": {"Filename": "pkg/types/types.go", "Line": 12, "Column": 2}},
+    {"FromLinter": "ineffassign", "Text": "ineffectual assignment to `result`", "SourceLines": ["    result = computeValue()"], "Replacement": null, "Pos": {"Filename": "internal/config/loader.go", "Line": 55, "Column": 5}},
+    {"FromLinter": "errcheck", "Text": "Error return value of `w.Write` is not checked", "SourceLines": ["    w.Write([]byte(response))"], "Replacement": null, "Pos": {"Filename": "pkg/handler/handler.go", "Line": 90, "Column": 3}},
+    {"FromLinter": "gosimple", "Text": "Should use a simple channel send/receive instead of select with a single case", "SourceLines": ["    select { case ch <- val: }"], "Replacement": null, "Pos": {"Filename": "internal/worker/pool.go", "Line": 33, "Column": 6}}
+  ]
+}"#;
+
+        let output = filter_golangci_json(input);
+        let savings = (count_tokens(input).saturating_sub(count_tokens(&output))) * 100
+            / count_tokens(input).max(1);
+        assert!(
+            savings >= 60,
+            "golangci-lint filter: expected >= 60% token savings, got {}%",
+            savings
+        );
+    }
 }

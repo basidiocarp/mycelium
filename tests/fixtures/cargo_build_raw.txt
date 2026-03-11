@@ -1,0 +1,73 @@
+   Compiling libc v0.2.153
+   Compiling cfg-if v1.0.0
+   Compiling proc-macro2 v1.0.85
+   Compiling quote v1.0.36
+   Compiling syn v2.0.66
+   Compiling serde v1.0.200
+   Compiling serde_json v1.0.127
+   Compiling regex v1.10.4
+   Compiling clap v4.5.1
+   Compiling anyhow v1.0.84
+   Compiling tokio v1.38.0
+   Compiling tokio-macros v2.2.0
+   Compiling bytes v1.6.0
+   Compiling futures-util v0.3.30
+   Compiling futures-core v0.3.30
+   Compiling pin-project-lite v0.2.13
+   Compiling parking_lot v0.12.1
+   Compiling smallvec v1.13.2
+   Compiling bitflags v2.5.0
+   Compiling indexmap v2.2.6
+   Compiling once_cell v1.19.0
+   Compiling unicode-ident v1.0.12
+   Compiling thiserror v1.0.57
+   Compiling log v0.4.21
+   Compiling tracing-core v0.1.32
+   Compiling tracing v0.1.40
+   Compiling http v1.1.0
+   Compiling hyper v1.1.0
+   Compiling reqwest v0.11.20
+   Compiling serde_derive v1.0.200
+   Compiling sqlx v0.7.4
+   Compiling uuid v1.6.1
+   Compiling chrono v0.4.35
+   Compiling async-trait v0.1.77
+   Compiling dashmap v5.5.3
+   Compiling parking_lot_core v0.9.9
+   Compiling lock_api v0.4.11
+   Compiling typenum v1.17.0
+   Compiling generic-array v0.14.7
+   Compiling crypto-common v0.1.6
+   Compiling sha2 v0.10.8
+   Compiling hmac v0.12.1
+   Compiling percent-encoding v2.3.1
+   Compiling form_urlencoded v1.2.1
+   Compiling url v2.5.0
+   Compiling mycelium v0.11.0 (/Users/user/projects/mycelium)
+error[E0308]: mismatched types
+ --> src/main.rs:45:12
+  |
+45 |     let x: i32 = "hello";
+  |            ---   ^^^^^^^ expected `i32`, found `&str`
+  |            |
+  |            expected due to this
+  |
+help: try using a `&` reference
+  |
+45 |     let x: i32 = &"hello";
+  |                  +
+
+error[E0425]: cannot find value `undefined_var` in this scope
+ --> src/lib.rs:120:9
+  |
+120|     println!("{}", undefined_var);
+   |                   ^^^^^^^^^^^^^^ not found in this scope
+   |
+note: a local variable with a similar name exists
+   |
+118|     let some_var = 5;
+   |         --------
+
+error: aborting due to 2 previous errors
+
+could not compile `mycelium` (bin target(s)) due to 2 previous error(s)

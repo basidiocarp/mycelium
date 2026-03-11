@@ -310,4 +310,43 @@ mod tests {
         assert_eq!(parse_error("SSL handshake failed", ""), "SSL/TLS error");
         assert_eq!(parse_error("", ""), "Unknown error");
     }
+
+    #[test]
+    fn test_wget_output_token_savings() {
+        fn count_tokens(text: &str) -> usize {
+            text.split_whitespace().count()
+        }
+
+        let stderr = r#"--2024-01-15 10:30:45--  https://example.com/large-file.tar.gz
+Resolving example.com (example.com)... 192.0.2.1
+Connecting to example.com (example.com)|192.0.2.1|:443... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 524288000 (500M) [application/gzip]
+Saving to: 'large-file.tar.gz'
+
+large-file.tar.gz           5%[==>                                            ] 26.21M   5.23MB/s  eta 90s
+large-file.tar.gz          10%[=====>                                         ] 52.43M   5.24MB/s  eta 85s
+large-file.tar.gz          15%[========>                                      ] 78.64M   5.25MB/s  eta 81s
+large-file.tar.gz          20%[===========>                                   ] 104.86M  5.23MB/s  eta 77s
+large-file.tar.gz          25%[=============>                                 ] 131.07M  5.24MB/s  eta 73s
+large-file.tar.gz          50%[===========================>                   ] 262.14M  5.25MB/s  eta 45s
+large-file.tar.gz          75%[===============================================>] 393.22M  5.24MB/s  eta 22s
+large-file.tar.gz         100%[=================================================>] 500.00M  5.25MB/s   in 95s
+
+2024-01-15 10:32:19 (5.25 MB/s) - 'large-file.tar.gz' saved [524288000/524288000]"#;
+
+        let raw = format!("{}\n", stderr);
+        let msg = format!(
+            "⬇️ {} ok | {} | {}",
+            "example.com/large-file.tar.gz", "large-file.tar.gz", "500.0MB"
+        );
+
+        let savings = (count_tokens(&raw).saturating_sub(count_tokens(&msg))) * 100
+            / count_tokens(&raw).max(1);
+        assert!(
+            savings >= 60,
+            "wget output filter: expected >= 60% token savings, got {}%",
+            savings
+        );
+    }
 }

@@ -84,4 +84,23 @@ npm notice
         let result = filter_npm_output(output);
         assert_eq!(result, "ok ✓");
     }
+
+    #[test]
+    fn test_npm_token_savings() {
+        fn count_tokens(text: &str) -> usize {
+            text.split_whitespace().count()
+        }
+
+        let input = include_str!("../../tests/fixtures/npm_run_output_raw.txt");
+        let output = filter_npm_output(input);
+        let input_tokens = count_tokens(input);
+        let output_tokens = count_tokens(&output);
+        let savings = (input_tokens.saturating_sub(output_tokens)) * 100 / input_tokens.max(1);
+
+        assert!(
+            savings >= 60,
+            "npm filter: expected >= 60% token savings, got {}%",
+            savings
+        );
+    }
 }

@@ -17,12 +17,18 @@ pub use passthrough::run_passthrough_gh;
 pub(crate) use passthrough::{run_passthrough_fn, run_passthrough_with_extra};
 
 /// Check if args contain --json flag (user wants specific JSON fields, not Mycelium filtering)
-pub(crate) fn has_json_flag(args: &[String]) -> bool {
-    args.iter().any(|a| a == "--json")
+fn has_json_flag_impl<S: AsRef<str>>(args: &[S]) -> bool {
+    args.iter().any(|a| a.as_ref() == "--json")
 }
 
+/// Check if args contain --json flag for owned String slices.
+pub(crate) fn has_json_flag(args: &[String]) -> bool {
+    has_json_flag_impl(args)
+}
+
+/// Check if args contain --json flag for borrowed string slices.
 fn has_json_flag_str(args: &[&str]) -> bool {
-    args.contains(&"--json")
+    has_json_flag_impl(args)
 }
 
 /// Extract a positional identifier (PR/issue number) from args, returning it

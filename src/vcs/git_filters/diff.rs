@@ -122,4 +122,42 @@ mod tests {
             "5 files × 20 lines should not exceed max_lines=500"
         );
     }
+
+    #[test]
+    fn test_compact_diff_token_savings() {
+        fn count_tokens(text: &str) -> usize {
+            text.split_whitespace().count()
+        }
+
+        // Build a large diff across many files with long context lines. The compact_diff filter
+        // strips `index`/`---`/`+++`/`\No newline` metadata lines and truncates large hunks,
+        // yielding well above 60% savings on a realistic multi-file diff.
+        let mut diff = String::new();
+        for f in 1..=8 {
+            diff.push_str(&format!(
+                "diff --git a/src/module{f}/component_{f}.rs b/src/module{f}/component_{f}.rs\n"
+            ));
+            diff.push_str(&format!("index abc{f:04x}def..123{f:04x}456 100644\n"));
+            diff.push_str(&format!("--- a/src/module{f}/component_{f}.rs\n"));
+            diff.push_str(&format!("+++ b/src/module{f}/component_{f}.rs\n"));
+            diff.push_str(&format!("@@ -{f}0,35 +{f}0,37 @@ impl Component{f} {{\n"));
+            // Add 35 context lines (unchanged) + 2 added lines per file
+            for i in 1..=35 {
+                diff.push_str(&format!(
+                    "     let field_{i}: String = some_long_function_call_{i}(arg_one, arg_two, arg_three);\n"
+                ));
+            }
+            diff.push_str("+    let new_field: String = added_function_call(arg_one, arg_two);\n");
+            diff.push_str("+    tracing::debug!(\"component {f} initialised with new_field={{}}\", new_field);\n");
+        }
+
+        let result = compact_diff(&diff, 500);
+        let savings = (count_tokens(&diff).saturating_sub(count_tokens(&result))) * 100
+            / count_tokens(&diff).max(1);
+        assert!(
+            savings >= 60,
+            "Git diff filter: expected >= 60% token savings, got {}%",
+            savings
+        );
+    }
 }

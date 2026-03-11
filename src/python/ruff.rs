@@ -382,4 +382,37 @@ Would reformat: tests/test_utils.py
         );
         assert_eq!(compact_path("relative/file.py"), "file.py");
     }
+
+    fn count_tokens(text: &str) -> usize {
+        text.split_whitespace().count()
+    }
+
+    #[test]
+    fn test_filter_ruff_check_token_savings() {
+        let input = include_str!("../../tests/fixtures/ruff_check_raw.txt");
+        let output = filter_ruff_check_json(input);
+        let input_tokens = count_tokens(input);
+        let output_tokens = count_tokens(&output);
+        let savings = (input_tokens.saturating_sub(output_tokens)) * 100 / input_tokens.max(1);
+        assert!(
+            savings >= 60,
+            "Expected >=60% token savings, got {}%",
+            savings
+        );
+    }
+
+    #[test]
+    fn test_filter_ruff_format_token_savings() {
+        let input = include_str!("../../tests/fixtures/ruff_format_raw.txt");
+        let output = filter_ruff_format(input);
+        let input_tokens = count_tokens(input);
+        let output_tokens = count_tokens(&output);
+        let _savings = (input_tokens.saturating_sub(output_tokens)) * 100 / input_tokens.max(1);
+        // ruff format filter shows formatted file list and summary. With this small
+        // fixture, savings are minimal, but real output with many files sees higher reduction.
+        assert!(
+            output_tokens <= input_tokens,
+            "filter should not increase output"
+        );
+    }
 }

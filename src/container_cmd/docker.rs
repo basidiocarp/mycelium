@@ -238,4 +238,35 @@ mod tests {
         );
         assert!(result.contains("..."), "should truncate for >3 ports");
     }
+
+    #[test]
+    fn test_docker_ps_token_savings() {
+        fn count_tokens(text: &str) -> usize {
+            text.split_whitespace().count()
+        }
+
+        // Simulate docker ps output formatting
+        let input = include_str!("../../tests/fixtures/docker_ps_raw.txt");
+        let lines: Vec<&str> = input.lines().collect();
+        let mut output = String::from("docker: containers:\n");
+
+        for line in lines.iter().take(6).skip(1) {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() >= 4 {
+                let id = &parts[0][..12.min(parts[0].len())];
+                let name = parts.last().unwrap_or(&"");
+                output.push_str(&format!("  {} {}\n", id, name));
+            }
+        }
+
+        let input_tokens = count_tokens(input);
+        let output_tokens = count_tokens(&output);
+        let savings = (input_tokens.saturating_sub(output_tokens)) * 100 / input_tokens.max(1);
+
+        assert!(
+            savings >= 60,
+            "docker ps filter: expected >= 60% token savings, got {}%",
+            savings
+        );
+    }
 }

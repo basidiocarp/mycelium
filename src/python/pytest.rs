@@ -321,4 +321,23 @@ collected 0 items
             (3, 1, 2)
         );
     }
+
+    fn count_tokens(text: &str) -> usize {
+        text.split_whitespace().count()
+    }
+
+    #[test]
+    fn test_filter_pytest_token_savings() {
+        let input = include_str!("../../tests/fixtures/pytest_raw.txt");
+        let output = filter_pytest_output(input);
+        let input_tokens = count_tokens(input);
+        let output_tokens = count_tokens(&output);
+        let savings = (input_tokens.saturating_sub(output_tokens)) * 100 / input_tokens.max(1);
+        // pytest filter shows only failures and summary, reducing boilerplate
+        assert!(
+            savings >= 40,
+            "Expected >=40% token savings, got {}%",
+            savings
+        );
+    }
 }

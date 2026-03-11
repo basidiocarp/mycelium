@@ -11,7 +11,8 @@ use std::sync::OnceLock;
 fn timestamp_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| {
-        Regex::new(r"^\d{4}[-/]\d{2}[-/]\d{2}[T ]\d{2}:\d{2}:\d{2}[.,]?\d*\s*").unwrap()
+        Regex::new(r"^\d{4}[-/]\d{2}[-/]\d{2}[T ]\d{2}:\d{2}:\d{2}[.,]?\d*\s*")
+            .expect("valid regex")
     })
 }
 fn uuid_re() -> &'static Regex {
@@ -23,15 +24,15 @@ fn uuid_re() -> &'static Regex {
 }
 fn hex_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"0x[0-9a-fA-F]+").unwrap())
+    RE.get_or_init(|| Regex::new(r"0x[0-9a-fA-F]+").expect("valid regex"))
 }
 fn num_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"\b\d{4,}\b").unwrap())
+    RE.get_or_init(|| Regex::new(r"\b\d{4,}\b").expect("valid regex"))
 }
 fn path_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"/[\w./\-]+").unwrap())
+    RE.get_or_init(|| Regex::new(r"/[\w./\-]+").expect("valid regex"))
 }
 
 /// Filter and deduplicate log output

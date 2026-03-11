@@ -13,19 +13,19 @@ const MAX_EXPANDED_RECORDS: usize = 20;
 
 fn expanded_record() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"-\[ RECORD \d+ ]-").unwrap())
+    RE.get_or_init(|| Regex::new(r"-\[ RECORD \d+ ]-").expect("valid regex"))
 }
 fn separator() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"^[-+]+$").unwrap())
+    RE.get_or_init(|| Regex::new(r"^[-+]+$").expect("valid regex"))
 }
 fn row_count() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"^\(\d+ rows?\)$").unwrap())
+    RE.get_or_init(|| Regex::new(r"^\(\d+ rows?\)$").expect("valid regex"))
 }
 fn record_header() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"^-\[ RECORD (\d+) ]-").unwrap())
+    RE.get_or_init(|| Regex::new(r"^-\[ RECORD (\d+) ]-").expect("valid regex"))
 }
 
 pub fn run(args: &[String], verbose: u8) -> Result<()> {

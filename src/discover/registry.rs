@@ -58,7 +58,9 @@ fn compiled() -> &'static Vec<Regex> {
 
 fn env_prefix() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"^(?:sudo\s+|env\s+|[A-Z_][A-Z0-9_]*=[^\s]*\s+)+").unwrap())
+    RE.get_or_init(|| {
+        Regex::new(r"^(?:sudo\s+|env\s+|[A-Z_][A-Z0-9_]*=[^\s]*\s+)+").expect("valid regex")
+    })
 }
 
 /// Classify a single (already-split) command.

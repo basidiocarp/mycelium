@@ -9,16 +9,17 @@ use std::sync::OnceLock;
 fn cargo_dep_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| {
-        Regex::new(r#"^([a-zA-Z0-9_-]+)\s*=\s*(?:"([^"]+)"|.*version\s*=\s*"([^"]+)")"#).unwrap()
+        Regex::new(r#"^([a-zA-Z0-9_-]+)\s*=\s*(?:"([^"]+)"|.*version\s*=\s*"([^"]+)")"#)
+            .expect("valid regex")
     })
 }
 fn cargo_section_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"^\[([^]]+)]").unwrap())
+    RE.get_or_init(|| Regex::new(r"^\[([^]]+)]").expect("valid regex"))
 }
 fn requirements_dep_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"^([a-zA-Z0-9_-]+)([=<>!~]+.*)?$").unwrap())
+    RE.get_or_init(|| Regex::new(r"^([a-zA-Z0-9_-]+)([=<>!~]+.*)?$").expect("valid regex"))
 }
 
 /// Summarize project dependencies

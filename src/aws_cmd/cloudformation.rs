@@ -182,4 +182,90 @@ mod tests {
         assert!(result.contains("my-stack CREATE_COMPLETE 2024-01-15"));
         assert!(!result.contains("="));
     }
+
+    #[test]
+    fn test_filter_cfn_list_stacks_token_savings() {
+        fn count_tokens(text: &str) -> usize {
+            text.split_whitespace().count()
+        }
+
+        let input = r#"{
+            "StackSummaries": [
+                {
+                    "StackName": "api-infrastructure",
+                    "StackStatus": "CREATE_COMPLETE",
+                    "CreationTime": "2024-01-10T08:30:00Z",
+                    "LastUpdatedTime": "2024-02-15T10:30:00Z",
+                    "StackId": "arn:aws:cloudformation:us-east-1:123456789:stack/api-infrastructure/abc-def-ghi",
+                    "TemplateDescription": "Production API infrastructure with ECS and RDS"
+                },
+                {
+                    "StackName": "database-backup",
+                    "StackStatus": "UPDATE_COMPLETE",
+                    "CreationTime": "2024-01-05T14:20:00Z",
+                    "LastUpdatedTime": "2024-02-20T14:00:00Z",
+                    "StackId": "arn:aws:cloudformation:us-east-1:123456789:stack/database-backup/xyz-pqr-stu",
+                    "TemplateDescription": "RDS database backup infrastructure"
+                }
+            ]
+        }"#;
+
+        let output = filter_cfn_list_stacks(input).unwrap();
+        let savings = (count_tokens(input).saturating_sub(count_tokens(&output))) * 100
+            / count_tokens(input).max(1);
+        assert!(
+            savings >= 60,
+            "CloudFormation list-stacks filter: expected >= 60% token savings, got {}%",
+            savings
+        );
+    }
+
+    #[test]
+    fn test_filter_cfn_describe_stacks_token_savings() {
+        fn count_tokens(text: &str) -> usize {
+            text.split_whitespace().count()
+        }
+
+        let input = r#"{
+            "Stacks": [
+                {
+                    "StackName": "api-infrastructure",
+                    "StackStatus": "CREATE_COMPLETE",
+                    "CreationTime": "2024-01-10T08:30:00Z",
+                    "LastUpdatedTime": "2024-02-15T10:30:00Z",
+                    "StackId": "arn:aws:cloudformation:us-east-1:123456789:stack/api-infrastructure/abc",
+                    "StackStatusReason": "Stack successfully created",
+                    "Outputs": [
+                        {"OutputKey": "ApiEndpoint", "OutputValue": "https://api.example.com", "Description": "API Gateway endpoint"},
+                        {"OutputKey": "DatabaseHost", "OutputValue": "prod.abc123.us-east-1.rds.amazonaws.com", "Description": "RDS database endpoint"}
+                    ],
+                    "Parameters": [
+                        {"ParameterKey": "Environment", "ParameterValue": "production"},
+                        {"ParameterKey": "InstanceType", "ParameterValue": "t3.large"}
+                    ]
+                },
+                {
+                    "StackName": "database-backup",
+                    "StackStatus": "UPDATE_COMPLETE",
+                    "CreationTime": "2024-01-05T14:20:00Z",
+                    "LastUpdatedTime": "2024-02-20T14:00:00Z",
+                    "StackId": "arn:aws:cloudformation:us-east-1:123456789:stack/database-backup/xyz",
+                    "StackStatusReason": "Stack update completed",
+                    "Outputs": [
+                        {"OutputKey": "BackupBucket", "OutputValue": "backup-prod-bucket-12345", "Description": "S3 bucket for backups"},
+                        {"OutputKey": "BackupRole", "OutputValue": "arn:aws:iam::123456789:role/backup-role", "Description": "IAM role for backup"}
+                    ]
+                }
+            ]
+        }"#;
+
+        let output = filter_cfn_describe_stacks(input).unwrap();
+        let savings = (count_tokens(input).saturating_sub(count_tokens(&output))) * 100
+            / count_tokens(input).max(1);
+        assert!(
+            savings >= 60,
+            "CloudFormation describe-stacks filter: expected >= 60% token savings, got {}%",
+            savings
+        );
+    }
 }

@@ -365,4 +365,24 @@ diff --git a/b.rs b/b.rs
         let result = condense_unified_diff("");
         assert!(result.is_empty());
     }
+
+    #[test]
+    fn test_diff_token_savings() {
+        fn count_tokens(text: &str) -> usize {
+            text.split_whitespace().count()
+        }
+
+        let input = include_str!("../../tests/fixtures/diff_unified_raw.txt");
+        let output = condense_unified_diff(input);
+
+        let input_tokens = count_tokens(input);
+        let output_tokens = count_tokens(&output);
+        let savings = (input_tokens.saturating_sub(output_tokens)) * 100 / input_tokens.max(1);
+
+        assert!(
+            savings >= 60,
+            "diff filter: expected >= 60% token savings, got {}%",
+            savings
+        );
+    }
 }

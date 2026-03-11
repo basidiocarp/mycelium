@@ -87,4 +87,29 @@ mod tests {
         let result = filter_s3_ls(&input);
         assert!(result.contains("... +20 more items"));
     }
+
+    #[test]
+    fn test_filter_s3_ls_token_savings() {
+        fn count_tokens(text: &str) -> usize {
+            text.split_whitespace().count()
+        }
+
+        // Build a 110-item list so the truncation filter (keeps 40, drops 70) produces ~62% savings.
+        let mut lines = Vec::new();
+        for i in 1..=110 {
+            lines.push(format!(
+                "2024-01-15 10:30:45 bucket-number-{i:03}-with-long-name"
+            ));
+        }
+        let input = lines.join("\n");
+
+        let result = filter_s3_ls(&input);
+        let savings = (count_tokens(&input).saturating_sub(count_tokens(&result))) * 100
+            / count_tokens(&input).max(1);
+        assert!(
+            savings >= 60,
+            "AWS S3 filter: expected >= 60% token savings, got {}%",
+            savings
+        );
+    }
 }

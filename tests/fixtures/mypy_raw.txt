@@ -1,0 +1,11 @@
+src/server/auth.py:12: error: Incompatible return value type (got "str", expected "int")  [return-value]
+src/server/auth.py:15: error: Argument 1 has incompatible type "int"; expected "str"  [arg-type]
+src/server/auth.py:28: error: Name "missing_var" is not defined  [name-defined]
+src/models/user.py:8: error: Name "foo" is not defined  [name-defined]
+src/models/user.py:10: error: Incompatible types in assignment  [assignment]
+src/models/user.py:20: error: Missing return statement  [return]
+src/models/user.py:35: error: Incompatible types in assignment  [assignment]
+src/api/routes.py:45: error: Argument 1 to "get_user" has incompatible type "str"; expected "int"  [arg-type]
+src/api/routes.py:50: error: Item "None" has no attribute "id"  [union-attr]
+src/api/routes.py:65: error: Unused variable "unused_var"  [unused-variable]
+Found 10 errors in 4 files (checked 25 source files)

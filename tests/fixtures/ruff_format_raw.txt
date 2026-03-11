@@ -1,0 +1,13 @@
+Would reformat: src/main.py
+Would reformat: src/utils.py
+Would reformat: tests/test_api.py
+Would reformat: src/models.py
+Would reformat: src/config.py
+Would reformat: src/database.py
+Would reformat: src/cache.py
+Would reformat: src/middleware.py
+Would reformat: src/helpers.py
+Would reformat: src/validators.py
+Would reformat: src/decorators.py
+Would reformat: src/exceptions.py
+8 files would be reformatted, 12 files left unchanged

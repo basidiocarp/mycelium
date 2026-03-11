@@ -1,0 +1,171 @@
+diff --git a/src/main.rs b/src/main.rs
+index 1234567..abcdefg 100644
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -1,25 +1,30 @@
+ use std::io::{self, Read};
+ use std::fs;
+ use std::path::Path;
+
++use crate::config::Config;
++use crate::logger::Logger;
++
+ fn main() {
+     let x = 5;
+-    println!("Hello, world!");
++    println!("Hello, Rust!");
+     let y = x + 1;
+
+     if y > 5 {
+-        println!("y is greater than 5");
++        println!("y is greater than 5!");
++        println!("Processing...");
+     } else {
+         println!("y is not greater than 5");
+     }
++    println!("Done!");
+
+     // Read file contents
+     let file_content = fs::read_to_string("input.txt")
+         .expect("Failed to read file");
+
+     println!("File contains {} bytes", file_content.len());
+ }
+
+ fn process_data(data: &str) -> Vec<String> {
+-    data.split_whitespace().map(|s| s.to_string()).collect()
++    data.split_whitespace().map(|s| s.trim().to_string()).collect()
+ }
+diff --git a/Cargo.toml b/Cargo.toml
+index 2222222..3333333 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -1,6 +1,10 @@
+ [package]
+ name = "hello"
+-version = "0.1.0"
++version = "0.2.0"
++edition = "2021"
++
++[dependencies]
++serde = { version = "1.0", features = ["derive"] }
++tokio = { version = "1.0", features = ["full"] }
+diff --git a/src/lib.rs b/src/lib.rs
+new file mode 100644
+index 0000000..1234567
+--- /dev/null
++++ b/src/lib.rs
+@@ -0,0 +1,50 @@
++pub mod api;
++pub mod config;
++pub mod db;
++pub mod logger;
++pub mod utils;
++pub mod services;
++
++pub use api::{Server, start_server};
++pub use config::Config;
++pub use logger::Logger;
++
++pub fn version() -> &'static str {
++    env!("CARGO_PKG_VERSION")
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn test_version() {
++        assert!(!version().is_empty());
++    }
++}
++diff --git a/src/config.rs b/src/config.rs
++index 5555555..6666666 100644
++--- a/src/config.rs
+++++ b/src/config.rs
++@@ -1,20 +1,28 @@
++ use std::env;
++ use std::path::Path;
++
++-pub struct Config {
+++pub struct Config {
++     pub db_url: String,
++     pub api_key: String,
++     pub port: u16,
+++    pub timeout: u32,
+++    pub max_connections: usize,
++ }
++
++ impl Config {
++-    pub fn from_env() -> Result<Self, String> {
+++    pub fn from_env() -> Result<Self, ConfigError> {
++         let db_url = env::var("DATABASE_URL")
++-            .map_err(|_| "DATABASE_URL not set")?;
+++            .map_err(|_| ConfigError::MissingVar("DATABASE_URL"))?;
++
++         let api_key = env::var("API_KEY")
++-            .map_err(|_| "API_KEY not set")?;
+++            .map_err(|_| ConfigError::MissingVar("API_KEY"))?;
++
++         let port = env::var("PORT")
++-            .unwrap_or_else(|_| "8080".to_string())
+++            .unwrap_or_else(|_| "3000".to_string())
++             .parse::<u16>()
++-            .map_err(|_| "PORT must be a number")?;
+++            .map_err(|_| ConfigError::InvalidPort)?;
+++
+++        let timeout = env::var("TIMEOUT").unwrap_or("30".to_string())
+++            .parse::<u32>()
+++            .map_err(|_| ConfigError::InvalidTimeout)?;
++
++         Ok(Config {
++             db_url,
++             api_key,
++             port,
+++            timeout,
+++            max_connections: 100,
++         })
++     }
++ }
++diff --git a/src/logger.rs b/src/logger.rs
++index 7777777..8888888 100644
++--- a/src/logger.rs
+++++ b/src/logger.rs
++@@ -1,15 +1,25 @@
++ use std::fs::File;
++ use std::io::Write;
+++use chrono::Local;
++
++ pub struct Logger {
++     file: Option<File>,
+++    level: LogLevel,
++ }
++
+++pub enum LogLevel {
+++    Debug,
+++    Info,
+++    Warn,
+++    Error,
+++}
+++
++ impl Logger {
++-    pub fn new(file_path: &str) -> Result<Self, std::io::Error> {
+++    pub fn new(file_path: &str, level: LogLevel) -> Result<Self, std::io::Error> {
++         let file = File::create(file_path)?;
++         Ok(Logger {
++             file: Some(file),
+++            level,
++         })
++     }
++
++-    pub fn log(&mut self, message: &str) -> Result<(), std::io::Error> {
+++    pub fn log(&mut self, message: &str) -> Result<(), std::io::Error> {
+++        let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S");
++         if let Some(ref mut f) = self.file {
++-            writeln!(f, "{}", message)?;
+++            writeln!(f, "[{}] {}", timestamp, message)?;
++         }
++         Ok(())
++     }
++}

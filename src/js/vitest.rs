@@ -121,12 +121,14 @@ fn extract_failures_from_json(json: &VitestJsonOutput) -> Vec<TestFailure> {
 /// Tier 2: Extract test statistics using regex (degraded mode)
 fn tests_re() -> &'static Regex {
     static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"Tests\s+(?:(\d+)\s+failed\s+\|\s+)?(\d+)\s+passed").unwrap())
+    RE.get_or_init(|| {
+        Regex::new(r"Tests\s+(?:(\d+)\s+failed\s+\|\s+)?(\d+)\s+passed").expect("valid regex")
+    })
 }
 
 fn duration_re() -> &'static Regex {
     static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"Duration\s+([\d.]+)(ms|s)").unwrap())
+    RE.get_or_init(|| Regex::new(r"Duration\s+([\d.]+)(ms|s)").expect("valid regex"))
 }
 
 fn extract_stats_regex(output: &str) -> Option<TestResult> {

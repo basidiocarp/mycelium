@@ -354,4 +354,25 @@ mod tests {
         let _args: Vec<OsString> = vec![OsString::from("help")];
         // Compile-time verification that the function exists with correct signature
     }
+
+    #[test]
+    fn test_pnpm_install_token_savings() {
+        fn count_tokens(text: &str) -> usize {
+            text.split_whitespace().count()
+        }
+
+        let input = include_str!("../../../tests/fixtures/pnpm_install_raw.txt");
+        let output = filter_pnpm_install(input);
+        let input_tokens = count_tokens(input);
+        let output_tokens = count_tokens(&output);
+        let savings = (input_tokens.saturating_sub(output_tokens)) * 100 / input_tokens.max(1);
+
+        // pnpm install filter removes progress bars but keeps dependency changes and summary
+        // Savings from removing progress indicators (~25-30% typical)
+        assert!(
+            savings >= 20,
+            "pnpm install filter: expected >= 20% token savings, got {}%",
+            savings
+        );
+    }
 }

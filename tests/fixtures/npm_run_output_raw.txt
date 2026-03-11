@@ -1,0 +1,23 @@
+> myapp@1.0.0 build
+> next build && npm run lint
+
+npm WARN deprecated inflight@1.0.6: This module is not supported, and it is not recommended for new code.
+npm WARN deprecated rimraf@2.7.1: Rimraf versions prior to v3 are no longer maintained
+npm WARN deprecated uuid@3.4.0: Please upgrade  to version 7 or higher.  Older versions may use Math.random() in certain circumstances
+
+⸨ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 0.0s ⸩
+npm notice
+Initializing Next.js build...
+Creating an optimized production build...
+✓ Compiled client and server successfully
+✓ Build completed
+✓ Assets optimized
+
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: fsevents@2.3.3
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: @swc/core@latest
+
+> linter@1.0.0 lint
+> eslint src/ --max-warnings 0
+
+✓ No linting errors found
+Linting completed successfully

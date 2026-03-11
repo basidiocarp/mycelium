@@ -1,0 +1,27 @@
+  Installing mycelium v0.11.0
+  Downloading crates ...
+  Downloaded anyhow v1.0.80
+  Downloaded clap v4.5.0
+  Downloaded proc-macro2 v1.0.85
+  Downloaded quote v1.0.36
+  Downloaded syn v2.0.66
+  Downloaded serde v1.0.200
+  Downloaded serde_json v1.0.127
+  Downloaded tokio v1.38.0
+  Downloaded regex v1.10.4
+   Locking 28 packages to latest compatible versions
+   Compiling libc v0.2.153
+   Compiling cfg-if v1.0.0
+   Compiling proc-macro2 v1.0.85
+   Compiling quote v1.0.36
+   Compiling syn v2.0.66
+   Compiling serde v1.0.200
+   Compiling anyhow v1.0.80
+   Compiling tokio v1.38.0
+   Compiling regex v1.10.4
+   Compiling clap v4.5.0
+   Compiling mycelium v0.11.0
+    Finished `release` profile [optimized] target(s) in 45.23s
+  Replacing /Users/user/.cargo/bin/mycelium
+   Replaced package `mycelium v0.9.4` with `mycelium v0.11.0` (/Users/user/.cargo/bin/mycelium)
+warning: be sure to add `/Users/user/.cargo/bin` to your PATH

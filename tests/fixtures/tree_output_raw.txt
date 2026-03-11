@@ -1,0 +1,81 @@
+.
+├── src
+│   ├── main.rs
+│   ├── lib.rs
+│   ├── config.rs
+│   ├── logger.rs
+│   ├── api
+│   │   ├── mod.rs
+│   │   ├── handlers.rs
+│   │   ├── middleware.rs
+│   │   ├── routes.rs
+│   │   └── errors.rs
+│   ├── db
+│   │   ├── mod.rs
+│   │   ├── models.rs
+│   │   ├── migrations.rs
+│   │   ├── queries.rs
+│   │   └── schema.rs
+│   ├── utils
+│   │   ├── mod.rs
+│   │   ├── helpers.rs
+│   │   ├── validators.rs
+│   │   ├── formatters.rs
+│   │   └── constants.rs
+│   ├── tests
+│   │   ├── unit_tests.rs
+│   │   ├── integration_tests.rs
+│   │   ├── fixtures.rs
+│   │   └── common.rs
+│   └── services
+│       ├── mod.rs
+│       ├── auth.rs
+│       ├── email.rs
+│       └── cache.rs
+├── tests
+│   ├── common.rs
+│   ├── integration.rs
+│   ├── e2e.rs
+│   └── fixtures
+│       ├── sample_input.txt
+│       ├── expected_output.txt
+│       ├── config.json
+│       └── test_data.csv
+├── examples
+│   ├── basic.rs
+│   ├── advanced.rs
+│   ├── concurrent.rs
+│   └── custom.rs
+├── benches
+│   ├── bench.rs
+│   └── large_dataset.rs
+├── docs
+│   ├── README.md
+│   ├── ARCHITECTURE.md
+│   ├── API.md
+│   ├── CONTRIBUTING.md
+│   ├── api
+│   │   ├── auth.md
+│   │   ├── users.md
+│   │   └── posts.md
+│   └── examples
+│       ├── basic.md
+│       ├── advanced.md
+│       └── migration.md
+├── Cargo.toml
+├── Cargo.lock
+├── README.md
+├── CHANGELOG.md
+├── .gitignore
+├── .github
+│   └── workflows
+│       ├── ci.yml
+│       ├── release.yml
+│       └── security.yml
+└── config
+    ├── development.toml
+    ├── production.toml
+    ├── testing.toml
+    └── defaults.toml
+
+23 directories, 68 files

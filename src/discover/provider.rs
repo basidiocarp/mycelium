@@ -1,11 +1,11 @@
 //! Reads and parses Claude Code JSONL session files to extract command executions.
 use anyhow::{Context, Result};
+use ignore::WalkBuilder;
 use std::collections::HashMap;
 use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
-use walkdir::WalkDir;
 
 /// A command extracted from a session file.
 #[derive(Debug)]
@@ -91,9 +91,10 @@ impl SessionProvider for ClaudeProvider {
             }
 
             // Walk the project directory recursively (catches subagents/)
-            for walk_entry in WalkDir::new(&path)
+            for walk_entry in WalkBuilder::new(&path)
+                .git_ignore(false)
                 .follow_links(false)
-                .into_iter()
+                .build()
                 .filter_map(|e| e.ok())
             {
                 let file_path = walk_entry.path();

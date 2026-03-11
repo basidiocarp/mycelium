@@ -178,7 +178,7 @@ pub fn join_with_overflow(items: &[String], total: usize, max: usize, label: &st
 /// assert_eq!(truncate_iso_date("short"), "short");
 /// ```
 pub fn truncate_iso_date(date: &str) -> &str {
-    if date.len() >= 10 { &date[..10] } else { date }
+    date.get(..10).unwrap_or(date)
 }
 
 /// Format a confirmation message: "ok \<action\> \<detail\>"

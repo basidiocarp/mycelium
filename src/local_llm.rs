@@ -11,72 +11,86 @@ use crate::filter::Language;
 fn import_rust() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| {
-        Regex::new(r"^use\s+([a-zA-Z_][a-zA-Z0-9_]*(?:::[a-zA-Z_][a-zA-Z0-9_]*)?)").unwrap()
+        Regex::new(r"^use\s+([a-zA-Z_][a-zA-Z0-9_]*(?:::[a-zA-Z_][a-zA-Z0-9_]*)?)")
+            .expect("valid regex")
     })
 }
 fn import_python() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"^(?:from\s+(\S+)|import\s+(\S+))").unwrap())
+    RE.get_or_init(|| Regex::new(r"^(?:from\s+(\S+)|import\s+(\S+))").expect("valid regex"))
 }
 fn import_js_ts() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| {
-        Regex::new(r#"import.*from\s+['"]([^'"]+)['"]|require\(['"]([^'"]+)['"]\)"#).unwrap()
+        Regex::new(r#"import.*from\s+['"]([^'"]+)['"]|require\(['"]([^'"]+)['"]\)"#)
+            .expect("valid regex")
     })
 }
 fn import_go() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r#"^\s*"([^"]+)"$"#).unwrap())
+    RE.get_or_init(|| Regex::new(r#"^\s*"([^"]+)"$"#).expect("valid regex"))
 }
 
 // Function patterns
 fn func_rust() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"(?:pub\s+)?(?:async\s+)?fn\s+([a-zA-Z_][a-zA-Z0-9_]*)").unwrap())
+    RE.get_or_init(|| {
+        Regex::new(r"(?:pub\s+)?(?:async\s+)?fn\s+([a-zA-Z_][a-zA-Z0-9_]*)").expect("valid regex")
+    })
 }
 fn func_python() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"def\s+([a-zA-Z_][a-zA-Z0-9_]*)").unwrap())
+    RE.get_or_init(|| Regex::new(r"def\s+([a-zA-Z_][a-zA-Z0-9_]*)").expect("valid regex"))
 }
 fn func_js_ts() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"(?:async\s+)?function\s+([a-zA-Z_][a-zA-Z0-9_]*)|(?:const|let|var)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(?:async\s+)?\(").unwrap())
+    RE.get_or_init(|| Regex::new(r"(?:async\s+)?function\s+([a-zA-Z_][a-zA-Z0-9_]*)|(?:const|let|var)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(?:async\s+)?\(").expect("valid regex"))
 }
 fn func_go() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"func\s+(?:\([^)]+\)\s+)?([a-zA-Z_][a-zA-Z0-9_]*)").unwrap())
+    RE.get_or_init(|| {
+        Regex::new(r"func\s+(?:\([^)]+\)\s+)?([a-zA-Z_][a-zA-Z0-9_]*)").expect("valid regex")
+    })
 }
 
 // Struct/class patterns
 fn struct_rust() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"(?:pub\s+)?(?:struct|enum)\s+([a-zA-Z_][a-zA-Z0-9_]*)").unwrap())
+    RE.get_or_init(|| {
+        Regex::new(r"(?:pub\s+)?(?:struct|enum)\s+([a-zA-Z_][a-zA-Z0-9_]*)").expect("valid regex")
+    })
 }
 fn struct_python() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"class\s+([a-zA-Z_][a-zA-Z0-9_]*)").unwrap())
+    RE.get_or_init(|| Regex::new(r"class\s+([a-zA-Z_][a-zA-Z0-9_]*)").expect("valid regex"))
 }
 fn struct_ts() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"(?:interface|class|type)\s+([a-zA-Z_][a-zA-Z0-9_]*)").unwrap())
+    RE.get_or_init(|| {
+        Regex::new(r"(?:interface|class|type)\s+([a-zA-Z_][a-zA-Z0-9_]*)").expect("valid regex")
+    })
 }
 fn struct_go() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"type\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+struct").unwrap())
+    RE.get_or_init(|| Regex::new(r"type\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+struct").expect("valid regex"))
 }
 fn struct_java() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"(?:public\s+)?class\s+([a-zA-Z_][a-zA-Z0-9_]*)").unwrap())
+    RE.get_or_init(|| {
+        Regex::new(r"(?:public\s+)?class\s+([a-zA-Z_][a-zA-Z0-9_]*)").expect("valid regex")
+    })
 }
 
 // Trait/interface patterns
 fn trait_rust() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"(?:pub\s+)?trait\s+([a-zA-Z_][a-zA-Z0-9_]*)").unwrap())
+    RE.get_or_init(|| {
+        Regex::new(r"(?:pub\s+)?trait\s+([a-zA-Z_][a-zA-Z0-9_]*)").expect("valid regex")
+    })
 }
 fn trait_ts() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"interface\s+([a-zA-Z_][a-zA-Z0-9_]*)").unwrap())
+    RE.get_or_init(|| Regex::new(r"interface\s+([a-zA-Z_][a-zA-Z0-9_]*)").expect("valid regex"))
 }
 
 /// Heuristic-based code summarizer - no external model needed

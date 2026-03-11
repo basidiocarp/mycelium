@@ -8,8 +8,8 @@ use jiff::Timestamp;
 use rusqlite::params;
 
 use super::{
-    CommandRecord, DayStats, GainSummary, MonthStats, ProjectStats, Tracker, WeekStats,
-    project_filter_params,
+    CommandRecord, CommandStats, DayStats, GainSummary, MonthStats, ProjectStats, Tracker,
+    WeekStats, project_filter_params,
 };
 
 /// A row from the parse health query.
@@ -96,11 +96,7 @@ impl Tracker {
         })
     }
 
-    #[allow(clippy::type_complexity)]
-    fn get_by_command(
-        &self,
-        project_path: Option<&str>,
-    ) -> Result<Vec<(String, usize, usize, f64, u64)>> {
+    fn get_by_command(&self, project_path: Option<&str>) -> Result<Vec<CommandStats>> {
         let (project_exact, project_glob) = project_filter_params(project_path);
         let mut stmt = self.conn.prepare(
             "SELECT mycelium_cmd, COUNT(*), SUM(saved_tokens), AVG(savings_pct), AVG(exec_time_ms)
@@ -112,13 +108,13 @@ impl Tracker {
         )?;
 
         let rows = stmt.query_map(params![project_exact, project_glob], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, i64>(1)? as usize,
-                row.get::<_, i64>(2)? as usize,
-                row.get::<_, f64>(3)?,
-                row.get::<_, f64>(4)? as u64,
-            ))
+            Ok(CommandStats {
+                command: row.get(0)?,
+                count: row.get::<_, i64>(1)? as usize,
+                tokens_saved: row.get::<_, i64>(2)? as usize,
+                savings_pct: row.get(3)?,
+                exec_time_ms: row.get::<_, f64>(4)? as u64,
+            })
         })?;
 
         Ok(rows.collect::<Result<Vec<_>, _>>()?)

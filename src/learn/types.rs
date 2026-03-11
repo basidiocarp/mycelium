@@ -71,7 +71,8 @@ fn cmd_not_found_re() -> &'static Regex {
 fn wrong_path_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| {
-        Regex::new(r"(?i)(no such file or directory|cannot find the path|file not found)").unwrap()
+        Regex::new(r"(?i)(no such file or directory|cannot find the path|file not found)")
+            .expect("valid regex")
     })
 }
 
@@ -87,7 +88,9 @@ fn missing_arg_re() -> &'static Regex {
 
 fn permission_denied_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"(?i)(permission denied|access denied|not permitted)").unwrap())
+    RE.get_or_init(|| {
+        Regex::new(r"(?i)(permission denied|access denied|not permitted)").expect("valid regex")
+    })
 }
 
 fn user_rejection_re() -> &'static Regex {
@@ -182,7 +185,7 @@ pub fn classify_error(output: &str) -> ErrorType {
 
 fn env_prefix_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"^(?:sudo\s+|[A-Z_][A-Z0-9_]*=[^\s]*\s+)+").unwrap())
+    RE.get_or_init(|| Regex::new(r"^(?:sudo\s+|[A-Z_][A-Z0-9_]*=[^\s]*\s+)+").expect("valid regex"))
 }
 
 /// Extract base command (first 1-2 tokens, stripping any KEY=VALUE env prefixes and sudo).

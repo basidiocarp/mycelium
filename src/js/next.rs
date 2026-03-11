@@ -173,7 +173,7 @@ fn filter_next_build(output: &str) -> String {
 /// Extract time from build output (e.g., "Compiled in 34.2s")
 fn next_time_re() -> &'static Regex {
     static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"(\d+(?:\.\d+)?)\s*(s|ms)").unwrap())
+    RE.get_or_init(|| Regex::new(r"(\d+(?:\.\d+)?)\s*(s|ms)").expect("valid regex"))
 }
 
 fn extract_time(line: &str) -> Option<String> {

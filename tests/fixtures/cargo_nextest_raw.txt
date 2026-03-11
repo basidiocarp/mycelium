@@ -1,0 +1,37 @@
+   Compiling mycelium v0.15.2
+   Downloading crates ...
+   Compiling serde v1.0.200
+   Compiling tokio v1.38.0
+   Compiling regex v1.10.4
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 15.43s
+────────────────────────────────────────────────────────────────
+    Starting 301 tests across 2 binaries
+        PASS [   0.009s] (1/301) mycelium::bin/mycelium cargo_cmd::tests::test_cargo_status
+        PASS [   0.008s] (2/301) mycelium::bin/mycelium cargo_cmd::tests::test_cargo_build_error
+        PASS [   0.007s] (3/301) mycelium::bin/mycelium filters::git::tests::test_git_log
+        PASS [   0.008s] (4/301) mycelium::bin/mycelium filters::cargo::tests::test_cargo_install
+        PASS [   0.009s] (5/301) mycelium::bin/mycelium filters::cargo::tests::test_cargo_clippy
+        PASS [   0.007s] (6/301) mycelium::bin/mycelium filters::cargo::tests::test_cargo_nextest_pass
+        FAIL [   0.015s] (7/301) mycelium::bin/mycelium filters::cargo::tests::test_cargo_nextest_fail
+
+  stderr ───
+
+    thread 'filters::cargo::tests::test_cargo_nextest_fail' panicked at 'assertion `left == right` failed':
+      left: 50
+     right: 100
+    at src/filters/cargo.rs:245:9
+
+        PASS [   0.006s] (8/301) mycelium::bin/mycelium filters::config::tests::test_config_parse
+        PASS [   0.007s] (9/301) mycelium::bin/mycelium filters::config::tests::test_config_default
+        PASS [   0.008s] (10/301) mycelium::bin/mycelium filters::config::tests::test_config_merge
+        PASS [   0.009s] (11/301) mycelium::bin/mycelium utils::tests::test_string_trim
+        PASS [   0.007s] (12/301) mycelium::bin/mycelium utils::tests::test_path_normalize
+        PASS [   0.009s] (13/301) mycelium::bin/mycelium utils::tests::test_path_join
+        PASS [   0.006s] (14/301) mycelium::bin/mycelium utils::tests::test_env_var_expand
+        PASS [   0.008s] (15/301) mycelium::bin/mycelium utils::tests::test_env_var_missing
+        PASS [   0.010s] (300/301) mycelium::bin/mycelium integration::test_full_pipeline
+        PASS [   0.007s] (301/301) mycelium::bin/mycelium integration::test_cleanup
+────────────────────────────────────────────────────────────────
+     Summary [   4.527s] 301 tests run: 300 passed, 1 failed, 0 skipped
+        FAIL [   0.015s] (7/301) mycelium::bin/mycelium filters::cargo::tests::test_cargo_nextest_fail
+error: test run failed

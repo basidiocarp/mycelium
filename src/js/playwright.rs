@@ -162,12 +162,12 @@ fn collect_test_results(
 /// Tier 2: Extract test statistics using regex (degraded mode)
 fn pw_summary_re() -> &'static Regex {
     static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"(\d+)\s+(passed|failed|flaky|skipped)").unwrap())
+    RE.get_or_init(|| Regex::new(r"(\d+)\s+(passed|failed|flaky|skipped)").expect("valid regex"))
 }
 
 fn pw_duration_re() -> &'static Regex {
     static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"\((\d+(?:\.\d+)?)(ms|s|m)\)").unwrap())
+    RE.get_or_init(|| Regex::new(r"\((\d+(?:\.\d+)?)(ms|s|m)\)").expect("valid regex"))
 }
 
 fn extract_playwright_regex(output: &str) -> Option<TestResult> {
@@ -219,7 +219,7 @@ fn extract_playwright_regex(output: &str) -> Option<TestResult> {
 /// Extract failures using regex
 fn pw_test_pattern() -> &'static Regex {
     static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"[×✗]\s+.*?›\s+([^›]+\.spec\.[tj]sx?)").unwrap())
+    RE.get_or_init(|| Regex::new(r"[×✗]\s+.*?›\s+([^›]+\.spec\.[tj]sx?)").expect("valid regex"))
 }
 
 fn extract_failures_regex(output: &str) -> Vec<TestFailure> {

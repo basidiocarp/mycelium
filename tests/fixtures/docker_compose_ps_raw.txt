@@ -1,0 +1,6 @@
+NAME                COMMAND                  SERVICE             STATUS              PORTS
+docker-project-web-1          "/docker-entrypoint.…"   web                 Up About a minute   0.0.0.0:80->80/tcp, 0.0.0.0:443->443/tcp
+docker-project-api-1          "docker-entrypoint.s…"   api                 Up About a minute   0.0.0.0:3000->3000/tcp
+docker-project-db-1           "docker-entrypoint.s…"   db                  Up About a minute   0.0.0.0:5432->5432/tcp
+docker-project-redis-1        "redis-server --appe…"   redis               Up About a minute   6379/tcp
+docker-project-worker-1       "python worker.py"       worker              Exited 0
