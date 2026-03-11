@@ -27,7 +27,6 @@
 //! println!("Saved {} tokens", summary.total_saved);
 //! ```
 //!
-//! See [docs/tracking.md](../docs/tracking.md) for full documentation.
 
 mod queries;
 mod schema;
@@ -696,7 +695,7 @@ mod tests {
             .unwrap();
 
         let summary = tracker.get_parse_failure_summary().unwrap();
-        // We can't assert exact rate because other tests may have added records,
+        // We can't assert the exact rate because other tests may have added records,
         // but we can verify recovery_rate is between 0 and 100
         assert!(summary.recovery_rate >= 0.0 && summary.recovery_rate <= 100.0);
     }

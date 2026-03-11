@@ -49,7 +49,10 @@ set -euo pipefail
 #  Parse input
 # =========================================================
 INPUT=$(cat)
-CMD=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
+CMD=$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null) || {
+  _mycelium_audit_log "skip:jq_parse_error" "-"
+  exit 0
+}
 
 if [ -z "$CMD" ]; then
   _mycelium_audit_log "skip:empty" "-"
