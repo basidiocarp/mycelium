@@ -9,6 +9,7 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
 
 jobs:
   build:
@@ -48,7 +49,7 @@ jobs:
 
       - name: Install cross (aarch64-linux)
         if: matrix.cross
-        run: cargo install cross --git https://github.com/cross-rs/cross
+        uses: taiki-e/install-action@cross
 
       - name: Build
         run: |
@@ -85,21 +86,29 @@ jobs:
     needs: build
     steps:
       - uses: actions/checkout@v6
+
+      - name: Download linux x86_64 build
+        uses: actions/download-artifact@v8
+        with:
+          name: mycelium-x86_64-unknown-linux-musl
+          path: artifacts
+
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
       - name: Build release
         run: cargo build --release
 
+      - name: Install packaging tools
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deb,cargo-generate-rpm
+
       - name: Build DEB
-        run: |
-          cargo install cargo-deb
-          cargo deb --no-build
+        run: cargo deb --no-build
 
       - name: Build RPM
-        run: |
-          cargo install cargo-generate-rpm
-          cargo generate-rpm
+        run: cargo generate-rpm
 
       - name: Upload DEB
         uses: actions/upload-artifact@v7
