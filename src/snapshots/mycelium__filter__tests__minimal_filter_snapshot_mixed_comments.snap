@@ -1,0 +1,22 @@
+---
+source: src/filter.rs
+expression: result
+---
+use std::collections::HashMap;
+
+/// A simple counter struct.
+pub struct Counter {
+    count: usize,
+}
+
+impl Counter {
+    // TODO: add overflow protection
+    pub fn increment(&mut self) {
+        self.count += 1;
+    }
+
+    // Regular comment about logic
+    pub fn get(&self) -> usize {
+        self.count
+    }
+}

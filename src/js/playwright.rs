@@ -99,6 +99,7 @@ impl OutputParser for PlaywrightParser {
                     skipped: json.stats.skipped,
                     duration_ms: Some(json.stats.duration as u64),
                     failures,
+                    passed_names: collect_passed_names(&json.suites),
                 };
 
                 ParseResult::Full(result)
@@ -159,6 +160,19 @@ fn collect_test_results(
     }
 }
 
+fn collect_passed_names(suites: &[PlaywrightSuite]) -> Vec<String> {
+    let mut names = Vec::new();
+    for suite in suites {
+        for spec in &suite.specs {
+            if spec.ok {
+                names.push(spec.title.clone());
+            }
+        }
+        names.extend(collect_passed_names(&suite.suites));
+    }
+    names
+}
+
 /// Tier 2: Extract test statistics using regex (degraded mode)
 fn pw_summary_re() -> &'static Regex {
     static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
@@ -210,6 +224,7 @@ fn extract_playwright_regex(output: &str) -> Option<TestResult> {
             skipped,
             duration_ms,
             failures: extract_failures_regex(&clean_output),
+            passed_names: Vec::new(),
         })
     } else {
         None
@@ -268,10 +283,14 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
     let is_test = args.first().map(|a| a == "test").unwrap_or(false);
     if is_test {
         cmd.arg("test");
-        cmd.arg("--reporter=json");
-        // Strip user's --reporter to avoid conflicts with our forced JSON
-        for arg in &args[1..] {
-            if !arg.starts_with("--reporter") {
+        let user_has_reporter = args[1..].iter().any(|a| a.starts_with("--reporter"));
+        if user_has_reporter {
+            for arg in &args[1..] {
+                cmd.arg(arg);
+            }
+        } else {
+            cmd.arg("--reporter=json");
+            for arg in &args[1..] {
                 cmd.arg(arg);
             }
         }

@@ -34,6 +34,12 @@ pub fn run(
         eprintln!("Detected language: {:?}", lang);
     }
 
+    // Bypass filtering for small files — agents need the full content
+    if content.lines().count() < 200 {
+        print!("{}", content);
+        return Ok(());
+    }
+
     // Apply filter
     let filter = filter::get_filter(level);
     let mut filtered = filter.filter(&content, &lang);

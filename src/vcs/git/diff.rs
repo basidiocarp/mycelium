@@ -158,7 +158,11 @@ pub(super) fn run_show(
 
     // Step 1: one-line commit summary
     let mut summary_cmd = super::git_cmd(global_args);
-    summary_cmd.args(["show", "--no-patch", "--pretty=format:%h %s (%ar) <%an>"]);
+    summary_cmd.args([
+        "show",
+        "--no-patch",
+        "--pretty=format:%h %s (%ar) <%an>%n%b",
+    ]);
     for arg in args {
         summary_cmd.arg(arg);
     }
@@ -168,7 +172,8 @@ pub(super) fn run_show(
         eprintln!("{}", stderr);
         std::process::exit(summary_output.status.code().unwrap_or(1));
     }
-    let summary = String::from_utf8_lossy(&summary_output.stdout);
+    let summary = String::from_utf8_lossy(&summary_output.stdout).to_string();
+    let summary = summary.trim_end().to_string();
     println!("{}", summary.trim());
 
     // Step 2: --stat summary

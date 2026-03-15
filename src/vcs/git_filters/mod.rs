@@ -19,8 +19,8 @@ pub(crate) fn filter_log_output(output: &str, limit: usize) -> String {
         .iter()
         .take(limit)
         .map(|line| {
-            if line.len() > 80 {
-                let truncated: String = line.chars().take(77).collect();
+            if line.len() > 120 {
+                let truncated: String = line.chars().take(117).collect();
                 format!("{}...", truncated)
             } else {
                 line.to_string()
@@ -128,7 +128,7 @@ mod tests {
         let result = filter_log_output(&long_line, 10);
         assert!(result.len() < long_line.len());
         assert!(result.contains("..."));
-        assert!(result.len() <= 80);
+        assert!(result.len() <= 120);
     }
 
     #[test]
@@ -144,7 +144,7 @@ mod tests {
     #[test]
     fn test_filter_log_output_multibyte() {
         // Thai characters: each is 3 bytes. A line with >80 bytes but few chars
-        let thai_msg = format!("abc1234 {} (2 days ago) <author>", "ก".repeat(30));
+        let thai_msg = format!("abc1234 {} (2 days ago) <author>", "ก".repeat(50));
         let result = filter_log_output(&thai_msg, 10);
         // Should not panic
         assert!(result.contains("abc1234"));
@@ -155,7 +155,7 @@ mod tests {
 
     #[test]
     fn test_filter_log_output_emoji() {
-        let emoji_msg = "abc1234 🎉🎊🎈🎁🎂🎄🎃🎆🎇✨🎉🎊🎈🎁🎂🎄🎃🎆🎇✨ (1 day ago) <user>";
+        let emoji_msg = "abc1234 🎉🎊🎈🎁🎂🎄🎃🎆🎇✨🎉🎊🎈🎁🎂🎄🎃🎆🎇✨🎉🎊🎈🎁🎂🎄🎃🎆🎇✨🎉🎊🎈🎁🎂🎄🎃🎆🎇✨🎉🎊🎈 (1 day ago) <user>";
         let result = filter_log_output(emoji_msg, 10);
         // Should not panic, should have "..."
         assert!(result.contains("..."));
@@ -196,7 +196,7 @@ mod tests {
         }
 
         // Each line is intentionally long (25-30 tokens). The filter truncates every line
-        // >80 chars to 77 chars + "...", keeping only ~10 tokens per line, giving >60% savings.
+        // >120 chars to 117 chars + "...", keeping only ~15 tokens per line, giving ~40% savings.
         let input = (0..20)
             .map(|i| {
                 format!(
@@ -212,8 +212,8 @@ mod tests {
         let savings = (count_tokens(&input).saturating_sub(count_tokens(&output))) * 100
             / count_tokens(&input).max(1);
         assert!(
-            savings >= 60,
-            "Git log filter: expected >= 60% token savings, got {}%",
+            savings >= 40,
+            "Git log filter: expected >= 40% token savings, got {}%",
             savings
         );
     }

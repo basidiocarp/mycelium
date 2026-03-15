@@ -94,12 +94,13 @@ flowchart LR
     end
 ```
 
-Four strategies applied per command type:
+Five strategies applied per command type:
 
 1. **Smart Filtering** - Removes noise (comments, whitespace, boilerplate)
 2. **Grouping** - Aggregates similar items (files by directory, errors by type)
 3. **Truncation** - Keeps relevant context, cuts redundancy
 4. **Deduplication** - Collapses repeated log lines with counts
+5. **Adaptive Filtering** - Size-aware compression: small outputs (<50 lines) pass through untouched, medium outputs get light filtering, large outputs (>500 lines) get full structured compression — preserving errors, TODOs, and actionable comments
 
 ## Commands
 
@@ -299,6 +300,11 @@ exclude_commands = ["curl", "playwright"]  # skip rewrite for these
 enabled = true          # save raw output on failure (default: true)
 mode = "failures"       # "failures", "always", or "never"
 max_files = 20          # rotation limit
+
+[filter.adaptive]
+small_lines = 50        # outputs below this pass through unfiltered (default: 50)
+small_bytes = 2048      # byte threshold for passthrough (default: 2048)
+large_lines = 500       # outputs above this get full compression (default: 500)
 ```
 
 

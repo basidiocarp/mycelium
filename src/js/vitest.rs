@@ -70,6 +70,15 @@ impl OutputParser for VitestParser {
                     _ => None,
                 };
 
+                let mut passed_names = Vec::new();
+                for file_result in &json.test_results {
+                    for assertion in &file_result.assertion_results {
+                        if assertion.status == "passed" {
+                            passed_names.push(assertion.full_name.clone());
+                        }
+                    }
+                }
+
                 let result = TestResult {
                     total: json.num_total_tests,
                     passed: json.num_passed_tests,
@@ -77,6 +86,7 @@ impl OutputParser for VitestParser {
                     skipped: json.num_pending_tests,
                     duration_ms,
                     failures,
+                    passed_names,
                 };
 
                 ParseResult::Full(result)
@@ -169,6 +179,7 @@ fn extract_stats_regex(output: &str) -> Option<TestResult> {
             skipped: 0,
             duration_ms,
             failures: extract_failures_regex(&clean_output),
+            passed_names: Vec::new(),
         })
     } else {
         None
@@ -228,8 +239,11 @@ fn run_vitest(args: &[String], verbose: u8) -> Result<()> {
     let mut cmd = package_manager_exec("vitest");
     cmd.arg("run"); // Force non-watch mode
 
-    // Add JSON reporter for structured output
-    cmd.arg("--reporter=json");
+    // Add JSON reporter for structured output, unless user already specified one
+    let user_has_reporter = args.iter().any(|a| a.starts_with("--reporter"));
+    if !user_has_reporter {
+        cmd.arg("--reporter=json");
+    }
 
     for arg in args {
         cmd.arg(arg);

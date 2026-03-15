@@ -47,25 +47,81 @@ pub trait TokenFormatter {
     }
 }
 
+fn collapse_stack_trace(message: &str) -> String {
+    let mut result = Vec::new();
+    let mut internal_count = 0usize;
+    for line in message.lines() {
+        let is_internal = line.contains("node_modules/")
+            || line.contains("/rustc/")
+            || line.contains("std::")
+            || line.contains("tokio::")
+            || line.contains("<core::")
+            || line.contains("at internal/");
+        if is_internal {
+            internal_count += 1;
+        } else {
+            if internal_count > 0 {
+                result.push(format!("    ... ({} internal frames)", internal_count));
+                internal_count = 0;
+            }
+            result.push(line.to_string());
+        }
+    }
+    if internal_count > 0 {
+        result.push(format!("    ... ({} internal frames)", internal_count));
+    }
+    result.join("\n")
+}
+
 impl TokenFormatter for TestResult {
     fn format_compact(&self) -> String {
         let mut lines = vec![format!("PASS ({}) FAIL ({})", self.passed, self.failed)];
 
         if !self.failures.is_empty() {
             lines.push(String::new());
-            for (idx, failure) in self.failures.iter().enumerate().take(5) {
-                lines.push(format!("{}. {}", idx + 1, failure.test_name));
-                let error_preview: String = failure
-                    .error_message
-                    .lines()
-                    .take(2)
-                    .collect::<Vec<_>>()
-                    .join(" ");
-                lines.push(format!("   {}", error_preview));
+            let mut also_failed: Vec<String> = Vec::new();
+            for (idx, failure) in self.failures.iter().enumerate() {
+                if idx < 5 {
+                    // Failures 1-5: full error message with stack trace collapsing
+                    lines.push(format!("{}. {}", idx + 1, failure.test_name));
+                    let collapsed = collapse_stack_trace(&failure.error_message);
+                    if !collapsed.is_empty() {
+                        lines.push(format!("   {}", collapsed.replace('\n', "\n   ")));
+                    }
+                    if let Some(trace) = &failure.stack_trace {
+                        let collapsed_trace = collapse_stack_trace(trace);
+                        if !collapsed_trace.is_empty() {
+                            lines.push(format!("   {}", collapsed_trace.replace('\n', "\n   ")));
+                        }
+                    }
+                } else if idx < 10 {
+                    // Failures 6-10: name + file path only
+                    lines.push(format!(
+                        "{}. {} ({})",
+                        idx + 1,
+                        failure.test_name,
+                        failure.file_path
+                    ));
+                } else {
+                    // Failures 11+: collect for summary line
+                    also_failed.push(failure.test_name.clone());
+                }
             }
+            if !also_failed.is_empty() {
+                lines.push(format!("... also failed: {}", also_failed.join(", ")));
+            }
+        }
 
-            if self.failures.len() > 5 {
-                lines.push(format!("\n... +{} more failures", self.failures.len() - 5));
+        // When all tests pass, show compact passed names list
+        if self.failures.is_empty() && !self.passed_names.is_empty() {
+            if self.passed_names.len() <= 20 {
+                lines.push(format!(
+                    "passed: {} ({} total)",
+                    self.passed_names.join(", "),
+                    self.passed_names.len()
+                ));
+            } else {
+                lines.push(format!("passed: {} tests", self.passed_names.len()));
             }
         }
 

@@ -830,7 +830,7 @@ Auto-detects: `Cargo.toml`, `package.json`, `pyproject.toml`, `go.mod`, `Gemfile
 |---------|-------------|---------|
 | `mycelium docker ps` | Compact container list | ~80% |
 | `mycelium docker images` | Compact image list | ~80% |
-| `mycelium docker logs <container>` | Deduplicated logs | ~70% |
+| `mycelium docker logs <container>` | Deduplicated logs (default --tail 500, respects user's --tail) | ~70% |
 | `mycelium docker compose ps` | Compact Compose services | ~80% |
 | `mycelium docker compose logs [service]` | Deduplicated Compose logs | ~70% |
 | `mycelium docker compose build [service]` | Build summary | ~60% |
@@ -922,7 +922,7 @@ Repeated lines are merged: `[ERROR] Connection refused (x42)`.
 mycelium curl [args...]
 ```
 
-Auto-detects JSON responses and displays the schema instead of the full content.
+Auto-detects JSON responses. Error responses (4xx/5xx) and small JSON (<5KB) are kept with full values. Larger JSON responses have string values truncated and deeply nested objects collapsed to preserve structure without bloating context.
 
 ---
 

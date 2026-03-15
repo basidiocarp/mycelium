@@ -149,8 +149,20 @@ pub(crate) fn docker_logs(args: &[String], _verbose: u8) -> Result<()> {
         return Ok(());
     }
 
+    // Check if user specified --tail
+    let user_tail = args
+        .iter()
+        .position(|a| a == "--tail")
+        .and_then(|i| args.get(i + 1).map(|s| s.as_str()))
+        .or_else(|| {
+            args.iter()
+                .find(|a| a.starts_with("--tail="))
+                .and_then(|a| a.strip_prefix("--tail="))
+        });
+    let tail_value = user_tail.unwrap_or("500");
+
     let output = Command::new("docker")
-        .args(["logs", "--tail", "100", container])
+        .args(["logs", "--tail", tail_value, container])
         .output()
         .context("Failed to run docker logs")?;
 
@@ -158,8 +170,14 @@ pub(crate) fn docker_logs(args: &[String], _verbose: u8) -> Result<()> {
     let stderr = String::from_utf8_lossy(&output.stderr);
     let raw = format!("{}\n{}", stdout, stderr);
 
+    let raw_line_count = raw.lines().count();
     let analyzed = crate::log_cmd::run_stdin_str(&raw);
-    let out = format!("docker: Logs for {}:\n{}", container, analyzed);
+    let dedup_count = raw_line_count.saturating_sub(analyzed.lines().count());
+
+    let mut out = format!("docker: Logs for {}:\n{}", container, analyzed);
+    if dedup_count > 0 {
+        out.push_str(&format!("\n({} lines deduplicated)", dedup_count));
+    }
     println!("{}", out);
     timer.track(
         &format!("docker logs {}", container),

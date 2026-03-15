@@ -1,5 +1,26 @@
-use crate::utils::truncate;
 use std::sync::OnceLock;
+
+fn collapse_internal_frames(text: &str) -> String {
+    let mut result = Vec::new();
+    let mut internal_count = 0usize;
+    for line in text.lines() {
+        let is_internal =
+            line.contains("/rustc/") || line.contains("std::") || line.contains("<core::");
+        if is_internal {
+            internal_count += 1;
+        } else {
+            if internal_count > 0 {
+                result.push(format!("   ... ({} internal frames)", internal_count));
+                internal_count = 0;
+            }
+            result.push(line.to_string());
+        }
+    }
+    if internal_count > 0 {
+        result.push(format!("   ... ({} internal frames)", internal_count));
+    }
+    result.join("\n")
+}
 
 /// Aggregated test results for compact display
 #[derive(Debug, Default, Clone)]
@@ -210,13 +231,50 @@ pub(crate) fn filter_cargo_test(output: &str, show_passing: bool) -> String {
     if !failures.is_empty() {
         result.push_str(&format!("FAILURES ({}):\n", failures.len()));
         result.push_str("═══════════════════════════════════════\n");
-        for (i, failure) in failures.iter().enumerate().take(10) {
-            result.push_str(&format!("{}. {}\n", i + 1, truncate(failure, 200)));
+        let mut tail_names: Vec<String> = Vec::new();
+        for (i, failure) in failures.iter().enumerate() {
+            if i < 5 {
+                // Full failure block with internal frame collapsing
+                result.push_str(&format!(
+                    "{}. {}\n",
+                    i + 1,
+                    collapse_internal_frames(failure)
+                ));
+            } else if i < 10 {
+                // First line only
+                let first_line = failure.lines().next().unwrap_or(failure);
+                result.push_str(&format!("{}. {}\n", i + 1, first_line));
+            } else {
+                // Collect remaining names
+                let name = failure.lines().next().unwrap_or(failure);
+                tail_names.push(name.to_string());
+            }
         }
-        if failures.len() > 10 {
-            result.push_str(&format!("\n... +{} more failures\n", failures.len() - 10));
+        if !tail_names.is_empty() {
+            result.push_str(&format!("... also failed: {}\n", tail_names.join(", ")));
         }
         result.push('\n');
+    }
+
+    // Collect passing names from output lines matching "test <name> ... ok"
+    let mut passing_names: Vec<String> = Vec::new();
+    for line in output.lines() {
+        if let Some(rest) = line.strip_prefix("test ") {
+            if let Some(name) = rest.strip_suffix(" ... ok") {
+                passing_names.push(name.trim().to_string());
+            }
+        }
+    }
+    if failures.is_empty() && !passing_names.is_empty() {
+        if passing_names.len() <= 20 {
+            result.push_str(&format!(
+                "passed: {} ({} total)\n",
+                passing_names.join(", "),
+                passing_names.len()
+            ));
+        } else {
+            result.push_str(&format!("passed: {} tests\n", passing_names.len()));
+        }
     }
 
     for line in &summary_lines {

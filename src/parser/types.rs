@@ -10,6 +10,8 @@ pub struct TestResult {
     pub skipped: usize,
     pub duration_ms: Option<u64>,
     pub failures: Vec<TestFailure>,
+    #[serde(default)]
+    pub passed_names: Vec<String>,
 }
 
 /// A single test failure with location and error details.

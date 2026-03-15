@@ -260,18 +260,41 @@ fn calculate_total(items: &[Item]) -> i32 {
     items.iter().map(|i| i.value).sum()
 }
 
-// FilterLevel::Minimal - Strip comments only (20-40% reduction)
+// FilterLevel::Minimal - Strip noise comments, keep actionable ones (20-40% reduction)
+// TODO: handle edge case           ← kept (actionable)
+// ========================         ← stripped (noise separator)
 fn calculate_total(items: &[Item]) -> i32 {
     items.iter().map(|i| i.value).sum()
 }
 
-// FilterLevel::Aggressive - Strip comments + function bodies (60-90% reduction)
-fn calculate_total(items: &[Item]) -> i32 { ... }
+// FilterLevel::Aggressive - Strip noise + fold large function bodies (60-90% reduction)
+fn calculate_total(items: &[Item]) -> i32 {
+    // small functions (≤30 lines) are kept inline
+    items.iter().map(|i| i.value).sum()
+}
+
+fn large_function() {
+    // ... (150 lines)              ← bodies >30 lines folded to a single line
+}
 ```
+
+**Adaptive filtering**: The MinimalFilter now distinguishes between noise comments (separators, auto-generated markers, pragma directives) and actionable comments (TODO, FIXME, HACK, SAFETY, NOTE, BUG, WARNING). License headers at the top of files are detected and stripped. The AggressiveFilter buffers function/impl bodies and folds those exceeding 30 lines to `// ... (N lines)` instead of dropping them entirely.
 
 **Language Support**: Rust, Python, JavaScript, TypeScript, Go, C, C++, Java
 
 **Detection**: File extension-based with fallback heuristics
+
+### Adaptive Output Sizing
+
+Output filtering is size-aware via `AdaptiveConfig`:
+
+| Output Size | Action | Rationale |
+|-------------|--------|-----------|
+| <50 lines AND <2KB | Passthrough | Small outputs don't need filtering |
+| 50-500 lines | Light filtering | Apply command-specific filters |
+| >500 lines | Full compression | Structured filtering, dedup, truncation |
+
+Thresholds are configurable in `config.toml` under `[filter.adaptive]`.
 
 ---
 
@@ -530,7 +553,7 @@ flowchart TD
 flowchart LR
     subgraph T1["Tier 1: User Settings"]
         CFG["config.toml\n~/.config/mycelium/config.toml"]
-        CFG --> CFGD["filter_level, tracking,\nretention_days"]
+        CFG --> CFGD["filter_level, tracking,\nretention_days, adaptive"]
     end
 
     subgraph T2["Tier 2: LLM Integration"]

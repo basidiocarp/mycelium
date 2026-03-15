@@ -11,7 +11,7 @@ pub(crate) fn compact_diff(diff: &str, max_lines: usize) -> String {
     let mut removed = 0;
     let mut in_hunk = false;
     let mut hunk_lines = 0;
-    let max_hunk_lines = 30;
+    let max_hunk_lines = 100;
 
     for line in diff.lines() {
         if line.starts_with("diff --git") {

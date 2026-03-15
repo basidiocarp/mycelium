@@ -57,15 +57,18 @@ fn filter_curl_output(output: &str) -> String {
         if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(trimmed) {
             // HTTP error responses: always pass through in full
             if is_error_response(&parsed) {
-                return serde_json::to_string_pretty(&parsed).unwrap_or_else(|_| trimmed.to_string());
+                return serde_json::to_string_pretty(&parsed)
+                    .unwrap_or_else(|_| trimmed.to_string());
             }
             // Small JSON (<5KB): pretty-print, keep all values
             if trimmed.len() < 5120 {
-                return serde_json::to_string_pretty(&parsed).unwrap_or_else(|_| trimmed.to_string());
+                return serde_json::to_string_pretty(&parsed)
+                    .unwrap_or_else(|_| trimmed.to_string());
             }
             // Large JSON: truncate values but keep structure
             let truncated = truncate_json_values(&parsed, 0, 3);
-            return serde_json::to_string_pretty(&truncated).unwrap_or_else(|_| trimmed.to_string());
+            return serde_json::to_string_pretty(&truncated)
+                .unwrap_or_else(|_| trimmed.to_string());
         }
     }
 
@@ -88,7 +91,11 @@ fn is_error_response(value: &serde_json::Value) -> bool {
     }
 }
 
-fn truncate_json_values(value: &serde_json::Value, depth: usize, max_depth: usize) -> serde_json::Value {
+fn truncate_json_values(
+    value: &serde_json::Value,
+    depth: usize,
+    max_depth: usize,
+) -> serde_json::Value {
     match value {
         serde_json::Value::String(s) if s.len() > 100 => {
             serde_json::Value::String(format!("{}...({}chars)", &s[..100], s.len()))
@@ -98,26 +105,25 @@ fn truncate_json_values(value: &serde_json::Value, depth: usize, max_depth: usiz
                 .iter()
                 .map(|v| truncate_json_values(v, depth + 1, max_depth))
                 .collect();
-            truncated.push(serde_json::Value::String(format!("...+{} more", arr.len() - 3)));
+            truncated.push(serde_json::Value::String(format!(
+                "...+{} more",
+                arr.len() - 3
+            )));
             serde_json::Value::Array(truncated)
         }
         serde_json::Value::Object(map) if depth >= max_depth => {
             serde_json::Value::String(format!("{{...{} keys}}", map.len()))
         }
-        serde_json::Value::Array(arr) => {
-            serde_json::Value::Array(
-                arr.iter()
-                    .map(|v| truncate_json_values(v, depth + 1, max_depth))
-                    .collect(),
-            )
-        }
-        serde_json::Value::Object(map) => {
-            serde_json::Value::Object(
-                map.iter()
-                    .map(|(k, v)| (k.clone(), truncate_json_values(v, depth + 1, max_depth)))
-                    .collect(),
-            )
-        }
+        serde_json::Value::Array(arr) => serde_json::Value::Array(
+            arr.iter()
+                .map(|v| truncate_json_values(v, depth + 1, max_depth))
+                .collect(),
+        ),
+        serde_json::Value::Object(map) => serde_json::Value::Object(
+            map.iter()
+                .map(|(k, v)| (k.clone(), truncate_json_values(v, depth + 1, max_depth)))
+                .collect(),
+        ),
         other => other.clone(),
     }
 }
@@ -192,7 +198,10 @@ mod tests {
         // Should not contain the full long strings
         assert!(result.len() < fixture.len(), "should be smaller than input");
         // Should still be valid JSON
-        assert!(serde_json::from_str::<serde_json::Value>(&result).is_ok(), "should be valid JSON");
+        assert!(
+            serde_json::from_str::<serde_json::Value>(&result).is_ok(),
+            "should be valid JSON"
+        );
         insta::assert_snapshot!(result);
     }
 

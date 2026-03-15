@@ -48,14 +48,6 @@ pub(super) fn run_log(
             .unwrap_or(config_max_commits)
     };
 
-    // Only add --no-merges if user didn't explicitly request merge commits
-    let wants_merges = args
-        .iter()
-        .any(|arg| arg == "--merges" || arg == "--min-parents=2");
-    if !wants_merges {
-        cmd.arg("--no-merges");
-    }
-
     // Pass all user arguments
     for arg in args {
         cmd.arg(arg);

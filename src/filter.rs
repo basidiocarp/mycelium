@@ -147,6 +147,46 @@ impl FilterStrategy for NoFilter {
 
 pub struct MinimalFilter;
 
+fn is_actionable_comment(line: &str) -> bool {
+    let upper = line.to_uppercase();
+    upper.contains("TODO")
+        || upper.contains("FIXME")
+        || upper.contains("HACK")
+        || upper.contains("SAFETY")
+        || upper.contains("NOTE")
+        || upper.contains("XXX")
+        || upper.contains("BUG")
+        || upper.contains("WARNING")
+}
+
+fn is_noise_comment(line: &str) -> bool {
+    let trimmed = line.trim();
+    // Separator lines: only comment chars + separator chars
+    let is_separator = trimmed
+        .chars()
+        .all(|c| matches!(c, '/' | '#' | '=' | '-' | '*' | '~' | ' ' | '\t'));
+    if is_separator && trimmed.len() > 3 {
+        return true;
+    }
+    // Auto-generated markers
+    if trimmed.contains("Code generated")
+        || trimmed.contains("DO NOT EDIT")
+        || trimmed.contains("@generated")
+        || trimmed.contains("AUTO-GENERATED")
+    {
+        return true;
+    }
+    // Pragma/lint directives
+    if trimmed.contains("eslint-disable")
+        || trimmed.contains("type: ignore")
+        || trimmed.contains("nolint")
+        || trimmed.contains("#pragma")
+    {
+        return true;
+    }
+    false
+}
+
 fn multiple_blank_lines() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| Regex::new(r"\n{3,}").expect("valid regex"))
@@ -163,7 +203,12 @@ impl FilterStrategy for MinimalFilter {
         let patterns = lang.comment_patterns();
         let mut result = String::with_capacity(content.len());
         let mut in_block_comment = false;
+        let mut block_buf: Vec<String> = Vec::new();
         let mut in_docstring = false;
+        // Track preamble to detect and strip license headers (>3 consecutive comment
+        // lines before any code).
+        let mut code_seen = false;
+        let mut preamble_buf: Vec<String> = Vec::new();
 
         for line in content.lines() {
             let trimmed = line.trim();
@@ -171,14 +216,42 @@ impl FilterStrategy for MinimalFilter {
             // Handle block comments
             if let (Some(start), Some(end)) = (patterns.block_start, patterns.block_end) {
                 if !in_docstring
+                    && !in_block_comment
                     && trimmed.contains(start)
                     && !trimmed.starts_with(patterns.doc_block_start.unwrap_or("###"))
                 {
                     in_block_comment = true;
+                    block_buf.clear();
                 }
                 if in_block_comment {
+                    block_buf.push(line.to_string());
                     if trimmed.contains(end) {
                         in_block_comment = false;
+                        // Keep block unless every line (stripped of markers) is noise.
+                        let all_noise = block_buf.iter().all(|l| {
+                            let stripped = l
+                                .trim()
+                                .trim_start_matches("/**")
+                                .trim_start_matches("/*")
+                                .trim_end_matches("*/")
+                                .trim_start_matches('*')
+                                .trim();
+                            stripped.is_empty()
+                                || is_noise_comment(stripped)
+                                || is_noise_comment(l.trim())
+                        });
+                        if !all_noise {
+                            if code_seen {
+                                for l in block_buf.drain(..) {
+                                    result.push_str(&l);
+                                    result.push('\n');
+                                }
+                            } else {
+                                preamble_buf.extend(block_buf.drain(..));
+                            }
+                        } else {
+                            block_buf.clear();
+                        }
                     }
                     continue;
                 }
@@ -198,28 +271,76 @@ impl FilterStrategy for MinimalFilter {
                 continue;
             }
 
-            // Skip single-line comments (but keep doc comments)
+            // Handle single-line comments
             if let Some(line_comment) = patterns.line
                 && trimmed.starts_with(line_comment)
             {
-                // Keep doc comments
-                if let Some(doc) = patterns.doc_line
-                    && trimmed.starts_with(doc)
-                {
+                // Always keep doc comments (/// and //!)
+                let is_doc = patterns.doc_line.is_some_and(|d| trimmed.starts_with(d))
+                    || (*lang == Language::Rust && trimmed.starts_with("//!"));
+                if is_doc {
                     result.push_str(line);
                     result.push('\n');
+                    continue;
                 }
-                continue;
-            }
 
-            // Skip empty lines at this point, we'll normalize later
-            if trimmed.is_empty() {
+                // In preamble: buffer for license-header detection
+                if !code_seen {
+                    preamble_buf.push(line.to_string());
+                    continue;
+                }
+
+                // After code has started: only drop noise
+                if is_noise_comment(trimmed) {
+                    continue;
+                }
+
+                // Keep actionable comments and all other regular comments
+                result.push_str(line);
                 result.push('\n');
                 continue;
             }
 
+            // Empty lines
+            if trimmed.is_empty() {
+                // An empty line ends the current preamble run — flush or discard
+                if !code_seen && !preamble_buf.is_empty() {
+                    if preamble_buf.len() > 3 {
+                        preamble_buf.clear();
+                    } else {
+                        for l in preamble_buf.drain(..) {
+                            result.push_str(&l);
+                            result.push('\n');
+                        }
+                    }
+                }
+                result.push('\n');
+                continue;
+            }
+
+            // Non-comment, non-empty code line: finalise preamble
+            if !code_seen {
+                if preamble_buf.len() > 3 {
+                    preamble_buf.clear();
+                } else {
+                    for l in preamble_buf.drain(..) {
+                        result.push_str(&l);
+                        result.push('\n');
+                    }
+                }
+                code_seen = true;
+            }
+
             result.push_str(line);
             result.push('\n');
+        }
+
+        // Flush any remaining preamble (file that ends without real code)
+        if !code_seen && preamble_buf.len() <= 3 {
+            for l in preamble_buf.drain(..) {
+                result.push_str(&l);
+                result.push('\n');
+            }
         }
 
         // Normalize multiple blank lines to max 2
@@ -252,8 +373,9 @@ impl FilterStrategy for AggressiveFilter {
     fn filter(&self, content: &str, lang: &Language) -> String {
         let minimal = MinimalFilter.filter(content, lang);
         let mut result = String::with_capacity(minimal.len() / 2);
-        let mut brace_depth = 0;
+        let mut brace_depth: i32 = 0;
         let mut in_impl_body = false;
+        let mut impl_body_buf: Vec<String> = Vec::new();
 
         for line in minimal.lines() {
             let trimmed = line.trim();
@@ -271,6 +393,7 @@ impl FilterStrategy for AggressiveFilter {
                 result.push('\n');
                 in_impl_body = true;
                 brace_depth = 0;
+                impl_body_buf.clear();
                 continue;
             }
 
@@ -282,17 +405,19 @@ impl FilterStrategy for AggressiveFilter {
                 brace_depth += open_braces as i32;
                 brace_depth -= close_braces as i32;
 
-                // Only keep the opening and closing braces
-                if brace_depth <= 1 && (trimmed == "{" || trimmed == "}" || trimmed.ends_with('{'))
-                {
-                    result.push_str(line);
-                    result.push('\n');
-                }
+                impl_body_buf.push(line.to_string());
 
                 if brace_depth <= 0 {
                     in_impl_body = false;
-                    if !trimmed.is_empty() && trimmed != "}" {
-                        result.push_str("    // ... implementation\n");
+                    if impl_body_buf.len() <= 30 {
+                        for l in impl_body_buf.drain(..) {
+                            result.push_str(&l);
+                            result.push('\n');
+                        }
+                    } else {
+                        let n = impl_body_buf.len();
+                        impl_body_buf.clear();
+                        result.push_str(&format!("    // ... ({n} lines)\n"));
                     }
                 }
                 continue;
@@ -402,16 +527,83 @@ mod tests {
     }
 
     #[test]
-    fn test_minimal_filter_removes_comments() {
-        let code = r#"
-// This is a comment
-fn main() {
-    println!("Hello");
-}
-"#;
+    fn test_minimal_filter_preserves_regular_comments() {
+        // A single-line comment before code is short preamble (<=3) — kept.
+        let code = "// This is a comment\nfn main() {\n    println!(\"Hello\");\n}\n";
         let filter = MinimalFilter;
         let result = filter.filter(code, &Language::Rust);
-        assert!(!result.contains("// This is a comment"));
+        assert!(
+            result.contains("// This is a comment"),
+            "regular comments should be kept; got:\n{result}"
+        );
         assert!(result.contains("fn main()"));
+    }
+
+    #[test]
+    fn test_minimal_filter_strips_noise_comments() {
+        let code = "fn foo() {\n    // ========================\n    let x = 1;\n    x\n}\n";
+        let filter = MinimalFilter;
+        let result = filter.filter(code, &Language::Rust);
+        assert!(
+            !result.contains("// ========================"),
+            "separator noise should be stripped; got:\n{result}"
+        );
+        assert!(result.contains("fn foo()"));
+    }
+
+    #[test]
+    fn test_minimal_filter_strips_license_header() {
+        let code = "// Copyright (c) 2024\n// All rights reserved\n// Licensed under MIT\n// See LICENSE file\nfn main() {}\n";
+        let filter = MinimalFilter;
+        let result = filter.filter(code, &Language::Rust);
+        assert!(
+            !result.contains("Copyright"),
+            "4-line license header should be stripped; got:\n{result}"
+        );
+        assert!(result.contains("fn main()"));
+    }
+
+    #[test]
+    fn test_minimal_filter_preserves_todo_comments() {
+        let code = "fn foo() {\n    // TODO: fix this\n    let x = 1;\n    x\n}\n";
+        let filter = MinimalFilter;
+        let result = filter.filter(code, &Language::Rust);
+        assert!(
+            result.contains("// TODO: fix this"),
+            "TODO comments should be kept; got:\n{result}"
+        );
+    }
+
+    #[test]
+    fn test_minimal_filter_snapshot_mixed_comments() {
+        let code = concat!(
+            "// Copyright (c) 2024 Example Corp\n",
+            "// All rights reserved.\n",
+            "// Licensed under the MIT License.\n",
+            "// See LICENSE for details.\n",
+            "\n",
+            "use std::collections::HashMap;\n",
+            "\n",
+            "/// A simple counter struct.\n",
+            "pub struct Counter {\n",
+            "    count: usize,\n",
+            "}\n",
+            "\n",
+            "impl Counter {\n",
+            "    // TODO: add overflow protection\n",
+            "    pub fn increment(&mut self) {\n",
+            "        self.count += 1;\n",
+            "    }\n",
+            "\n",
+            "    // ========================\n",
+            "    // Regular comment about logic\n",
+            "    pub fn get(&self) -> usize {\n",
+            "        self.count\n",
+            "    }\n",
+            "}\n",
+        );
+        let filter = MinimalFilter;
+        let result = filter.filter(code, &Language::Rust);
+        insta::assert_snapshot!(result);
     }
 }

@@ -21,7 +21,7 @@ Single Rust binary, zero external dependencies, overhead < 10ms per command.
 
 ## Overview
 
-mycelium acts as a proxy between an LLM (Claude Code, Gemini CLI, etc.) and system commands. Four filtering strategies are applied depending on the command type:
+mycelium acts as a proxy between an LLM (Claude Code, Gemini CLI, etc.) and system commands. Five filtering strategies are applied depending on the command type:
 
 | Strategy | Description | Example |
 |----------|-------------|---------|
@@ -29,6 +29,16 @@ mycelium acts as a proxy between an LLM (Claude Code, Gemini CLI, etc.) and syst
 | **Grouping** | Aggregation by directory, error type, or rule | Tests grouped by file |
 | **Truncation** | Keeps relevant context, removes redundancy | Condensed diff |
 | **Deduplication** | Merges repeated log lines with counters | `error x42` |
+| **Adaptive filtering** | Size-aware compression with actionable content preservation | Small outputs pass through, large outputs get full compression |
+
+### Adaptive filtering
+
+Outputs are classified by size before filtering:
+- **Small** (<50 lines / <2KB): pass through unfiltered
+- **Medium** (50-500 lines): light command-specific filtering
+- **Large** (>500 lines): full structured compression
+
+The code filter (`filter.rs`) preserves actionable comments (TODO, FIXME, HACK, SAFETY, NOTE, BUG, WARNING) while stripping noise (separators, auto-generated markers, pragma directives). License headers are detected and removed. The aggressive filter folds function bodies >30 lines to `// ... (N lines)` instead of removing them entirely.
 
 ### Fallback mechanism
 
@@ -61,14 +71,14 @@ mycelium --skip-env next build  # Disable Next.js env validation
 
 | Category | Commands | Typical Savings |
 |----------|----------|----------------|
-| **Files** | ls, tree, read, find, grep, diff | 60-80% |
-| **Git** | status, log, diff, show, add, commit, push, pull | 75-92% |
+| **Files** | ls, tree, read, find, grep, diff | 30-80% |
+| **Git** | status, log, diff, show, add, commit, push, pull | 40-92% |
 | **GitHub** | pr, issue, run, api | 26-87% |
-| **Tests** | cargo test, vitest, playwright, pytest, go test | 90-99% |
+| **Tests** | cargo test, vitest, playwright, pytest, go test | 50-99% |
 | **Build/Lint** | cargo build, tsc, eslint, prettier, next, ruff, clippy | 70-87% |
 | **Packages** | pnpm, npm, pip, deps, prisma | 60-80% |
-| **Containers** | docker, kubectl | 70-80% |
-| **Data** | json, env, log, curl, wget | 60-80% |
+| **Containers** | docker, kubectl | 60-90% |
+| **Data** | json, env, log, curl, wget | 40-85% |
 | **Analytics** | gain, discover, learn, cc-economics | N/A (meta) |
 
 ---

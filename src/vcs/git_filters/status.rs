@@ -58,35 +58,39 @@ pub(crate) fn format_status_output(porcelain: &str) -> String {
         }
     }
 
-    // Build summary
+    // Build summary with 50-file total cap
+    let total = staged_files.len() + modified_files.len() + untracked_files.len();
+    let mut remaining_budget = 50usize;
+
     if staged > 0 {
         output.push_str(&format!("Staged: {} files\n", staged));
-        for f in staged_files.iter().take(5) {
+        for f in staged_files.iter().take(remaining_budget) {
             output.push_str(&format!("   {}\n", f));
         }
-        if staged_files.len() > 5 {
-            output.push_str(&format!("   ... +{} more\n", staged_files.len() - 5));
-        }
+        remaining_budget =
+            remaining_budget.saturating_sub(staged_files.len().min(remaining_budget));
     }
 
     if modified > 0 {
         output.push_str(&format!("Modified: {} files\n", modified));
-        for f in modified_files.iter().take(5) {
+        for f in modified_files.iter().take(remaining_budget) {
             output.push_str(&format!("   {}\n", f));
         }
-        if modified_files.len() > 5 {
-            output.push_str(&format!("   ... +{} more\n", modified_files.len() - 5));
-        }
+        remaining_budget =
+            remaining_budget.saturating_sub(modified_files.len().min(remaining_budget));
     }
 
     if untracked > 0 {
         output.push_str(&format!("Untracked: {} files\n", untracked));
-        for f in untracked_files.iter().take(3) {
+        for f in untracked_files.iter().take(remaining_budget) {
             output.push_str(&format!("   {}\n", f));
         }
-        if untracked_files.len() > 3 {
-            output.push_str(&format!("   ... +{} more\n", untracked_files.len() - 3));
-        }
+        remaining_budget =
+            remaining_budget.saturating_sub(untracked_files.len().min(remaining_budget));
+    }
+
+    if total > 50 {
+        output.push_str(&format!("   ... +{} more files\n", total - 50));
     }
 
     if conflicts > 0 {
@@ -265,7 +269,7 @@ A  added.rs
 
     #[test]
     fn test_format_status_output_truncation() {
-        // Test that >5 staged files show "... +N more"
+        // Test with 7 staged files - all shown since < 50 budget
         let porcelain = r#"## main
 M  file1.rs
 M  file2.rs
@@ -278,10 +282,51 @@ M  file7.rs
         let result = format_status_output(porcelain);
         assert!(result.contains("Staged: 7 files"));
         assert!(result.contains("file1.rs"));
-        assert!(result.contains("file5.rs"));
-        assert!(result.contains("... +2 more"));
-        assert!(!result.contains("file6.rs"));
-        assert!(!result.contains("file7.rs"));
+        assert!(result.contains("file7.rs")); // All files show when < 50 total
+        assert!(!result.contains("... +")); // No overflow when < 50
+    }
+
+    #[test]
+    fn test_format_status_output_50_file_budget() {
+        // Test that 20+20+20=60 files total shows "... +10 more files"
+        let mut porcelain = "## main\n".to_string();
+
+        // Add 20 staged files
+        for i in 1..=20 {
+            porcelain.push_str(&format!("M  staged{}.rs\n", i));
+        }
+        // Add 20 modified files
+        for i in 1..=20 {
+            porcelain.push_str(&format!(" M modified{}.rs\n", i));
+        }
+        // Add 20 untracked files
+        for i in 1..=20 {
+            porcelain.push_str(&format!("?? untracked{}.txt\n", i));
+        }
+
+        let result = format_status_output(&porcelain);
+
+        // Should show summary lines
+        assert!(result.contains("Staged: 20 files"));
+        assert!(result.contains("Modified: 20 files"));
+        assert!(result.contains("Untracked: 20 files"));
+
+        // Should show first few from each category
+        assert!(result.contains("staged1.rs"));
+        assert!(result.contains("modified1.rs"));
+        assert!(result.contains("untracked1.txt"));
+
+        // Should show budget overflow message
+        assert!(result.contains("... +10 more files"));
+
+        // Staged and modified should all appear (first 40 of budget)
+        assert!(result.contains("staged20.rs"));
+        assert!(result.contains("modified20.rs"));
+
+        // Only first 10 untracked should appear (budget exhausted)
+        assert!(result.contains("untracked10.txt"));
+        assert!(!result.contains("untracked11.txt"));
+        assert!(!result.contains("untracked20.txt"));
     }
 
     #[test]

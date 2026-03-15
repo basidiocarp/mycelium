@@ -111,6 +111,28 @@ impl Default for CargoFilterConfig {
     }
 }
 
+/// Controls when adaptive filtering activates based on output size.
+/// Small outputs pass through unfiltered; large outputs get full compression.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AdaptiveConfig {
+    /// Outputs below this line count AND `small_bytes` pass through unfiltered (default: 50)
+    pub small_lines: usize,
+    /// Outputs below this byte count AND `small_lines` pass through unfiltered (default: 2048)
+    pub small_bytes: usize,
+    /// Outputs above this line count get full structured filtering (default: 500)
+    pub large_lines: usize,
+}
+
+impl Default for AdaptiveConfig {
+    fn default() -> Self {
+        Self {
+            small_lines: 50,
+            small_bytes: 2048,
+            large_lines: 500,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FilterConfig {
     #[serde(default = "default_ignore_dirs")]
@@ -121,6 +143,8 @@ pub struct FilterConfig {
     pub git: Option<GitFilterConfig>,
     #[serde(default)]
     pub cargo: Option<CargoFilterConfig>,
+    #[serde(default)]
+    pub adaptive: Option<AdaptiveConfig>,
 }
 
 fn default_ignore_dirs() -> Vec<String> {
@@ -145,6 +169,7 @@ impl Default for FilterConfig {
             ignore_files: default_ignore_files(),
             git: None,
             cargo: None,
+            adaptive: None,
         }
     }
 }
