@@ -1,0 +1,172 @@
+{
+  "total": 10,
+  "page": 1,
+  "per_page": 10,
+  "users": [
+    {
+      "id": 1001,
+      "username": "alice_dev",
+      "email": "alice@example.com",
+      "full_name": "Alice Johnson",
+      "bio": "Senior software engineer with 10 years of experience building distributed systems and cloud-native applications. Passionate about Rust, performance optimization, and developer tooling. Open source contributor and occasional conference speaker. Previously worked at large tech companies in San Francisco.",
+      "location": "San Francisco, CA",
+      "website": "https://alice.dev",
+      "avatar_url": "https://cdn.example.com/avatars/alice_dev_256x256_highres_profile_photo_2024.jpg",
+      "joined_at": "2019-03-15T08:00:00Z",
+      "last_active": "2024-01-15T14:23:11Z",
+      "followers": 842,
+      "following": 193,
+      "public_repos": 47,
+      "company": "Acme Corporation",
+      "hireable": true,
+      "skills": ["Rust", "Go", "Python", "Kubernetes", "PostgreSQL", "Redis", "Kafka", "gRPC"],
+      "stats": {
+        "commits_this_year": 1247,
+        "pull_requests_merged": 89,
+        "issues_closed": 134,
+        "code_reviews": 312,
+        "streak_days": 47
+      },
+      "preferences": {
+        "theme": "dark",
+        "notifications": true,
+        "newsletter": false,
+        "two_factor_enabled": true
+      }
+    },
+    {
+      "id": 1002,
+      "username": "bob_backend",
+      "email": "bob@example.com",
+      "full_name": "Bob Martinez",
+      "bio": "Backend engineer specializing in high-throughput data pipelines and real-time analytics systems. I enjoy solving complex scaling challenges and mentoring junior developers. Currently focused on building observability tooling that helps teams understand their systems better at runtime without adding overhead.",
+      "location": "Austin, TX",
+      "website": "https://bobmartinez.io",
+      "avatar_url": "https://cdn.example.com/avatars/bob_backend_256x256_highres_profile_photo_2024.jpg",
+      "joined_at": "2020-07-22T10:15:00Z",
+      "last_active": "2024-01-14T19:45:00Z",
+      "followers": 521,
+      "following": 88,
+      "public_repos": 23,
+      "company": "DataFlow Inc",
+      "hireable": false,
+      "skills": ["Java", "Scala", "Apache Flink", "Kafka", "Cassandra", "Elasticsearch", "Spark"],
+      "stats": {
+        "commits_this_year": 934,
+        "pull_requests_merged": 61,
+        "issues_closed": 78,
+        "code_reviews": 215,
+        "streak_days": 12
+      },
+      "preferences": {
+        "theme": "light",
+        "notifications": true,
+        "newsletter": true,
+        "two_factor_enabled": true
+      }
+    },
+    {
+      "id": 1003,
+      "username": "carol_frontend",
+      "email": "carol@example.com",
+      "full_name": "Carol Chen",
+      "bio": "Frontend architect passionate about performance, accessibility, and design systems. I build interfaces that delight users and scale with teams. Strong believer in test-driven development and continuous integration. Contributor to several popular open-source UI libraries. Love speaking at local meetups about modern CSS and web standards.",
+      "location": "New York, NY",
+      "website": "https://carolchen.dev",
+      "avatar_url": "https://cdn.example.com/avatars/carol_frontend_256x256_highres_profile_photo_2024.jpg",
+      "joined_at": "2018-11-05T09:30:00Z",
+      "last_active": "2024-01-15T11:02:33Z",
+      "followers": 1203,
+      "following": 267,
+      "public_repos": 68,
+      "company": "Creative Studio LLC",
+      "hireable": false,
+      "skills": ["TypeScript", "React", "Vue", "CSS", "WebAssembly", "Figma", "GraphQL", "Next.js"],
+      "stats": {
+        "commits_this_year": 2103,
+        "pull_requests_merged": 147,
+        "issues_closed": 223,
+        "code_reviews": 489,
+        "streak_days": 92
+      },
+      "preferences": {
+        "theme": "system",
+        "notifications": false,
+        "newsletter": false,
+        "two_factor_enabled": true
+      }
+    },
+    {
+      "id": 1004,
+      "username": "dave_devops",
+      "email": "dave@example.com",
+      "full_name": "David Kim",
+      "bio": "DevOps and platform engineer with expertise in Kubernetes, Terraform, and GitOps workflows. I help engineering teams move fast without breaking things by building reliable, automated infrastructure. Strong opinions on incident response, SLOs, and on-call hygiene. Former SRE at a major cloud provider, now building internal platforms at a startup.",
+      "location": "Seattle, WA",
+      "website": "https://davekim.cloud",
+      "avatar_url": "https://cdn.example.com/avatars/dave_devops_256x256_highres_profile_photo_2024.jpg",
+      "joined_at": "2017-06-12T07:45:00Z",
+      "last_active": "2024-01-15T16:55:00Z",
+      "followers": 678,
+      "following": 142,
+      "public_repos": 31,
+      "company": "CloudScale Systems",
+      "hireable": true,
+      "skills": ["Terraform", "Kubernetes", "Helm", "ArgoCD", "Prometheus", "Grafana", "Ansible"],
+      "stats": {
+        "commits_this_year": 567,
+        "pull_requests_merged": 44,
+        "issues_closed": 99,
+        "code_reviews": 178,
+        "streak_days": 28
+      },
+      "preferences": {
+        "theme": "dark",
+        "notifications": true,
+        "newsletter": false,
+        "two_factor_enabled": true
+      }
+    },
+    {
+      "id": 1005,
+      "username": "eve_ml",
+      "email": "eve@example.com",
+      "full_name": "Eve Thompson",
+      "bio": "Machine learning engineer and researcher working at the intersection of NLP and developer tools. I build systems that help developers write better code faster using AI assistance. PhD in computational linguistics. Published researcher with papers on code generation, program synthesis, and large language model fine-tuning for domain-specific applications.",
+      "location": "Boston, MA",
+      "website": "https://evethompson.ai",
+      "avatar_url": "https://cdn.example.com/avatars/eve_ml_256x256_highres_profile_photo_2024.jpg",
+      "joined_at": "2021-01-08T13:00:00Z",
+      "last_active": "2024-01-13T22:17:00Z",
+      "followers": 2341,
+      "following": 89,
+      "public_repos": 19,
+      "company": "AI Research Lab",
+      "hireable": false,
+      "skills": ["Python", "PyTorch", "TensorFlow", "Rust", "CUDA", "Triton", "HuggingFace", "MLflow"],
+      "stats": {
+        "commits_this_year": 789,
+        "pull_requests_merged": 33,
+        "issues_closed": 56,
+        "code_reviews": 98,
+        "streak_days": 5
+      },
+      "preferences": {
+        "theme": "light",
+        "notifications": true,
+        "newsletter": true,
+        "two_factor_enabled": false
+      }
+    }
+  ],
+  "meta": {
+    "generated_at": "2024-01-15T17:00:00Z",
+    "api_version": "v3",
+    "request_id": "req_a1b2c3d4e5f6g7h8i9j0",
+    "rate_limit": {
+      "limit": 5000,
+      "remaining": 4987,
+      "reset_at": "2024-01-15T18:00:00Z"
+    }
+  }
+}

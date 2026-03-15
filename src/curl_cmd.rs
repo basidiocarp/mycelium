@@ -1,7 +1,5 @@
 //! Token-optimized curl proxy that auto-formats JSON responses and truncates large outputs.
-use crate::json_cmd;
 use crate::tracking;
-use crate::utils::truncate;
 use anyhow::{Context, Result};
 use std::process::Command;
 
@@ -52,36 +50,76 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
 fn filter_curl_output(output: &str) -> String {
     let trimmed = output.trim();
 
-    // Try JSON detection: starts with { or [
+    // Try JSON detection
     if (trimmed.starts_with('{') || trimmed.starts_with('['))
         && (trimmed.ends_with('}') || trimmed.ends_with(']'))
-        && let Ok(schema) = json_cmd::filter_json_string(trimmed, 5)
     {
-        // Only use schema if it's actually shorter than the original (#297)
-        if schema.len() <= trimmed.len() {
-            return schema;
+        if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(trimmed) {
+            // HTTP error responses: always pass through in full
+            if is_error_response(&parsed) {
+                return serde_json::to_string_pretty(&parsed).unwrap_or_else(|_| trimmed.to_string());
+            }
+            // Small JSON (<5KB): pretty-print, keep all values
+            if trimmed.len() < 5120 {
+                return serde_json::to_string_pretty(&parsed).unwrap_or_else(|_| trimmed.to_string());
+            }
+            // Large JSON: truncate values but keep structure
+            let truncated = truncate_json_values(&parsed, 0, 3);
+            return serde_json::to_string_pretty(&truncated).unwrap_or_else(|_| trimmed.to_string());
         }
     }
 
-    // Not JSON: truncate long output
+    // Non-JSON: cap at 100 lines
     let lines: Vec<&str> = trimmed.lines().collect();
-    if lines.len() > 30 {
-        let mut result: Vec<&str> = lines[..30].to_vec();
-        result.push("");
-        let msg = format!(
-            "... ({} more lines, {} bytes total)",
-            lines.len() - 30,
-            trimmed.len()
-        );
-        return format!("{}\n{}", result.join("\n"), msg);
+    if lines.len() > 100 {
+        let mut result = lines[..100].join("\n");
+        result.push_str(&format!("\n... ({} more lines)", lines.len() - 100));
+        result
+    } else {
+        trimmed.to_string()
     }
+}
 
-    // Short output: return as-is but truncate long lines
-    lines
-        .iter()
-        .map(|l| truncate(l, 200))
-        .collect::<Vec<_>>()
-        .join("\n")
+fn is_error_response(value: &serde_json::Value) -> bool {
+    if let serde_json::Value::Object(map) = value {
+        map.contains_key("error") || map.contains_key("errors")
+    } else {
+        false
+    }
+}
+
+fn truncate_json_values(value: &serde_json::Value, depth: usize, max_depth: usize) -> serde_json::Value {
+    match value {
+        serde_json::Value::String(s) if s.len() > 100 => {
+            serde_json::Value::String(format!("{}...({}chars)", &s[..100], s.len()))
+        }
+        serde_json::Value::Array(arr) if arr.len() > 3 => {
+            let mut truncated: Vec<serde_json::Value> = arr[..3]
+                .iter()
+                .map(|v| truncate_json_values(v, depth + 1, max_depth))
+                .collect();
+            truncated.push(serde_json::Value::String(format!("...+{} more", arr.len() - 3)));
+            serde_json::Value::Array(truncated)
+        }
+        serde_json::Value::Object(map) if depth >= max_depth => {
+            serde_json::Value::String(format!("{{...{} keys}}", map.len()))
+        }
+        serde_json::Value::Array(arr) => {
+            serde_json::Value::Array(
+                arr.iter()
+                    .map(|v| truncate_json_values(v, depth + 1, max_depth))
+                    .collect(),
+            )
+        }
+        serde_json::Value::Object(map) => {
+            serde_json::Value::Object(
+                map.iter()
+                    .map(|(k, v)| (k.clone(), truncate_json_values(v, depth + 1, max_depth)))
+                    .collect(),
+            )
+        }
+        other => other.clone(),
+    }
 }
 
 #[cfg(test)]
@@ -90,12 +128,12 @@ mod tests {
 
     #[test]
     fn test_filter_curl_json() {
-        // Large JSON where schema is shorter than original — schema should be returned
-        let output = r#"{"name": "a very long user name here", "count": 42, "items": [1, 2, 3], "description": "a very long description that takes up many characters in the original JSON payload", "status": "active", "url": "https://example.com/api/v1/users/123"}"#;
+        // Small JSON: pretty-printed with actual values preserved
+        let output = r#"{"name": "Alice", "count": 42, "status": "active"}"#;
         let result = filter_curl_output(output);
         assert!(result.contains("name"));
-        assert!(result.contains("string"));
-        assert!(result.contains("int"));
+        assert!(result.contains("Alice"));
+        assert!(result.contains("42"));
     }
 
     #[test]
@@ -115,21 +153,20 @@ mod tests {
 
     #[test]
     fn test_filter_curl_json_small_returns_original() {
-        // Small JSON where schema would be larger than original (issue #297)
+        // Small JSON: should be pretty-printed with values intact
         let output = r#"{"r2Ready":true,"status":"ok"}"#;
         let result = filter_curl_output(output);
-        // Schema would be "{\n  r2Ready: bool,\n  status: string\n}" which is longer
-        // Should return the original JSON unchanged
-        assert_eq!(result.trim(), output.trim());
+        assert!(result.contains("true"));
+        assert!(result.contains("ok"));
     }
 
     #[test]
     fn test_filter_curl_long_output() {
-        let lines: Vec<String> = (0..50).map(|i| format!("Line {}", i)).collect();
+        let lines: Vec<String> = (0..110).map(|i| format!("Line {}", i)).collect();
         let output = lines.join("\n");
         let result = filter_curl_output(&output);
         assert!(result.contains("Line 0"));
-        assert!(result.contains("Line 29"));
+        assert!(result.contains("Line 99"));
         assert!(result.contains("more lines"));
     }
 
@@ -148,22 +185,15 @@ mod tests {
         insta::assert_snapshot!(output);
     }
 
-    fn count_tokens(text: &str) -> usize {
-        text.split_whitespace().count()
-    }
-
     #[test]
-    fn test_json_token_savings() {
-        let input = include_str!("../tests/fixtures/curl_json_raw.txt");
-        let output = filter_curl_output(input);
-        let input_tokens = count_tokens(input);
-        let output_tokens = count_tokens(&output);
-        let savings_pct = (input_tokens.saturating_sub(output_tokens)) * 100 / input_tokens.max(1);
-        assert!(
-            savings_pct >= 60,
-            "Expected >= 60% token savings, got {}%",
-            savings_pct
-        );
+    fn test_curl_large_json_truncates_values() {
+        let fixture = include_str!("../tests/fixtures/curl_large_json.json");
+        let result = filter_curl_output(fixture);
+        // Should not contain the full long strings
+        assert!(result.len() < fixture.len(), "should be smaller than input");
+        // Should still be valid JSON
+        assert!(serde_json::from_str::<serde_json::Value>(&result).is_ok(), "should be valid JSON");
+        insta::assert_snapshot!(result);
     }
 
     #[test]
