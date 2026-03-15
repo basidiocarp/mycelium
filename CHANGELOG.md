@@ -2,6 +2,41 @@
 
 All notable changes to Mycelium are documented in this file.
 
+## v0.2.0
+
+### Features
+
+- **Adaptive filtering**: Size-aware output compression — small outputs (<50 lines / <2KB) pass through unfiltered, medium outputs get light filtering, large outputs (>500 lines) get full structured compression. Configurable via `[filter.adaptive]` in config.toml (`small_lines`, `small_bytes`, `large_lines`).
+
+- **Intelligent comment classification**: MinimalFilter now distinguishes actionable comments (TODO, FIXME, HACK, SAFETY, NOTE, BUG, WARNING) from noise (separator lines, auto-generated markers, pragma directives). Noise is stripped; actionable comments are preserved.
+
+- **License header detection**: File preambles with >3 consecutive comment lines before any code are detected as license headers and stripped by the MinimalFilter.
+
+- **Function body folding**: AggressiveFilter folds function/impl bodies exceeding 30 lines to `// ... (N lines)` instead of dropping them entirely. Small functions are kept inline.
+
+### Improvements
+
+- **curl**: Preserve real JSON values instead of schematizing. Error responses (4xx/5xx) and small JSON (<5KB) pass through with full values. Only large responses get value truncation.
+
+- **docker logs**: Default `--tail` raised from 100 to 500. Respects user-specified `--tail` value. Shows deduplication count in output.
+
+- **git diff**: Hunk line cap raised from 30 to 100 lines for more complete diffs.
+
+- **git log**: Removed automatic `--no-merges` injection — users get the log they asked for.
+
+- **git status**: Line truncation raised from 80 to 120 characters.
+
+- **ls**: Removed `dist/`, `build/`, `.vscode/` from default noise directories — these are commonly needed by agents.
+
+- **Test formatters**: Show full error context for cargo test, vitest, and playwright failures. Added `passed_names` tracking to `TestResult`.
+
+### Documentation
+
+- Updated ARCHITECTURE.md with adaptive filtering details and output sizing tiers.
+- Updated FEATURES.md with adaptive filtering strategy and revised savings ranges.
+- Updated COMMANDS.md with new curl and docker logs behavior.
+- Updated README.md with five filtering strategies and `[filter.adaptive]` config.
+
 ## v0.1.6
 
 ### Security

@@ -53,23 +53,22 @@ fn filter_curl_output(output: &str) -> String {
     // Try JSON detection
     if (trimmed.starts_with('{') || trimmed.starts_with('['))
         && (trimmed.ends_with('}') || trimmed.ends_with(']'))
+        && let Ok(parsed) = serde_json::from_str::<serde_json::Value>(trimmed)
     {
-        if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(trimmed) {
-            // HTTP error responses: always pass through in full
-            if is_error_response(&parsed) {
-                return serde_json::to_string_pretty(&parsed)
-                    .unwrap_or_else(|_| trimmed.to_string());
-            }
-            // Small JSON (<5KB): pretty-print, keep all values
-            if trimmed.len() < 5120 {
-                return serde_json::to_string_pretty(&parsed)
-                    .unwrap_or_else(|_| trimmed.to_string());
-            }
-            // Large JSON: truncate values but keep structure
-            let truncated = truncate_json_values(&parsed, 0, 3);
-            return serde_json::to_string_pretty(&truncated)
+        // HTTP error responses: always pass through in full
+        if is_error_response(&parsed) {
+            return serde_json::to_string_pretty(&parsed)
                 .unwrap_or_else(|_| trimmed.to_string());
         }
+        // Small JSON (<5KB): pretty-print, keep all values
+        if trimmed.len() < 5120 {
+            return serde_json::to_string_pretty(&parsed)
+                .unwrap_or_else(|_| trimmed.to_string());
+        }
+        // Large JSON: truncate values but keep structure
+        let truncated = truncate_json_values(&parsed, 0, 3);
+        return serde_json::to_string_pretty(&truncated)
+            .unwrap_or_else(|_| trimmed.to_string());
     }
 
     // Non-JSON: cap at 100 lines

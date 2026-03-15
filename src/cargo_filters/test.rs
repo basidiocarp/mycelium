@@ -259,10 +259,10 @@ pub(crate) fn filter_cargo_test(output: &str, show_passing: bool) -> String {
     // Collect passing names from output lines matching "test <name> ... ok"
     let mut passing_names: Vec<String> = Vec::new();
     for line in output.lines() {
-        if let Some(rest) = line.strip_prefix("test ") {
-            if let Some(name) = rest.strip_suffix(" ... ok") {
-                passing_names.push(name.trim().to_string());
-            }
+        if let Some(rest) = line.strip_prefix("test ")
+            && let Some(name) = rest.strip_suffix(" ... ok")
+        {
+            passing_names.push(name.trim().to_string());
         }
     }
     if failures.is_empty() && !passing_names.is_empty() {

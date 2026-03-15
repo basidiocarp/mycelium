@@ -85,8 +85,6 @@ pub(crate) fn format_status_output(porcelain: &str) -> String {
         for f in untracked_files.iter().take(remaining_budget) {
             output.push_str(&format!("   {}\n", f));
         }
-        remaining_budget =
-            remaining_budget.saturating_sub(untracked_files.len().min(remaining_budget));
     }
 
     if total > 50 {

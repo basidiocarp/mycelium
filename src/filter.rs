@@ -147,7 +147,8 @@ impl FilterStrategy for NoFilter {
 
 pub struct MinimalFilter;
 
-fn is_actionable_comment(line: &str) -> bool {
+#[allow(dead_code)]
+pub(crate) fn is_actionable_comment(line: &str) -> bool {
     let upper = line.to_uppercase();
     upper.contains("TODO")
         || upper.contains("FIXME")
@@ -247,7 +248,7 @@ impl FilterStrategy for MinimalFilter {
                                     result.push('\n');
                                 }
                             } else {
-                                preamble_buf.extend(block_buf.drain(..));
+                                preamble_buf.append(&mut block_buf);
                             }
                         } else {
                             block_buf.clear();
