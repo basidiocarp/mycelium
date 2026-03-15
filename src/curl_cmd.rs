@@ -57,18 +57,15 @@ fn filter_curl_output(output: &str) -> String {
     {
         // HTTP error responses: always pass through in full
         if is_error_response(&parsed) {
-            return serde_json::to_string_pretty(&parsed)
-                .unwrap_or_else(|_| trimmed.to_string());
+            return serde_json::to_string_pretty(&parsed).unwrap_or_else(|_| trimmed.to_string());
         }
         // Small JSON (<5KB): pretty-print, keep all values
         if trimmed.len() < 5120 {
-            return serde_json::to_string_pretty(&parsed)
-                .unwrap_or_else(|_| trimmed.to_string());
+            return serde_json::to_string_pretty(&parsed).unwrap_or_else(|_| trimmed.to_string());
         }
         // Large JSON: truncate values but keep structure
         let truncated = truncate_json_values(&parsed, 0, 3);
-        return serde_json::to_string_pretty(&truncated)
-            .unwrap_or_else(|_| trimmed.to_string());
+        return serde_json::to_string_pretty(&truncated).unwrap_or_else(|_| trimmed.to_string());
     }
 
     // Non-JSON: cap at 100 lines
