@@ -69,23 +69,19 @@ pub fn store_output(command: &str, output: &str, project: Option<&str>) -> Resul
 }
 
 fn build_request(command: &str, output: &str, project: &str) -> String {
-    let arguments = serde_json::json!({
-        "command": command,
-        "output": output,
-        "project": project,
-    });
-
-    let request = serde_json::json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "tools/call",
-        "params": {
+    let request = spore::jsonrpc::Request::new(
+        "tools/call",
+        serde_json::json!({
             "name": "hyphae_store_command_output",
-            "arguments": arguments,
-        }
-    });
-
-    format!("{}\n", request)
+            "arguments": {
+                "command": command,
+                "output": output,
+                "project": project,
+            }
+        }),
+    );
+    // Use line-delimited format (not Content-Length) since hyphae uses that
+    serde_json::to_string(&request).expect("Request serialization cannot fail") + "\n"
 }
 
 fn parse_response(response: &str) -> Result<ChunkSummary> {

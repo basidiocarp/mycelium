@@ -1,6 +1,7 @@
 //! CLI client for Rhizome — code intelligence via tree-sitter and LSP.
 
 use anyhow::{Context, Result, bail};
+use spore::{Tool, discover};
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::sync::mpsc;
@@ -18,13 +19,13 @@ pub fn get_structure(file: &Path) -> Result<String> {
 }
 
 fn run_rhizome_command(subcommand: &str, file: &Path) -> Result<String> {
-    let rhizome_bin = crate::rhizome::rhizome_binary().context("Rhizome binary not found")?;
+    let info = discover(Tool::Rhizome).context("Rhizome binary not found")?;
 
     let file_str = file.to_str().context("Invalid file path")?;
 
     // Spawn rhizome subprocess with timeout
     let (tx, rx) = mpsc::channel();
-    let bin = rhizome_bin.to_string();
+    let bin = info.binary_path.to_string_lossy().to_string();
     let sub = subcommand.to_string();
     let path = file_str.to_string();
 

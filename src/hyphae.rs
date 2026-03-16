@@ -1,21 +1,29 @@
 //! Hyphae integration — optional chunked storage for large command outputs.
 
+use spore::{Tool, discover};
 use std::sync::OnceLock;
 
-/// Whether the Hyphae binary is available in PATH.
-static HYPHAE_AVAILABLE: OnceLock<bool> = OnceLock::new();
-/// Cached path to the Hyphae binary.
-static HYPHAE_PATH: OnceLock<Option<String>> = OnceLock::new();
+/// Cached string representation of the hyphae binary path.
+static HYPHAE_BINARY_PATH: OnceLock<Option<String>> = OnceLock::new();
 
 /// Check if the Hyphae binary is available in PATH.
-/// Result is cached after first call.
+/// Result is cached by spore for the lifetime of the process.
 pub fn is_available() -> bool {
-    *HYPHAE_AVAILABLE.get_or_init(|| detect_hyphae().is_some())
+    discover(Tool::Hyphae).is_some()
 }
 
 /// Returns the cached path to the hyphae binary, if available.
 pub fn hyphae_binary() -> Option<&'static str> {
-    HYPHAE_PATH.get_or_init(detect_hyphae).as_deref()
+    HYPHAE_BINARY_PATH
+        .get_or_init(|| {
+            discover(Tool::Hyphae).map(|info| {
+                info.binary_path
+                    .to_str()
+                    .unwrap_or("hyphae")
+                    .to_string()
+            })
+        })
+        .as_deref()
 }
 
 /// Check config override, then auto-detection.
@@ -79,40 +87,15 @@ fn format_chunk_summary(command: &str, summary: &crate::hyphae_client::ChunkSumm
     )
 }
 
-fn detect_hyphae() -> Option<String> {
-    #[cfg(target_os = "windows")]
-    let result = std::process::Command::new("where").arg("hyphae").output();
-
-    #[cfg(not(target_os = "windows"))]
-    let result = std::process::Command::new("which").arg("hyphae").output();
-
-    match result {
-        Ok(output) if output.status.success() => {
-            let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            if path.is_empty() {
-                None
-            } else {
-                // Take just the first line (in case `where` returns multiple)
-                Some(path.lines().next().unwrap_or(&path).to_string())
-            }
-        }
-        _ => None,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_detect_hyphae_returns_option() {
+    fn test_is_available_does_not_panic() {
         // In CI/test environment, hyphae is likely not installed
         // This test just verifies the function doesn't panic
-        let result = detect_hyphae();
-        // result is either Some(path) or None — both are valid
-        if let Some(path) = &result {
-            assert!(!path.is_empty());
-        }
+        let _available = is_available();
     }
 
     #[test]
