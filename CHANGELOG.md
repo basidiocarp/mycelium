@@ -2,6 +2,19 @@
 
 All notable changes to Mycelium are documented in this file.
 
+## v0.2.1
+
+### Features
+
+- **Hyphae integration**: When [Hyphae](https://github.com/basidiocarp/hyphae) is installed, large command outputs (>500 lines) are automatically chunked and stored in Hyphae instead of being destructively filtered. A summary with retrieval key is returned to the agent. Fully optional — Mycelium remains standalone without Hyphae. Configurable via `[filter.hyphae]` in config.toml.
+
+- **Rhizome integration**: When [Rhizome](https://github.com/basidiocarp/rhizome) is installed, `mycelium read` delegates to Rhizome for structured symbol extraction (functions, types, imports) instead of applying MinimalFilter/AggressiveFilter. Non-code files fall back to existing filters. Configurable via `[filter.rhizome]` in config.toml.
+
+### CI
+
+- Removed cargo audit workflow.
+- Added concurrency groups, pre-built tool installs, merged performance jobs, fixed double coverage run, bumped upload-artifact to v7.
+
 ## v0.2.0
 
 ### Features
