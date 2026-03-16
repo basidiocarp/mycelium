@@ -34,6 +34,35 @@ pub fn run(
         eprintln!("Detected language: {:?}", lang);
     }
 
+    // Try Rhizome for code files when available (provides structural outline)
+    if lang != Language::Unknown
+        && content.lines().count() >= 200
+        && crate::rhizome::should_use_rhizome()
+    {
+        match crate::rhizome_client::get_structure(file) {
+            Ok(structure) => {
+                let filename = file.file_name().and_then(|n| n.to_str()).unwrap_or("file");
+                let mycelium_output = format!(
+                    "[rhizome] {} — use get_definition(\"{}\", \"<symbol>\") for full source\n\n{}",
+                    filename, filename, structure
+                );
+                println!("{}", mycelium_output);
+                timer.track(
+                    &format!("cat {}", file.display()),
+                    "mycelium read (rhizome)",
+                    &content,
+                    &mycelium_output,
+                );
+                return Ok(());
+            }
+            Err(e) => {
+                if verbose > 0 {
+                    eprintln!("[mycelium] Rhizome failed, falling back to filter: {}", e);
+                }
+            }
+        }
+    }
+
     // Bypass filtering for small files — agents need the full content
     if content.lines().count() < 200 {
         print!("{}", content);

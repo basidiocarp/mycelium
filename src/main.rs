@@ -53,6 +53,8 @@ mod plugin_cmd;
 mod psql_cmd;
 mod python;
 mod rewrite_cmd;
+mod rhizome;
+mod rhizome_client;
 mod runner_cmd;
 mod self_update_cmd;
 mod streaming;

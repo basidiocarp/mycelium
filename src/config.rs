@@ -146,6 +146,18 @@ pub struct HyphaeConfig {
     pub enabled: Option<bool>,
 }
 
+/// Controls Rhizome integration for code-intelligence-enhanced file reading.
+///
+/// Three modes:
+/// - `enabled: None` (default) — auto-detect: use Rhizome when binary is in PATH
+/// - `enabled: Some(true)` — force on: always try Rhizome (still requires binary in PATH)
+/// - `enabled: Some(false)` — force off: never use Rhizome, always use local filtering
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RhizomeConfig {
+    #[serde(default)]
+    pub enabled: Option<bool>,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FilterConfig {
     #[serde(default = "default_ignore_dirs")]
@@ -160,6 +172,8 @@ pub struct FilterConfig {
     pub adaptive: Option<AdaptiveConfig>,
     #[serde(default)]
     pub hyphae: Option<HyphaeConfig>,
+    #[serde(default)]
+    pub rhizome: Option<RhizomeConfig>,
 }
 
 fn default_ignore_dirs() -> Vec<String> {
@@ -186,6 +200,7 @@ impl Default for FilterConfig {
             cargo: None,
             adaptive: None,
             hyphae: None,
+            rhizome: None,
         }
     }
 }

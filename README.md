@@ -102,6 +102,7 @@ Five strategies applied per command type:
 4. **Deduplication** - Collapses repeated log lines with counts
 5. **Adaptive Filtering** - Size-aware compression: small outputs (<50 lines) pass through untouched, medium outputs get light filtering, large outputs (>500 lines) get full structured compression — preserving errors, TODOs, and actionable comments
 6. **Hyphae Routing** *(optional)* - When [Hyphae](https://github.com/basidiocarp/hyphae) is installed, large outputs (>500 lines) are stored in Hyphae's chunked storage instead of being destructively filtered, preserving full output for later retrieval while returning a concise summary
+7. **Rhizome Code Intelligence** *(optional)* - When [Rhizome](https://github.com/basidiocarp/rhizome) is installed, `mycelium read` uses tree-sitter + LSP structural outlines for large code files (≥200 lines) instead of destructive comment/body filtering
 
 ## Commands
 
@@ -310,6 +311,10 @@ large_lines = 500       # outputs above this get full compression (default: 500)
 [filters.hyphae]
 # enabled = true   # Force on (default: auto-detect from PATH)
 # enabled = false  # Force off (never use Hyphae)
+
+[filters.rhizome]
+# enabled = true   # Force on (default: auto-detect from PATH)
+# enabled = false  # Force off (never use Rhizome)
 ```
 
 
