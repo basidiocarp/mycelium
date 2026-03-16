@@ -4,7 +4,7 @@ Complete guide to analyzing your mycelium token savings with temporal breakdowns
 
 ## Overview
 
-The `mycelium gain` command provides comprehensive analytics for tracking your token savings across time periods.
+`mycelium gain` shows token savings analytics with temporal breakdowns and data exports.
 
 **Database Location**: `~/.local/share/mycelium/history.db`
 **Retention Policy**: 90 days
@@ -75,12 +75,7 @@ Date            Cmds      Input     Output      Saved   Save%
 TOTAL            196       1.3M      59.2K       1.2M   95.6%
 ```
 
-**Metrics explained:**
-- **Cmds**: Number of mycelium commands executed
-- **Input**: Estimated tokens from raw command output
-- **Output**: Actual tokens after mycelium filtering
-- **Saved**: Input - Output (tokens prevented from reaching LLM)
-- **Save%**: Percentage reduction (Saved / Input × 100)
+Metrics: Cmds = commands executed, Input = estimated tokens from raw output, Output = tokens after filtering, Saved = Input - Output, Save% = (Saved / Input) × 100.
 
 ### Weekly Breakdown
 
@@ -250,7 +245,7 @@ EOF
 
 mycelium estimates tokens using `text.len() / 4` (4 characters per token average).
 
-**Accuracy**: ±10% compared to actual LLM tokenization (sufficient for trends).
+Accuracy: ±10% compared to actual LLM tokenization. Sufficient for trends.
 
 ### Savings Calculation
 
@@ -419,11 +414,11 @@ print(f'mycelium estimate: {len(text) // 4}')
 
 ## Best Practices
 
-1. **Regular Exports**: `mycelium gain --all --format json > monthly-$(date +%Y%m).json`
-2. **Trend Analysis**: Compare week-over-week savings to identify optimization opportunities
-3. **Command Profiling**: Use `--history` to see which commands save the most
-4. **Backup Before Cleanup**: Always backup before manual database operations
-5. **CI Integration**: Track savings across team in shared dashboards
+1. Export regularly: `mycelium gain --all --format json > monthly-$(date +%Y%m).json`
+2. Compare week-over-week savings to spot optimization opportunities
+3. Use `--history` to see which commands save the most
+4. Back up before manual database operations
+5. Track savings across teams in shared dashboards
 
 ## See Also
 

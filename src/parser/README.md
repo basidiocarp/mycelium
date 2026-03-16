@@ -2,13 +2,13 @@
 
 ## Overview
 
-The parser infrastructure provides a unified, three-tier parsing system for tool outputs with graceful degradation:
+Three-tier parsing system for tool outputs with graceful degradation:
 
-- **Tier 1 (Full)**: Complete JSON parsing with all structured data
-- **Tier 2 (Degraded)**: Partial parsing with warnings (fallback regex)
-- **Tier 3 (Passthrough)**: Raw output truncation with error markers
+- Tier 1 (Full): complete JSON parsing with all structured data
+- Tier 2 (Degraded): partial parsing with warnings (fallback regex)
+- Tier 3 (Passthrough): raw output truncation with error markers
 
-This ensures Mycelium **never returns false data silently** while maintaining maximum token efficiency.
+If parsing fails at one tier, it falls to the next. No tier returns false data silently.
 
 ## Architecture
 
@@ -178,7 +178,7 @@ For build tools (next, webpack, vite, cargo, etc.)
 
 ### Existing Module → Parser Trait
 
-**Before:**
+Without the parser trait:
 ```rust
 fn run_vitest(args: &[String]) -> Result<()> {
     let output = Command::new("vitest").output()?;
@@ -188,7 +188,7 @@ fn run_vitest(args: &[String]) -> Result<()> {
 }
 ```
 
-**After:**
+With the parser trait:
 ```rust
 fn run_vitest(args: &[String], verbose: u8) -> Result<()> {
     let output = Command::new("vitest")
@@ -242,14 +242,9 @@ fn test_vitest_regex_fallback() {
 }
 ```
 
-## Benefits
+## Trade-offs
 
-1. **Maintenance**: Tool version changes break gracefully (Tier 2/3 fallback)
-2. **Reliability**: Never silent failures or false data
-3. **Observability**: Clear degradation markers in verbose mode
-4. **Token Efficiency**: Structured data enables better compression
-5. **Consistency**: Unified interface across all tool types
-6. **Testing**: Fixture-based regression tests for multiple versions
+Tool version changes break gracefully via tier fallback instead of hard failures. Degradation markers in verbose mode make it visible when parsing drops to a lower tier. Structured data from Tier 1 parses enables better compression than raw text truncation. The unified `OutputParser` trait means all tool modules follow the same pattern, which simplifies fixture-based regression testing across tool versions.
 
 ## Roadmap
 
