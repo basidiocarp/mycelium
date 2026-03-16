@@ -16,12 +16,8 @@ pub fn is_available() -> bool {
 pub fn hyphae_binary() -> Option<&'static str> {
     HYPHAE_BINARY_PATH
         .get_or_init(|| {
-            discover(Tool::Hyphae).map(|info| {
-                info.binary_path
-                    .to_str()
-                    .unwrap_or("hyphae")
-                    .to_string()
-            })
+            discover(Tool::Hyphae)
+                .map(|info| info.binary_path.to_str().unwrap_or("hyphae").to_string())
         })
         .as_deref()
 }
@@ -112,11 +108,14 @@ mod tests {
     }
 
     #[test]
-    fn test_decide_action_large_output_no_hyphae() {
-        // 600 lines — large, but Hyphae not available in test → Filter
+    fn test_decide_action_large_output() {
+        // 600 lines — large output
         let large = "line\n".repeat(600);
-        // Without Hyphae in PATH, large output falls back to Filter
-        assert_eq!(decide_action(&large), OutputAction::Filter);
+        if is_available() {
+            assert_eq!(decide_action(&large), OutputAction::Chunk);
+        } else {
+            assert_eq!(decide_action(&large), OutputAction::Filter);
+        }
     }
 
     #[test]
@@ -134,11 +133,19 @@ mod tests {
     }
 
     #[test]
-    fn test_route_or_filter_large_falls_back_without_hyphae() {
-        // Large output, but Hyphae not installed → should fall back to filter
+    fn test_route_or_filter_large_output() {
+        // Large output — routes through Hyphae if available, otherwise falls back to filter
         let large = "line\n".repeat(600);
         let result = route_or_filter("test", &large, |_| "FILTERED".to_string());
-        assert_eq!(result, "FILTERED");
+        if is_available() {
+            assert!(
+                result.contains("[mycelium→hyphae]"),
+                "Expected Hyphae summary, got: {}",
+                &result[..result.len().min(100)]
+            );
+        } else {
+            assert_eq!(result, "FILTERED");
+        }
     }
 
     #[test]

@@ -2,6 +2,24 @@
 
 All notable changes to Mycelium are documented in this file.
 
+## v0.2.2
+
+### Features
+
+- **`mycelium init --ecosystem`**: Detect sibling Basidiocarp tools (Hyphae, Rhizome, Cap) and register their MCP servers with Claude Code in one command.
+
+### Refactoring
+
+- **Spore crate for tool discovery**: Replaced manual `which`/`where` binary detection in Hyphae and Rhizome modules with the shared `spore` crate's `discover()` API.
+
+### Bug Fixes
+
+- **Fixed Hyphae tests on machines with Hyphae installed**: Tests now adapt to the environment instead of assuming Hyphae is absent.
+
+### CI
+
+- Updated CI workflow configuration.
+
 ## v0.2.1
 
 ### Features

@@ -541,6 +541,7 @@ pub fn dispatch(cli: Cli) -> Result<()> {
             show,
             claude_md,
             hook_only,
+            ecosystem,
             auto_patch,
             no_patch,
             uninstall,
@@ -549,6 +550,8 @@ pub fn dispatch(cli: Cli) -> Result<()> {
                 init::show_config()?;
             } else if uninstall {
                 init::uninstall(global, cli.verbose)?;
+            } else if ecosystem {
+                init::run_ecosystem(cli.verbose)?;
             } else {
                 let patch_mode = if auto_patch {
                     init::PatchMode::Auto

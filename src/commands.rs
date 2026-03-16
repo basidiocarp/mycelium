@@ -577,6 +577,10 @@ pub enum Commands {
         #[arg(long = "hook-only", group = "mode")]
         hook_only: bool,
 
+        /// Detect sibling ecosystem tools and configure them for Claude Code
+        #[arg(long, group = "mode")]
+        ecosystem: bool,
+
         /// Auto-patch settings.json without prompting
         #[arg(long = "auto-patch", group = "patch")]
         auto_patch: bool,
