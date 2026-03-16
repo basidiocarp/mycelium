@@ -99,6 +99,18 @@ pub fn run_ecosystem(verbose: u8) -> Result<()> {
             }
         }
 
+        // Initialize hyphae database if it doesn't exist
+        if hyphae_info.is_some() {
+            if let Some(data_dir) = dirs::data_dir().map(|d| d.join("hyphae")) {
+                if !data_dir.join("hyphae.db").exists() {
+                    let _ = std::fs::create_dir_all(&data_dir);
+                    // Run `hyphae stats` to trigger DB creation
+                    let _ = Command::new("hyphae").arg("stats").output();
+                    configured.push("hyphae database initialized");
+                }
+            }
+        }
+
         // Register rhizome MCP if installed
         if rhizome_info.is_some() {
             match register_mcp("rhizome", &["rhizome", "serve", "--expanded"], verbose) {
