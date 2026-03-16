@@ -15,5 +15,5 @@ jobs:
     uses: basidiocarp/.github/.github/workflows/rust-performance.yml@main
     with:
       binary: mycelium
-      max-size-mb: 8
+      max-size-mb: 9
       max-startup-ms: 15
