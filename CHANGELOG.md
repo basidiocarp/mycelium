@@ -36,6 +36,18 @@ All notable changes to Mycelium are documented in this file.
 - Updated FEATURES.md with adaptive filtering strategy and revised savings ranges.
 - Updated COMMANDS.md with new curl and docker logs behavior.
 - Updated README.md with five filtering strategies and `[filter.adaptive]` config.
+- Documented optional Hyphae integration in CLAUDE.md.
+- Rewrote `.plans/hyphae-integration.md` and `.plans/rhizome-integration.md` in fleet format.
+
+### CI
+
+- Added concurrency groups to ci, coverage, performance workflows (cancel stale runs on new pushes).
+- Added `CARGO_INCREMENTAL=0` to all CI workflows for smaller cache.
+- Switched to `taiki-e/install-action` for cross, cargo-deb, cargo-generate-rpm, hyperfine (pre-built binaries instead of compiling from source).
+- Merged performance binary-size and startup-time into a single job (one build instead of two).
+- Fixed coverage workflow running `cargo llvm-cov` twice — now runs once.
+- Bumped `upload-artifact` to v7 across all workflows.
+- Removed cargo audit workflow.
 
 ## v0.1.6
 
