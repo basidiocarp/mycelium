@@ -30,25 +30,27 @@ pub fn run_err(command: &str, verbose: u8) -> Result<()> {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
     let raw = format!("{}\n{}", stdout, stderr);
-    let filtered = filter_errors(&raw);
-    let mut out = String::new();
-
-    if filtered.is_empty() {
-        if output.status.success() {
-            out.push_str("ok: Command completed successfully (no errors)");
-        } else {
-            out.push_str(&format!(
-                "FAIL: Command failed (exit code: {:?})\n",
-                output.status.code()
-            ));
-            let lines: Vec<&str> = raw.lines().collect();
-            for line in lines.iter().rev().take(10).rev() {
-                out.push_str(&format!("  {}\n", line));
+    let exit_status = output.status;
+    let out = crate::hyphae::route_or_filter(command, &raw, |r| {
+        let filtered = filter_errors(r);
+        if filtered.is_empty() {
+            if exit_status.success() {
+                "ok: Command completed successfully (no errors)".to_string()
+            } else {
+                let mut msg = format!(
+                    "FAIL: Command failed (exit code: {:?})\n",
+                    exit_status.code()
+                );
+                let lines: Vec<&str> = r.lines().collect();
+                for line in lines.iter().rev().take(10).rev() {
+                    msg.push_str(&format!("  {}\n", line));
+                }
+                msg
             }
+        } else {
+            filtered
         }
-    } else {
-        out.push_str(&filtered);
-    }
+    });
 
     let exit_code = output
         .status
@@ -94,7 +96,8 @@ pub fn run_test(command: &str, verbose: u8) -> Result<()> {
         .status
         .code()
         .unwrap_or(if output.status.success() { 0 } else { 1 });
-    let summary = extract_test_summary(&raw, command);
+    let summary =
+        crate::hyphae::route_or_filter(command, &raw, |r| extract_test_summary(r, command));
     if let Some(hint) = crate::tee::tee_and_hint(&raw, "test", exit_code) {
         println!("{}\n{}", summary, hint);
     } else {

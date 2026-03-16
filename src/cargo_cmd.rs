@@ -92,7 +92,11 @@ where
         .status
         .code()
         .unwrap_or(if output.status.success() { 0 } else { 1 });
-    let filtered = filter_fn(&raw);
+    let filtered = crate::hyphae::route_or_filter(
+        &format!("cargo {} {}", subcommand, restored_args.join(" ")),
+        &raw,
+        filter_fn,
+    );
 
     if let Some(hint) = crate::tee::tee_and_hint(&raw, &format!("cargo_{}", subcommand), exit_code)
     {
@@ -155,11 +159,18 @@ fn run_test(args: &[String], verbose: u8) -> Result<()> {
         println!("{}", hint);
     }
 
+    // Route through Hyphae for very large test output
+    let output = crate::hyphae::route_or_filter(
+        &format!("cargo test {}", restored.join(" ")),
+        &result.raw,
+        |_| result.filtered.clone(),
+    );
+
     timer.track(
         &format!("cargo test {}", restored.join(" ")),
         &format!("mycelium cargo test {}", restored.join(" ")),
         &result.raw,
-        &result.filtered,
+        &output,
     );
 
     if result.exit_code != 0 {

@@ -133,6 +133,19 @@ impl Default for AdaptiveConfig {
     }
 }
 
+/// Controls Hyphae integration for chunked storage of large outputs.
+///
+/// Three modes:
+/// - `enabled: None` (default) — auto-detect: use Hyphae when binary is in PATH
+/// - `enabled: Some(true)` — force on: always try Hyphae (still requires binary in PATH)
+/// - `enabled: Some(false)` — force off: never use Hyphae, always use local filtering
+#[derive(Debug, Serialize, Deserialize)]
+pub struct HyphaeConfig {
+    /// Override auto-detection. `true` forces Hyphae on, `false` forces it off.
+    #[serde(default)]
+    pub enabled: Option<bool>,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FilterConfig {
     #[serde(default = "default_ignore_dirs")]
@@ -145,6 +158,8 @@ pub struct FilterConfig {
     pub cargo: Option<CargoFilterConfig>,
     #[serde(default)]
     pub adaptive: Option<AdaptiveConfig>,
+    #[serde(default)]
+    pub hyphae: Option<HyphaeConfig>,
 }
 
 fn default_ignore_dirs() -> Vec<String> {
@@ -170,6 +185,7 @@ impl Default for FilterConfig {
             git: None,
             cargo: None,
             adaptive: None,
+            hyphae: None,
         }
     }
 }

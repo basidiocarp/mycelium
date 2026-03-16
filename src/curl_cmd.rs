@@ -33,8 +33,10 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
 
     let raw = stdout.to_string();
 
-    // Auto-detect JSON and pipe through filter
-    let filtered = filter_curl_output(&stdout);
+    // Auto-detect JSON and pipe through filter (or route to Hyphae for large output)
+    let filtered = crate::hyphae::route_or_filter(&format!("curl {}", args.join(" ")), &raw, |r| {
+        filter_curl_output(r)
+    });
     println!("{}", filtered);
 
     timer.track(

@@ -37,6 +37,8 @@ pub use vcs::git;
 pub use vcs::gt_cmd;
 mod hook_audit_cmd;
 mod hook_check;
+mod hyphae;
+mod hyphae_client;
 mod init;
 mod integrity;
 mod js;

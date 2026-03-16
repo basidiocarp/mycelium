@@ -170,14 +170,16 @@ pub(crate) fn docker_logs(args: &[String], _verbose: u8) -> Result<()> {
     let stderr = String::from_utf8_lossy(&output.stderr);
     let raw = format!("{}\n{}", stdout, stderr);
 
-    let raw_line_count = raw.lines().count();
-    let analyzed = crate::log_cmd::run_stdin_str(&raw);
-    let dedup_count = raw_line_count.saturating_sub(analyzed.lines().count());
-
-    let mut out = format!("docker: Logs for {}:\n{}", container, analyzed);
-    if dedup_count > 0 {
-        out.push_str(&format!("\n({} lines deduplicated)", dedup_count));
-    }
+    let out = crate::hyphae::route_or_filter(&format!("docker logs {}", container), &raw, |r| {
+        let raw_line_count = r.lines().count();
+        let analyzed = crate::log_cmd::run_stdin_str(r);
+        let dedup_count = raw_line_count.saturating_sub(analyzed.lines().count());
+        let mut out = format!("docker: Logs for {}:\n{}", container, analyzed);
+        if dedup_count > 0 {
+            out.push_str(&format!("\n({} lines deduplicated)", dedup_count));
+        }
+        out
+    });
     println!("{}", out);
     timer.track(
         &format!("docker logs {}", container),

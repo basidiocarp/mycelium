@@ -101,6 +101,7 @@ Five strategies applied per command type:
 3. **Truncation** - Keeps relevant context, cuts redundancy
 4. **Deduplication** - Collapses repeated log lines with counts
 5. **Adaptive Filtering** - Size-aware compression: small outputs (<50 lines) pass through untouched, medium outputs get light filtering, large outputs (>500 lines) get full structured compression — preserving errors, TODOs, and actionable comments
+6. **Hyphae Routing** *(optional)* - When [Hyphae](https://github.com/basidiocarp/hyphae) is installed, large outputs (>500 lines) are stored in Hyphae's chunked storage instead of being destructively filtered, preserving full output for later retrieval while returning a concise summary
 
 ## Commands
 
@@ -305,6 +306,10 @@ max_files = 20          # rotation limit
 small_lines = 50        # outputs below this pass through unfiltered (default: 50)
 small_bytes = 2048      # byte threshold for passthrough (default: 2048)
 large_lines = 500       # outputs above this get full compression (default: 500)
+
+[filters.hyphae]
+# enabled = true   # Force on (default: auto-detect from PATH)
+# enabled = false  # Force off (never use Hyphae)
 ```
 
 

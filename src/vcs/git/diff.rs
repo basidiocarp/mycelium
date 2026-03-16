@@ -79,7 +79,11 @@ pub(super) fn run_diff(
     let mut final_output = stat_stdout.to_string();
     if !diff_stdout.is_empty() {
         println!("\n--- Changes ---");
-        let compacted = compact_diff(&diff_stdout, max_lines.unwrap_or(500));
+        let compacted = crate::hyphae::route_or_filter(
+            &format!("git diff {}", args.join(" ")),
+            &diff_stdout,
+            |d| compact_diff(d, max_lines.unwrap_or(500)),
+        );
         println!("{}", compacted);
         final_output.push_str("\n--- Changes ---\n");
         final_output.push_str(&compacted);
@@ -204,7 +208,11 @@ pub(super) fn run_show(
         if verbose > 0 {
             println!("\n--- Changes ---");
         }
-        let compacted = compact_diff(diff_text, max_lines.unwrap_or(500));
+        let compacted = crate::hyphae::route_or_filter(
+            &format!("git show {}", args.join(" ")),
+            diff_text,
+            |d| compact_diff(d, max_lines.unwrap_or(500)),
+        );
         println!("{}", compacted);
         final_output.push_str(&format!("\n{}", compacted));
     }
