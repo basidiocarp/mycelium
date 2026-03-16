@@ -1,8 +1,6 @@
-# Mycelium Architecture Documentation
+# Mycelium Architecture
 
-> **Mycelium** - A high-performance CLI proxy that minimizes LLM token consumption through intelligent output filtering and compression.
-
-For extensibility guide and adding new commands, see [EXTENDING.md](EXTENDING.md).
+Mycelium sits between an LLM and system commands, filtering output to reduce token consumption. For adding new commands, see [EXTENDING.md](EXTENDING.md).
 
 ---
 
@@ -57,11 +55,11 @@ flowchart LR
 
 ### Design Principles
 
-1. **Single Responsibility**: Each module handles one command type
-2. **Minimal Overhead**: ~5-15ms proxy overhead per command
-3. **Exit Code Preservation**: CI/CD reliability through proper exit code propagation
-4. **Fail-Safe**: If filtering fails, fall back to original output
-5. **Transparent**: Users can always see raw output with `-v` flags
+1. Single responsibility: each module handles one command type
+2. Minimal overhead: ~5-15ms proxy overhead per command
+3. Exit code preservation: CI/CD reliability through proper exit code propagation
+4. Fail-safe: if filtering fails, fall back to original output
+5. Transparent: users can always see raw output with `-v` flags
 
 ### Hook Architecture (v0.9.5+)
 
@@ -198,7 +196,7 @@ block-beta
 | **Analytics** | `gain/`, `discover/`, `learn/`, `cc_economics/` | gain, discover, learn, cc-economics | N/A |
 | **Shared** | `utils.rs`, `filter.rs`, `tracking/`, `parser/`, `tee.rs` | (infrastructure) | N/A |
 
-**Total: 60+ modules** across 17 directories
+60+ modules across 17 directories
 
 ### Module Count Breakdown
 
@@ -278,15 +276,15 @@ fn large_function() {
 }
 ```
 
-**Adaptive filtering**: The MinimalFilter now distinguishes between noise comments (separators, auto-generated markers, pragma directives) and actionable comments (TODO, FIXME, HACK, SAFETY, NOTE, BUG, WARNING). License headers at the top of files are detected and stripped. The AggressiveFilter buffers function/impl bodies and folds those exceeding 30 lines to `// ... (N lines)` instead of dropping them entirely.
+The MinimalFilter distinguishes between noise comments (separators, auto-generated markers, pragma directives) and actionable comments (TODO, FIXME, HACK, SAFETY, NOTE, BUG, WARNING). License headers at the top of files are detected and stripped. The AggressiveFilter buffers function/impl bodies and folds those exceeding 30 lines to `// ... (N lines)` instead of dropping them entirely.
 
-**Language Support**: Rust, Python, JavaScript, TypeScript, Go, C, C++, Java
+Language support: Rust, Python, JavaScript, TypeScript, Go, C, C++, Java
 
-**Detection**: File extension-based with fallback heuristics
+Detection is file extension-based with fallback heuristics
 
 ### Adaptive Output Sizing
 
-Output filtering is size-aware via `AdaptiveConfig`:
+Output sizing thresholds (`AdaptiveConfig`):
 
 | Output Size | Action | Rationale |
 |-------------|--------|-----------|
@@ -432,7 +430,7 @@ classDiagram
 
 ### Package Manager Detection Pattern
 
-**Critical Infrastructure for JS/TS Stack (8 modules)**
+All 8 JS/TS modules use this detection pattern.
 
 ```mermaid
 flowchart TD
@@ -488,7 +486,7 @@ lazy_static::lazy_static! {
 }
 ```
 
-**Design**: Single-threaded execution with Mutex for future-proofing.
+Single-threaded execution. The Mutex is for future-proofing.
 
 ---
 
@@ -583,10 +581,7 @@ panic = "abort"        # Smaller binary size
 
 ### Performance Characteristics
 
-**Binary:**
-- Size: ~4.1 MB (stripped release build)
-- Startup: ~5-10ms (cold start)
-- Memory: ~2-5 MB (typical usage)
+Binary: ~4.1 MB stripped, ~5-10ms cold start, ~2-5 MB memory.
 
 **Runtime overhead (estimated):**
 
@@ -609,15 +604,15 @@ pie title Overhead Breakdown (typical command)
 
 ## Resources
 
-- **[FEATURES.md](FEATURES.md)**: Feature overview and savings summary
-- **[COMMANDS.md](COMMANDS.md)**: Complete command reference
-- **[ANALYTICS.md](ANALYTICS.md)**: Analytics, hooks, configuration
-- **[EXTENDING.md](EXTENDING.md)**: Adding new commands, patterns, ADRs
-- **[PLUGINS.md](PLUGINS.md)**: Custom filter plugins
-- **[COST_ANALYSIS.md](COST_ANALYSIS.md)**: Token economics and accuracy
-- **Cargo.toml**: Dependencies, build profiles, package metadata
-- **src/**: Source code organized by module
-- **.github/workflows/**: CI/CD automation (multi-platform builds, releases)
+- [FEATURES.md](FEATURES.md): Feature overview and savings summary
+- [COMMANDS.md](COMMANDS.md): Complete command reference
+- [ANALYTICS.md](ANALYTICS.md): Analytics, hooks, configuration
+- [EXTENDING.md](EXTENDING.md): Adding new commands, patterns, ADRs
+- [PLUGINS.md](PLUGINS.md): Custom filter plugins
+- [COST_ANALYSIS.md](COST_ANALYSIS.md): Token economics and accuracy
+- Cargo.toml: Dependencies, build profiles, package metadata
+- src/: Source code organized by module
+- .github/workflows/: CI/CD automation (multi-platform builds, releases)
 
 ---
 

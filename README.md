@@ -5,13 +5,11 @@ mycelium filters and compresses command outputs before they reach your LLM conte
 
 ## The Ecosystem
 
-Mycelium is part of a fungal-themed suite of developer tools, named after the biology of fungi; a fitting metaphor for software that works quietly underground to connect and support what's above.
+Mycelium is part of a fungal-themed suite of developer tools, named after the biology of fungi.
 
-- **mycelium** — the vast underground network of filaments that feeds and connects. This tool: the connective tissue between your LLM and your dev environment, silently filtering everything that flows through.
-- **[hyphae](https://github.com/basidiocarp/hyphae)** — the individual thread-like filaments that form mycelium. Fine-grained instrumentation and tracing.
-- **[cap](https://github.com/basidiocarp/cap)** — the visible fruiting body above ground. The surface layer: dashboards, analytics, the part you actually see.
-
-The tooling is written in Rust — a language that shares its name with another form of fungal life. Hence why it's called mycelium.
+- **mycelium** — Filters and compresses command output before it reaches your LLM context.
+- **[hyphae](https://github.com/basidiocarp/hyphae)** — Persistent memory system for AI agents with instrumentation and tracing.
+- **[cap](https://github.com/basidiocarp/cap)** — Web dashboard for memory browsing and token analytics.
 
 ## Savings (30-min Claude Code Session)
 
@@ -62,7 +60,7 @@ Download from [releases](https://github.com/basidiocarp/mycelium):
 ### Verify Installation
 
 ```bash
-mycelium --version   # Should show "mycelium 0.1.4"
+mycelium --version   # Should show "mycelium 0.2.2"
 mycelium gain        # Should show token savings stats
 ```
 ## Quick Start
@@ -94,15 +92,15 @@ flowchart LR
     end
 ```
 
-Five strategies applied per command type:
+Filtering strategies by command type:
 
-1. **Smart Filtering** - Removes noise (comments, whitespace, boilerplate)
-2. **Grouping** - Aggregates similar items (files by directory, errors by type)
-3. **Truncation** - Keeps relevant context, cuts redundancy
-4. **Deduplication** - Collapses repeated log lines with counts
-5. **Adaptive Filtering** - Size-aware compression: small outputs (<50 lines) pass through untouched, medium outputs get light filtering, large outputs (>500 lines) get full structured compression — preserving errors, TODOs, and actionable comments
-6. **Hyphae Routing** *(optional)* - When [Hyphae](https://github.com/basidiocarp/hyphae) is installed, large outputs (>500 lines) are stored in Hyphae's chunked storage instead of being destructively filtered, preserving full output for later retrieval while returning a concise summary
-7. **Rhizome Code Intelligence** *(optional)* - When [Rhizome](https://github.com/basidiocarp/rhizome) is installed, `mycelium read` uses tree-sitter + LSP structural outlines for large code files (≥200 lines) instead of destructive comment/body filtering
+1. Smart filtering — Removes noise (comments, whitespace, boilerplate)
+2. Grouping — Aggregates similar items (files by directory, errors by type)
+3. Truncation — Keeps relevant context, cuts redundancy
+4. Deduplication — Collapses repeated log lines with counts
+5. Adaptive filtering — Size-aware compression: small outputs (<50 lines) pass through untouched, medium outputs get light filtering, large outputs (>500 lines) get full structured compression—preserving errors, TODOs, and actionable comments
+6. Hyphae routing *(optional)* — When [Hyphae](https://github.com/basidiocarp/hyphae) is installed, large outputs (>500 lines) are stored in Hyphae's chunked storage instead of being destructively filtered, preserving full output for later retrieval while returning a concise summary
+7. Rhizome code intelligence *(optional)* — When [Rhizome](https://github.com/basidiocarp/rhizome) is installed, `mycelium read` uses tree-sitter and LSP structural outlines for large code files (≥200 lines) instead of destructive comment/body filtering
 
 ## Commands
 
@@ -212,7 +210,7 @@ mycelium discover --all --since 7    # All projects, last 7 days
 
 ## Examples
 
-**Directory listing:**
+Directory listing:
 ```
 # ls -la (45 lines, ~800 tokens)        # mycelium ls (12 lines, ~150 tokens)
 drwxr-xr-x  15 user staff 480 ...       my-project/
@@ -221,7 +219,7 @@ drwxr-xr-x  15 user staff 480 ...       my-project/
                                          +-- Cargo.toml
 ```
 
-**Git operations:**
+Git operations:
 ```
 # git push (15 lines, ~200 tokens)       # mycelium git push (1 line, ~10 tokens)
 Enumerating objects: 5, done.             ok main
@@ -230,7 +228,7 @@ Delta compression using up to 8 threads
 ...
 ```
 
-**Test output:**
+Test output:
 ```
 # cargo test (200+ lines on failure)     # mycelium test cargo test (~20 lines)
 running 15 tests                          FAILED: 2/15 tests
@@ -241,9 +239,7 @@ test utils::test_format ... ok              test_overflow: panic at utils.rs:18
 
 ## Auto-Rewrite Hook
 
-The most effective way to use mycelium. The hook transparently intercepts Bash commands and rewrites them to mycelium equivalents before execution.
-
-**Result**: 100% mycelium adoption across all conversations and subagents, zero token overhead.
+The hook transparently intercepts Bash commands and rewrites them to mycelium equivalents before execution. This provides 100% mycelium adoption across all conversations and subagents with zero token overhead.
 
 ### Setup
 
@@ -317,8 +313,6 @@ large_lines = 500       # outputs above this get full compression (default: 500)
 # enabled = false  # Force off (never use Rhizome)
 ```
 
-
-
 ### Releasing
 
 Use the release script to bump the version, run quality checks, and tag:
@@ -349,14 +343,14 @@ Shipped plugins (install with `./scripts/install-plugin.sh <name>`):
 
 ## Documentation
 
-- **[FEATURES.md](docs/FEATURES.md)** – Feature overview and savings summary
-- **[COMMANDS.md](docs/COMMANDS.md)** – Complete command reference (45+ commands)
-- **[ANALYTICS.md](docs/ANALYTICS.md)** – Analytics, hooks, configuration, tee system
-- **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** – Technical architecture
-- **[EXTENDING.md](docs/EXTENDING.md)** – Adding new commands, development patterns
-- **[PLUGINS.md](docs/PLUGINS.md)** – Write custom filter plugins
-- **[COST_ANALYSIS.md](docs/COST_ANALYSIS.md)** – Economics math and accuracy
-- **[TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** – Fix common issues
-- **[INSTALL.md](INSTALL.md)** – Detailed installation guide
-- **[SECURITY.md](SECURITY.md)** – Security policy and PR review process
-- **[AUDIT_GUIDE.md](docs/AUDIT_GUIDE.md)** – Token savings analytics guide
+- [FEATURES.md](docs/FEATURES.md) – Feature overview and savings summary
+- [COMMANDS.md](docs/COMMANDS.md) – Complete command reference (45+ commands)
+- [ANALYTICS.md](docs/ANALYTICS.md) – Analytics, hooks, configuration, tee system
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) – Technical architecture
+- [EXTENDING.md](docs/EXTENDING.md) – Adding new commands, development patterns
+- [PLUGINS.md](docs/PLUGINS.md) – Write custom filter plugins
+- [COST_ANALYSIS.md](docs/COST_ANALYSIS.md) – Economics math and accuracy
+- [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) – Fix common issues
+- [INSTALL.md](INSTALL.md) – Detailed installation guide
+- [SECURITY.md](SECURITY.md) – Security policy and PR review process
+- [AUDIT_GUIDE.md](docs/AUDIT_GUIDE.md) – Token savings analytics guide
