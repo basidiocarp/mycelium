@@ -7,12 +7,6 @@ use std::process::{Command, Stdio};
 use std::sync::mpsc;
 use std::time::Duration;
 
-/// Get structured symbol list (functions, types, traits, impls) for a file.
-#[allow(dead_code)]
-pub fn get_symbols(file: &Path) -> Result<String> {
-    run_rhizome_command("symbols", file)
-}
-
 /// Get hierarchical outline (modules, classes, methods with nesting) for a file.
 pub fn get_structure(file: &Path) -> Result<String> {
     run_rhizome_command("structure", file)
@@ -74,22 +68,6 @@ mod tests {
     use std::path::PathBuf;
 
     #[test]
-    fn test_get_symbols_without_rhizome() {
-        // Rhizome is likely not installed in test environment
-        let path = PathBuf::from("src/main.rs");
-        let result = get_symbols(&path);
-        // Should return Err (rhizome not found) — not panic
-        if let Err(err) = result {
-            let msg = err.to_string();
-            assert!(
-                msg.contains("not found") || msg.contains("timed out") || msg.contains("failed"),
-                "Unexpected error: {}",
-                msg
-            );
-        }
-    }
-
-    #[test]
     fn test_get_structure_without_rhizome() {
         let path = PathBuf::from("src/main.rs");
         let result = get_structure(&path);
@@ -106,7 +84,7 @@ mod tests {
     #[test]
     fn test_nonexistent_file() {
         let path = PathBuf::from("/nonexistent/file.rs");
-        let result = get_symbols(&path);
+        let result = get_structure(&path);
         // Should fail gracefully
         assert!(result.is_err());
     }

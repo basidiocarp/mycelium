@@ -371,4 +371,74 @@ test_show_passing = true
         assert!(!cargo_config.test_show_passing);
         assert!(cargo_config.build_show_warnings);
     }
+
+    #[test]
+    fn test_hyphae_config_enabled_true() {
+        let toml = r#"
+[filters.hyphae]
+enabled = true
+"#;
+        let config: Config = toml::from_str(toml).expect("valid toml");
+        let hyphae = config.filters.hyphae.expect("hyphae config present");
+        assert_eq!(hyphae.enabled, Some(true));
+    }
+
+    #[test]
+    fn test_hyphae_config_enabled_false() {
+        let toml = r#"
+[filters.hyphae]
+enabled = false
+"#;
+        let config: Config = toml::from_str(toml).expect("valid toml");
+        let hyphae = config.filters.hyphae.expect("hyphae config present");
+        assert_eq!(hyphae.enabled, Some(false));
+    }
+
+    #[test]
+    fn test_hyphae_config_absent_is_none() {
+        let config = Config::default();
+        assert!(config.filters.hyphae.is_none());
+    }
+
+    #[test]
+    fn test_rhizome_config_enabled_true() {
+        let toml = r#"
+[filters.rhizome]
+enabled = true
+"#;
+        let config: Config = toml::from_str(toml).expect("valid toml");
+        let rhizome = config.filters.rhizome.expect("rhizome config present");
+        assert_eq!(rhizome.enabled, Some(true));
+    }
+
+    #[test]
+    fn test_rhizome_config_enabled_false() {
+        let toml = r#"
+[filters.rhizome]
+enabled = false
+"#;
+        let config: Config = toml::from_str(toml).expect("valid toml");
+        let rhizome = config.filters.rhizome.expect("rhizome config present");
+        assert_eq!(rhizome.enabled, Some(false));
+    }
+
+    #[test]
+    fn test_rhizome_config_absent_is_none() {
+        let config = Config::default();
+        assert!(config.filters.rhizome.is_none());
+    }
+
+    #[test]
+    fn test_hyphae_and_rhizome_together() {
+        let toml = r#"
+[filters.hyphae]
+enabled = true
+
+[filters.rhizome]
+enabled = false
+"#;
+        let config: Config = toml::from_str(toml).expect("valid toml");
+        assert_eq!(config.filters.hyphae.unwrap().enabled, Some(true));
+        assert_eq!(config.filters.rhizome.unwrap().enabled, Some(false));
+    }
 }
