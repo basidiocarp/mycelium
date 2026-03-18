@@ -542,6 +542,7 @@ pub fn dispatch(cli: Cli) -> Result<()> {
             claude_md,
             hook_only,
             ecosystem,
+            onboard,
             client,
             auto_patch,
             no_patch,
@@ -551,6 +552,8 @@ pub fn dispatch(cli: Cli) -> Result<()> {
                 init::show_config()?;
             } else if uninstall {
                 init::uninstall(global, cli.verbose)?;
+            } else if onboard {
+                init::run_onboard(cli.verbose)?;
             } else if ecosystem {
                 init::run_ecosystem(client.as_deref(), cli.verbose)?;
             } else {

@@ -598,6 +598,10 @@ pub enum Commands {
         #[arg(long, group = "mode")]
         ecosystem: bool,
 
+        /// Interactive onboarding wizard (falls back to --ecosystem if stdin is not a TTY)
+        #[arg(long, group = "mode")]
+        onboard: bool,
+
         /// Target a specific MCP client (cursor, windsurf, cline, continue, claude-desktop, generic)
         #[arg(long)]
         client: Option<String>,
