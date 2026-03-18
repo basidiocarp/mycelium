@@ -474,5 +474,6 @@ fn run_claude_md_mode(global: bool, verbose: u8) -> Result<()> {
 // Need with_context for uninstall
 use anyhow::Context;
 
+pub mod clients;
 mod ecosystem;
 pub use ecosystem::run_ecosystem;

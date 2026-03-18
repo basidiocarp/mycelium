@@ -1,9 +1,14 @@
-//! `mycelium init --ecosystem` — detect sibling tools and configure Claude Code.
+//! `mycelium init --ecosystem` — detect sibling tools and configure MCP clients.
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use colored::Colorize;
 use spore::{Tool, discover};
 use std::process::Command;
+
+use super::clients::{self, McpClient, ServerConfig};
+
+/// Embedded session-summary hook script (POSIX sh, installed as Stop hook).
+const SESSION_SUMMARY_HOOK: &str = include_str!("../../hooks/session-summary.sh");
 
 /// Cap is not in the spore `Tool` enum — detect it separately.
 fn discover_cap() -> Option<String> {
@@ -56,7 +61,17 @@ fn register_mcp(name: &str, args: &[&str], verbose: u8) -> Result<bool> {
 }
 
 /// Main entry point for `mycelium init --ecosystem`.
-pub fn run_ecosystem(verbose: u8) -> Result<()> {
+pub fn run_ecosystem(client: Option<&str>, verbose: u8) -> Result<()> {
+    // Handle --client generic: just print JSON snippet and exit
+    if client
+        .as_ref()
+        .is_some_and(|c| c.eq_ignore_ascii_case("generic"))
+    {
+        let servers = build_server_configs();
+        clients::print_generic_config(&servers);
+        return Ok(());
+    }
+
     // ── 1. Discover tools ──────────────────────────────────────────────────
     let cap_version = discover_cap();
 
@@ -128,6 +143,13 @@ pub fn run_ecosystem(verbose: u8) -> Result<()> {
             configured.push("mycelium hooks + CLAUDE.md");
         }
 
+        // Install session-summary Stop hook (captures session metrics in hyphae)
+        match install_session_summary_hook(verbose) {
+            Ok(true) => configured.push("session summary hook"),
+            Ok(false) => { /* already present */ }
+            Err(e) => eprintln!("  {} session summary hook: {}", "!".yellow(), e),
+        }
+
         if !configured.is_empty() {
             println!();
             println!("  {} Configured:", "\u{2713}".green());
@@ -143,6 +165,9 @@ pub fn run_ecosystem(verbose: u8) -> Result<()> {
         );
         println!("    Install Claude Code first, then re-run: mycelium init --ecosystem");
     }
+
+    // ── 3b. Configure additional MCP clients ────────────────────────────────
+    configure_detected_clients(client, &hyphae_info, &rhizome_info, verbose);
 
     // ── 4. Print missing tool instructions ─────────────────────────────────
     let mut missing: Vec<(&str, &str)> = Vec::new();
@@ -181,6 +206,140 @@ pub fn run_ecosystem(verbose: u8) -> Result<()> {
     Ok(())
 }
 
+/// Install the session-summary Stop hook into `~/.claude/hooks/` and register it
+/// in `~/.claude/settings.json`. Returns `Ok(true)` if newly installed,
+/// `Ok(false)` if already present. Idempotent.
+fn install_session_summary_hook(verbose: u8) -> Result<bool> {
+    use super::hook::atomic_write;
+    use std::fs;
+    #[cfg(unix)]
+    use std::os::unix::fs::PermissionsExt;
+
+    let claude_dir = super::claude_md::resolve_claude_dir()?;
+    let hook_dir = claude_dir.join("hooks");
+    fs::create_dir_all(&hook_dir)
+        .with_context(|| format!("Failed to create hook dir: {}", hook_dir.display()))?;
+
+    let hook_path = hook_dir.join("session-summary.sh");
+    let hook_command = hook_path
+        .to_str()
+        .context("Hook path contains invalid UTF-8")?
+        .to_string();
+
+    // Write hook script (idempotent — skip if content matches)
+    let needs_write = if hook_path.exists() {
+        let existing = fs::read_to_string(&hook_path)?;
+        existing != SESSION_SUMMARY_HOOK
+    } else {
+        true
+    };
+
+    if needs_write {
+        fs::write(&hook_path, SESSION_SUMMARY_HOOK)
+            .with_context(|| format!("Failed to write hook: {}", hook_path.display()))?;
+        if verbose > 0 {
+            eprintln!("  Wrote session-summary hook: {}", hook_path.display());
+        }
+    }
+
+    // Set executable permissions
+    #[cfg(unix)]
+    fs::set_permissions(&hook_path, fs::Permissions::from_mode(0o755))
+        .with_context(|| format!("Failed to chmod hook: {}", hook_path.display()))?;
+
+    // Register Stop hook in settings.json (merge, don't overwrite)
+    let settings_path = claude_dir.join("settings.json");
+    let mut root: serde_json::Value = if settings_path.exists() {
+        let content = fs::read_to_string(&settings_path)
+            .with_context(|| format!("Failed to read {}", settings_path.display()))?;
+        if content.trim().is_empty() {
+            serde_json::json!({})
+        } else {
+            serde_json::from_str(&content)
+                .with_context(|| format!("Failed to parse {}", settings_path.display()))?
+        }
+    } else {
+        serde_json::json!({})
+    };
+
+    // Check idempotency — look for session-summary.sh in Stop hooks
+    if stop_hook_already_present(&root, &hook_command) {
+        if verbose > 0 {
+            eprintln!("  session-summary hook already in settings.json");
+        }
+        return Ok(false);
+    }
+
+    // Deep-merge: add Stop hook entry
+    insert_stop_hook_entry(&mut root, &hook_command);
+
+    // Atomic write settings.json
+    let serialized =
+        serde_json::to_string_pretty(&root).context("Failed to serialize settings.json")?;
+    atomic_write(&settings_path, &serialized)?;
+
+    if verbose > 0 {
+        eprintln!("  Registered session-summary Stop hook in settings.json");
+    }
+
+    Ok(true)
+}
+
+/// Check if the session-summary Stop hook is already registered.
+fn stop_hook_already_present(root: &serde_json::Value, hook_command: &str) -> bool {
+    let stop_array = match root
+        .get("hooks")
+        .and_then(|h| h.get("Stop"))
+        .and_then(|s| s.as_array())
+    {
+        Some(arr) => arr,
+        None => return false,
+    };
+
+    stop_array
+        .iter()
+        .filter_map(|entry| entry.get("hooks")?.as_array())
+        .flatten()
+        .filter_map(|hook| hook.get("command")?.as_str())
+        .any(|cmd| {
+            cmd == hook_command
+                || (cmd.contains("session-summary.sh")
+                    && hook_command.contains("session-summary.sh"))
+        })
+}
+
+/// Deep-merge a Stop hook entry into settings.json, preserving existing hooks.
+fn insert_stop_hook_entry(root: &mut serde_json::Value, hook_command: &str) {
+    let root_obj = match root.as_object_mut() {
+        Some(obj) => obj,
+        None => {
+            *root = serde_json::json!({});
+            root.as_object_mut()
+                .expect("Just created object, must succeed")
+        }
+    };
+
+    let hooks = root_obj
+        .entry("hooks")
+        .or_insert_with(|| serde_json::json!({}))
+        .as_object_mut()
+        .expect("hooks must be an object");
+
+    let stop = hooks
+        .entry("Stop")
+        .or_insert_with(|| serde_json::json!([]))
+        .as_array_mut()
+        .expect("Stop must be an array");
+
+    stop.push(serde_json::json!({
+        "matcher": "",
+        "hooks": [{
+            "type": "command",
+            "command": hook_command
+        }]
+    }));
+}
+
 /// Print a single tool's status line.
 fn print_tool_status(name: &str, version: Option<&str>) {
     match version {
@@ -204,6 +363,119 @@ fn print_tool_status(name: &str, version: Option<&str>) {
                 "\u{2717} not installed".red(),
                 hint.dimmed()
             );
+        }
+    }
+}
+
+/// Build MCP server configurations from discovered tools.
+fn build_server_configs() -> Vec<ServerConfig> {
+    let mut servers = Vec::new();
+    if discover(Tool::Hyphae).is_some() {
+        servers.push(ServerConfig {
+            name: "hyphae".to_string(),
+            command: "hyphae".to_string(),
+            args: vec!["serve".to_string()],
+        });
+    }
+    if discover(Tool::Rhizome).is_some() {
+        servers.push(ServerConfig {
+            name: "rhizome".to_string(),
+            command: "rhizome".to_string(),
+            args: vec!["serve".to_string(), "--expanded".to_string()],
+        });
+    }
+    servers
+}
+
+/// Configure detected MCP clients (other than Claude Code, which is handled separately).
+fn configure_detected_clients(
+    client_filter: Option<&str>,
+    hyphae_info: &Option<spore::ToolInfo>,
+    rhizome_info: &Option<spore::ToolInfo>,
+    verbose: u8,
+) {
+    let mut servers = Vec::new();
+    if hyphae_info.is_some() {
+        servers.push(ServerConfig {
+            name: "hyphae".to_string(),
+            command: "hyphae".to_string(),
+            args: vec!["serve".to_string()],
+        });
+    }
+    if rhizome_info.is_some() {
+        servers.push(ServerConfig {
+            name: "rhizome".to_string(),
+            command: "rhizome".to_string(),
+            args: vec!["serve".to_string(), "--expanded".to_string()],
+        });
+    }
+
+    if servers.is_empty() {
+        return;
+    }
+
+    // Determine which clients to configure
+    let targets: Vec<McpClient> = if let Some(name) = client_filter {
+        match McpClient::from_flag(name) {
+            Some(c) => vec![c],
+            None => {
+                eprintln!(
+                    "  {} Unknown client '{}'. Known: claude-code, cursor, windsurf, cline, continue, claude-desktop",
+                    "!".yellow(),
+                    name
+                );
+                return;
+            }
+        }
+    } else {
+        // No filter: detect all installed, skip Claude Code (already handled above)
+        clients::detect_clients()
+            .into_iter()
+            .filter(|c| *c != McpClient::ClaudeCode)
+            .collect()
+    };
+
+    if targets.is_empty() {
+        return;
+    }
+
+    println!();
+    println!("{}", "Configuring additional MCP clients...".bold());
+
+    let mut client_configured = Vec::new();
+
+    for target in &targets {
+        if *target == McpClient::ClaudeCode && client_filter.is_none() {
+            continue;
+        }
+
+        match clients::register_servers(*target, &servers, verbose) {
+            Ok(true) => {
+                client_configured.push(target.name());
+            }
+            Ok(false) => {
+                eprintln!(
+                    "  {} {} registration returned false",
+                    "!".yellow(),
+                    target.name()
+                );
+            }
+            Err(e) => {
+                eprintln!(
+                    "  {} {} registration failed: {}",
+                    "!".yellow(),
+                    target.name(),
+                    e
+                );
+            }
+        }
+    }
+
+    if !client_configured.is_empty() {
+        println!();
+        println!("  {} MCP servers registered for:", "\u{2713}".green());
+        for name in &client_configured {
+            println!("    - {name}");
         }
     }
 }
@@ -234,5 +506,113 @@ mod tests {
     #[test]
     fn test_claude_is_available_does_not_panic() {
         let _result = claude_is_available();
+    }
+
+    #[test]
+    fn test_session_summary_hook_embedded() {
+        assert!(SESSION_SUMMARY_HOOK.starts_with("#!/bin/sh"));
+        assert!(SESSION_SUMMARY_HOOK.contains("hyphae store"));
+        assert!(SESSION_SUMMARY_HOOK.contains("session_id"));
+    }
+
+    #[test]
+    fn test_stop_hook_already_present_exact() {
+        let json = serde_json::json!({
+            "hooks": {
+                "Stop": [{
+                    "matcher": "",
+                    "hooks": [{
+                        "type": "command",
+                        "command": "/Users/test/.claude/hooks/session-summary.sh"
+                    }]
+                }]
+            }
+        });
+        assert!(stop_hook_already_present(
+            &json,
+            "/Users/test/.claude/hooks/session-summary.sh"
+        ));
+    }
+
+    #[test]
+    fn test_stop_hook_already_present_different_path() {
+        let json = serde_json::json!({
+            "hooks": {
+                "Stop": [{
+                    "matcher": "",
+                    "hooks": [{
+                        "type": "command",
+                        "command": "/home/user/.claude/hooks/session-summary.sh"
+                    }]
+                }]
+            }
+        });
+        assert!(stop_hook_already_present(
+            &json,
+            "/Users/other/.claude/hooks/session-summary.sh"
+        ));
+    }
+
+    #[test]
+    fn test_stop_hook_not_present_empty() {
+        let json = serde_json::json!({});
+        assert!(!stop_hook_already_present(
+            &json,
+            "/Users/test/.claude/hooks/session-summary.sh"
+        ));
+    }
+
+    #[test]
+    fn test_stop_hook_not_present_other_hooks() {
+        let json = serde_json::json!({
+            "hooks": {
+                "PreToolUse": [{
+                    "matcher": "Bash",
+                    "hooks": [{
+                        "type": "command",
+                        "command": "/Users/test/.claude/hooks/mycelium-rewrite.sh"
+                    }]
+                }]
+            }
+        });
+        assert!(!stop_hook_already_present(
+            &json,
+            "/Users/test/.claude/hooks/session-summary.sh"
+        ));
+    }
+
+    #[test]
+    fn test_insert_stop_hook_entry_empty() {
+        let mut json = serde_json::json!({});
+        insert_stop_hook_entry(&mut json, "/test/session-summary.sh");
+
+        let stop = json["hooks"]["Stop"].as_array().unwrap();
+        assert_eq!(stop.len(), 1);
+        assert_eq!(
+            stop[0]["hooks"][0]["command"].as_str().unwrap(),
+            "/test/session-summary.sh"
+        );
+    }
+
+    #[test]
+    fn test_insert_stop_hook_preserves_existing() {
+        let mut json = serde_json::json!({
+            "hooks": {
+                "PreToolUse": [{
+                    "matcher": "Bash",
+                    "hooks": [{
+                        "type": "command",
+                        "command": "/test/mycelium-rewrite.sh"
+                    }]
+                }]
+            }
+        });
+        insert_stop_hook_entry(&mut json, "/test/session-summary.sh");
+
+        // PreToolUse preserved
+        assert!(json["hooks"]["PreToolUse"].is_array());
+        // Stop added
+        let stop = json["hooks"]["Stop"].as_array().unwrap();
+        assert_eq!(stop.len(), 1);
     }
 }

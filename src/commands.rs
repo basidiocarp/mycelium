@@ -581,6 +581,10 @@ pub enum Commands {
         #[arg(long, group = "mode")]
         ecosystem: bool,
 
+        /// Target a specific MCP client (cursor, windsurf, cline, continue, claude-desktop, generic)
+        #[arg(long)]
+        client: Option<String>,
+
         /// Auto-patch settings.json without prompting
         #[arg(long = "auto-patch", group = "patch")]
         auto_patch: bool,
