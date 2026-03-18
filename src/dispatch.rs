@@ -765,6 +765,22 @@ pub fn dispatch(cli: Cli) -> Result<()> {
             )?;
         }
 
+        Commands::Context {
+            task,
+            project,
+            budget,
+            include,
+        } => {
+            let task_str = task.join(" ");
+            init::context::run(
+                &task_str,
+                project.as_deref(),
+                budget,
+                include.as_deref(),
+                cli.json,
+            )?;
+        }
+
         Commands::Npx { ref args } => {
             dispatch_npx(args, &cli)?;
         }

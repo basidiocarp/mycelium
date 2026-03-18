@@ -475,5 +475,6 @@ fn run_claude_md_mode(global: bool, verbose: u8) -> Result<()> {
 use anyhow::Context;
 
 pub mod clients;
+pub mod context;
 mod ecosystem;
 pub use ecosystem::run_ecosystem;

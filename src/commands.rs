@@ -557,6 +557,23 @@ pub enum Commands {
         min_occurrences: usize,
     },
 
+    /// Gather context from Hyphae for a task (memories, errors, sessions, code)
+    #[command(display_order = 103)]
+    Context {
+        /// Task description to gather context for
+        #[arg(trailing_var_arg = true, required = true)]
+        task: Vec<String>,
+        /// Project name to scope the search
+        #[arg(short, long)]
+        project: Option<String>,
+        /// Token budget (default: 2000)
+        #[arg(short, long, default_value = "2000")]
+        budget: u64,
+        /// Include specific sources (comma-separated: memories,errors,sessions,code)
+        #[arg(short, long)]
+        include: Option<String>,
+    },
+
     // ── Setup ────────────────────────────────────────────────────────────────
     /// Initialize mycelium instructions in CLAUDE.md
     #[command(display_order = 110)]
@@ -1291,6 +1308,7 @@ pub const MYCELIUM_META_COMMANDS: &[&str] = &[
     "gain",
     "discover",
     "learn",
+    "context",
     "init",
     "config",
     "proxy",
