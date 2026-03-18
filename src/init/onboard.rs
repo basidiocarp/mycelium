@@ -282,7 +282,7 @@ fn build_missing_list<'a>(
         ));
     }
     if cap.is_none() {
-        missing.push(("cap", "npm install -g @basidiocarp/cap"));
+        missing.push(("cap", "git clone https://github.com/basidiocarp/cap && cd cap && npm i && npm run dev:all"));
     }
     missing
 }

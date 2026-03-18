@@ -185,7 +185,7 @@ pub fn run_ecosystem(client: Option<&str>, verbose: u8) -> Result<()> {
         ));
     }
     if cap_version.is_none() {
-        missing.push(("cap", "npm install -g @basidiocarp/cap"));
+        missing.push(("cap", "git clone https://github.com/basidiocarp/cap && cd cap && npm i && npm run dev:all"));
     }
 
     if !missing.is_empty() {
@@ -353,7 +353,7 @@ fn print_tool_status(name: &str, version: Option<&str>) {
         }
         None => {
             let hint = match name {
-                "cap" => " (optional: npm install -g @basidiocarp/cap)",
+                "cap" => " (optional: git clone https://github.com/basidiocarp/cap && cd cap && npm i && npm run dev:all)",
                 _ => "",
             };
             println!(
