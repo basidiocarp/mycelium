@@ -2,6 +2,27 @@
 
 All notable changes to Mycelium are documented in this file.
 
+## v0.3.2
+
+### Features
+
+- **`mycelium init --onboard`**: Interactive onboarding wizard that guides new users through ecosystem setup, tool detection, and configuration in one step.
+- **`mycelium init --ecosystem --client <name>`**: Multi-client support for `init --ecosystem`, allowing separate MCP configurations per client (Claude Code, Cursor, etc.).
+- **`mycelium context <task>`**: New CLI command that gathers relevant context for a task description by querying Hyphae memories, Rhizome code intelligence, and local project state.
+- **Session-summary Stop hook**: Automatically generates a session summary when Claude Code exits, capturing key decisions and outcomes for Hyphae storage.
+
+### Refactoring
+
+- **Spore adoption for tool discovery**: Migrated remaining manual binary detection to the shared `spore` crate's `discover()` API for consistent cross-tool resolution.
+
+### Tests
+
+- **Config deserialization tests**: Added test coverage for TOML config parsing, including edge cases for missing fields and invalid values.
+
+### Bug Fixes
+
+- **Clippy fixes**: Resolved pedantic clippy warnings across the codebase.
+
 ## v0.2.2
 
 ### Features
