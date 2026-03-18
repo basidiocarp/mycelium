@@ -35,7 +35,8 @@ impl McpClient {
         }
     }
 
-    /// CLI flag value (lowercase, kebab-case).
+    /// CLI flag value (lowercase, kebab-case). Inverse of [`from_flag`].
+    #[allow(dead_code)]
     pub fn flag(self) -> &'static str {
         match self {
             Self::ClaudeCode => "claude-code",
