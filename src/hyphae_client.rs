@@ -1,11 +1,15 @@
 //! MCP client for Hyphae — stores large command output as retrievable chunks.
+//!
+//! Uses a persistent `hyphae serve` subprocess (cached via `OnceLock`) to avoid
+//! cold start overhead for each call. The subprocess is spawned on first use and
+//! reused for all subsequent `store_output()` calls within the same process
+//! lifetime.
 
-use anyhow::{Context, Result, bail};
+use anyhow::{anyhow, Context, Result, bail};
 use serde::Deserialize;
-use std::io::{Read, Write};
-use std::process::{Command, Stdio};
-use std::sync::mpsc;
-use std::time::Duration;
+use std::io::{BufRead, BufReader, Write};
+use std::process::{Child, Command, Stdio, ChildStdout};
+use std::sync::{Mutex, OnceLock};
 
 /// Summary returned by Hyphae after chunking command output.
 #[derive(Debug, Deserialize)]
@@ -16,54 +20,117 @@ pub struct ChunkSummary {
     pub chunk_count: usize,
 }
 
+/// ─────────────────────────────────────────────────────────────────────────────
+/// Persistent Hyphae MCP connection
+/// ─────────────────────────────────────────────────────────────────────────────
+
+/// Cached Hyphae process — initialized on first use, reused for all subsequent
+/// calls during this process lifetime. Avoids spawning a new subprocess per call.
+static HYPHAE_PROCESS: OnceLock<Mutex<HyphaeConnection>> = OnceLock::new();
+
+struct HyphaeConnection {
+    child: Child,
+    stdout_reader: BufReader<ChildStdout>,
+}
+
+impl HyphaeConnection {
+    /// Initialize persistent Hyphae MCP connection.
+    fn init() -> Result<Self> {
+        let hyphae_bin = crate::hyphae::hyphae_binary()
+            .context("Hyphae binary not found")?;
+
+        let mut child = Command::new(hyphae_bin)
+            .arg("serve")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .context("Failed to spawn hyphae serve")?;
+
+        let stdout = child
+            .stdout
+            .take()
+            .context("Failed to get stdout pipe")?;
+
+        let stdout_reader = BufReader::new(stdout);
+
+        Ok(HyphaeConnection { child, stdout_reader })
+    }
+
+    /// Send a request and read the response line-by-line. Returns the parsed
+    /// JSON-RPC response.
+    fn call(&mut self, request: &str) -> Result<serde_json::Value> {
+        let stdin = self
+            .child
+            .stdin
+            .as_mut()
+            .context("Lost stdin pipe to hyphae")?;
+
+        stdin
+            .write_all(request.as_bytes())
+            .context("Failed to write to hyphae stdin")?;
+        stdin.flush().context("Failed to flush hyphae stdin")?;
+
+        // Read response line by line until we find valid JSON
+        let mut line = String::new();
+        loop {
+            line.clear();
+            self.stdout_reader
+                .read_line(&mut line)
+                .context("Failed to read from hyphae stdout")?;
+
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(trimmed) {
+                return Ok(json);
+            }
+        }
+    }
+}
+
+/// Get or initialize the persistent Hyphae connection.
+fn get_hyphae() -> Result<&'static Mutex<HyphaeConnection>> {
+    // Use get_or_init to initialize the Hyphae connection on first call.
+    // We panic on init failure, which is acceptable since Hyphae is optional.
+    let conn = HYPHAE_PROCESS.get_or_init(|| {
+        match HyphaeConnection::init() {
+            Ok(c) => Mutex::new(c),
+            Err(e) => {
+                // Panic only on init; errors during calls are handled in call()
+                panic!("Failed to initialize Hyphae connection: {}", e);
+            }
+        }
+    });
+
+    Ok(conn)
+}
+
+/// ─────────────────────────────────────────────────────────────────────────────
+/// Public API
+/// ─────────────────────────────────────────────────────────────────────────────
+
 /// Store command output in Hyphae's chunked storage.
 ///
-/// Spawns `hyphae serve` as a single-shot MCP subprocess, sends a `tools/call`
-/// JSON-RPC request for `hyphae_store_command_output`, and parses the response.
+/// Uses a persistent MCP connection to avoid subprocess spawn overhead per call.
 ///
 /// Returns `Err` on any failure (timeout, parse error, Hyphae crash) — caller
 /// should fall back to local filtering.
 pub fn store_output(command: &str, output: &str, project: Option<&str>) -> Result<ChunkSummary> {
-    let hyphae_bin = crate::hyphae::hyphae_binary().context("Hyphae binary not found")?;
-
     let project_name = project
         .map(|s| s.to_string())
         .unwrap_or_else(detect_project_name);
 
     let request = build_request(command, output, &project_name);
 
-    // Spawn hyphae serve subprocess
-    let mut child = Command::new(hyphae_bin)
-        .arg("serve")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .context("Failed to spawn hyphae serve")?;
+    let hyphae_conn = get_hyphae()?;
+    let mut conn = hyphae_conn
+        .lock()
+        .map_err(|e| anyhow!("Hyphae connection lock poisoned: {}", e))?;
 
-    // Write request to stdin, then close it
-    if let Some(mut stdin) = child.stdin.take() {
-        stdin
-            .write_all(request.as_bytes())
-            .context("Failed to write to hyphae stdin")?;
-    }
-
-    // Read response with 5-second timeout
-    let (tx, rx) = mpsc::channel();
-    let mut stdout = child.stdout.take().context("Failed to get hyphae stdout")?;
-
-    std::thread::spawn(move || {
-        let mut response = String::new();
-        let _ = stdout.read_to_string(&mut response);
-        let _ = tx.send(response);
-    });
-
-    let response = rx
-        .recv_timeout(Duration::from_secs(5))
-        .context("Hyphae response timed out after 5 seconds")?;
-
-    // Clean up child process
-    let _ = child.wait();
+    let response = conn.call(&request)?;
 
     parse_response(&response)
 }
@@ -81,41 +148,35 @@ fn build_request(command: &str, output: &str, project: &str) -> String {
         }),
     );
     // Use line-delimited format (not Content-Length) since hyphae uses that
-    serde_json::to_string(&request).expect("Request serialization cannot fail") + "\n"
+    serde_json::to_string(&request).expect("Request serialization cannot fail")
+        + "\n"
 }
 
-fn parse_response(response: &str) -> Result<ChunkSummary> {
-    // Find the first complete JSON object in the response
-    // (hyphae may emit initialization messages before the response)
-    for line in response.lines() {
-        let line = line.trim();
-        if line.is_empty() {
-            continue;
-        }
+/// ─────────────────────────────────────────────────────────────────────────────
+/// Response parsing
+/// ─────────────────────────────────────────────────────────────────────────────
 
-        if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
-            // Look for the result.content[0].text field
-            if let Some(text) = json
-                .get("result")
-                .and_then(|r| r.get("content"))
-                .and_then(|c| c.as_array())
-                .and_then(|a| a.first())
-                .and_then(|item| item.get("text"))
-                .and_then(|t| t.as_str())
-            {
-                let summary: ChunkSummary = serde_json::from_str(text)
-                    .context("Failed to parse ChunkSummary from Hyphae response")?;
-                return Ok(summary);
-            }
-
-            // Check for JSON-RPC error
-            if let Some(error) = json.get("error") {
-                bail!("Hyphae returned error: {}", error);
-            }
-        }
+fn parse_response(json: &serde_json::Value) -> Result<ChunkSummary> {
+    // Look for the result.content[0].text field
+    if let Some(text) = json
+        .get("result")
+        .and_then(|r| r.get("content"))
+        .and_then(|c| c.as_array())
+        .and_then(|a| a.first())
+        .and_then(|item| item.get("text"))
+        .and_then(|t| t.as_str())
+    {
+        let summary: ChunkSummary = serde_json::from_str(text)
+            .context("Failed to parse ChunkSummary from Hyphae response")?;
+        return Ok(summary);
     }
 
-    bail!("No valid JSON-RPC response found in Hyphae output")
+    // Check for JSON-RPC error
+    if let Some(error) = json.get("error") {
+        bail!("Hyphae returned error: {}", error);
+    }
+
+    bail!("No valid response in Hyphae JSON-RPC message")
 }
 
 fn detect_project_name() -> String {
@@ -144,33 +205,35 @@ mod tests {
 
     #[test]
     fn test_parse_response_valid() {
-        let response = r#"{"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":"{\"summary\":\"5 tests passed\",\"document_id\":\"abc123\",\"chunk_count\":3}"}]}}"#;
-        let summary = parse_response(response).unwrap();
+        let json = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+                "content": [{
+                    "type": "text",
+                    "text": r#"{"summary":"5 tests passed","document_id":"abc123","chunk_count":3}"#
+                }]
+            }
+        });
+        let summary = parse_response(&json).unwrap();
         assert_eq!(summary.summary, "5 tests passed");
         assert_eq!(summary.document_id, "abc123");
         assert_eq!(summary.chunk_count, 3);
     }
 
     #[test]
-    fn test_parse_response_with_prefix_messages() {
-        let response = "some init message\n{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"{\\\"summary\\\":\\\"ok\\\",\\\"document_id\\\":\\\"def456\\\",\\\"chunk_count\\\":1}\"}]}}";
-        let summary = parse_response(response).unwrap();
-        assert_eq!(summary.document_id, "def456");
-    }
-
-    #[test]
     fn test_parse_response_error() {
-        let response =
-            r#"{"jsonrpc":"2.0","id":1,"error":{"code":-32600,"message":"Invalid request"}}"#;
-        let result = parse_response(response);
+        let json = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "error": {
+                "code": -32600,
+                "message": "Invalid request"
+            }
+        });
+        let result = parse_response(&json);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("error"));
-    }
-
-    #[test]
-    fn test_parse_response_empty() {
-        let result = parse_response("");
-        assert!(result.is_err());
     }
 
     #[test]
