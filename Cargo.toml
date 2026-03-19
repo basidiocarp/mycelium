@@ -1,6 +1,6 @@
 [package]
 name = "mycelium"
-version = "0.4.1"
+version = "0.4.2"
 edition = "2024"
 authors = ["William Newton"]
 description = "Mycelium - High-performance CLI proxy to minimize LLM token consumption"
