@@ -10,6 +10,12 @@ use super::clients::{self, McpClient, ServerConfig};
 /// Embedded session-summary hook script (POSIX sh, installed as Stop hook).
 const SESSION_SUMMARY_HOOK: &str = include_str!("../../hooks/session-summary.sh");
 
+/// Embedded Hyphae capture hooks (PostToolUse, installed to ~/.claude/hooks/basidiocarp/)
+const CAPTURE_ERRORS_HOOK: &str = include_str!("../../hooks/capture-errors.js");
+const CAPTURE_CORRECTIONS_HOOK: &str = include_str!("../../hooks/capture-corrections.js");
+const CAPTURE_CODE_CHANGES_HOOK: &str = include_str!("../../hooks/capture-code-changes.js");
+const HOOK_UTILS: &str = include_str!("../../hooks/lib/utils.js");
+
 /// Cap is not in the spore `Tool` enum — detect it separately.
 fn discover_cap() -> Option<String> {
     let output = Command::new("cap").arg("--version").output().ok()?;
@@ -148,6 +154,18 @@ pub fn run_ecosystem(client: Option<&str>, verbose: u8) -> Result<()> {
             Ok(true) => configured.push("session summary hook"),
             Ok(false) => { /* already present */ }
             Err(e) => eprintln!("  {} session summary hook: {}", "!".yellow(), e),
+        }
+
+        // Install capture hooks if hyphae is available
+        if hyphae_info.is_some() {
+            match install_capture_hooks(verbose) {
+                Ok(count) if count > 0 => {
+                    let msg = format!("{count} capture hooks");
+                    configured.push(Box::leak(msg.into_boxed_str()));
+                }
+                Ok(_) => { /* already present */ }
+                Err(e) => eprintln!("  {} capture hooks: {}", "!".yellow(), e),
+            }
         }
 
         if !configured.is_empty() {
@@ -333,6 +351,223 @@ fn insert_stop_hook_entry(root: &mut serde_json::Value, hook_command: &str) {
 
     stop.push(serde_json::json!({
         "matcher": "",
+        "hooks": [{
+            "type": "command",
+            "command": hook_command
+        }]
+    }));
+}
+
+/// Install Hyphae capture hooks to `~/.claude/hooks/basidiocarp/` and register them
+/// in `~/.claude/settings.json`. Returns the number of hooks installed (0 if already present).
+/// Idempotent.
+fn install_capture_hooks(verbose: u8) -> Result<usize> {
+    use super::hook::atomic_write;
+    use std::fs;
+    #[cfg(unix)]
+    use std::os::unix::fs::PermissionsExt;
+
+    let claude_dir = super::claude_md::resolve_claude_dir()?;
+    let hook_dir = claude_dir.join("hooks").join("basidiocarp");
+    fs::create_dir_all(&hook_dir)
+        .with_context(|| format!("Failed to create hook dir: {}", hook_dir.display()))?;
+
+    let lib_dir = hook_dir.join("lib");
+    fs::create_dir_all(&lib_dir)
+        .with_context(|| format!("Failed to create lib dir: {}", lib_dir.display()))?;
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Install utils.js
+    // ─────────────────────────────────────────────────────────────────────────
+    let utils_path = lib_dir.join("utils.js");
+    let utils_installed = if utils_path.exists() {
+        let existing = fs::read_to_string(&utils_path)?;
+        existing != HOOK_UTILS
+    } else {
+        true
+    };
+
+    if utils_installed {
+        fs::write(&utils_path, HOOK_UTILS)
+            .with_context(|| format!("Failed to write utils.js: {}", utils_path.display()))?;
+        if verbose > 0 {
+            eprintln!("  Wrote utils.js: {}", utils_path.display());
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Install capture hooks (with path adjustments)
+    // ─────────────────────────────────────────────────────────────────────────
+    let hooks = vec![
+        ("capture-errors.js", CAPTURE_ERRORS_HOOK),
+        ("capture-corrections.js", CAPTURE_CORRECTIONS_HOOK),
+        ("capture-code-changes.js", CAPTURE_CODE_CHANGES_HOOK),
+    ];
+
+    let mut newly_installed = 0;
+
+    for (name, content) in hooks {
+        let hook_path = hook_dir.join(name);
+
+        // Adjust require() paths in the hook content to use ./lib/utils
+        let adjusted_content = content.replace("require('../lib/utils')", "require('./lib/utils')");
+
+        let needs_write = if hook_path.exists() {
+            let existing = fs::read_to_string(&hook_path)?;
+            existing != adjusted_content
+        } else {
+            true
+        };
+
+        if needs_write {
+            fs::write(&hook_path, &adjusted_content)
+                .with_context(|| format!("Failed to write hook: {}", hook_path.display()))?;
+            if verbose > 0 {
+                eprintln!("  Wrote {}: {}", name, hook_path.display());
+            }
+            newly_installed += 1;
+        }
+
+        // Set executable permissions
+        #[cfg(unix)]
+        fs::set_permissions(&hook_path, fs::Permissions::from_mode(0o755))
+            .with_context(|| format!("Failed to chmod hook: {}", hook_path.display()))?;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Register PostToolUse hooks in settings.json
+    // ─────────────────────────────────────────────────────────────────────────
+    let settings_path = claude_dir.join("settings.json");
+    let mut root: serde_json::Value = if settings_path.exists() {
+        let content = fs::read_to_string(&settings_path)
+            .with_context(|| format!("Failed to read {}", settings_path.display()))?;
+        if content.trim().is_empty() {
+            serde_json::json!({})
+        } else {
+            serde_json::from_str(&content)
+                .with_context(|| format!("Failed to parse {}", settings_path.display()))?
+        }
+    } else {
+        serde_json::json!({})
+    };
+
+    // Check which hooks are already registered
+    let capture_errors_path = hook_dir.join("capture-errors.js");
+    let capture_corrections_path = hook_dir.join("capture-corrections.js");
+    let capture_code_changes_path = hook_dir.join("capture-code-changes.js");
+
+    let errors_present = post_tool_use_hook_already_present(&root, &capture_errors_path);
+    let corrections_present = post_tool_use_hook_already_present(&root, &capture_corrections_path);
+    let changes_present = post_tool_use_hook_already_present(&root, &capture_code_changes_path);
+
+    // Register hooks that aren't already present
+    let mut settings_changed = false;
+
+    if !errors_present {
+        insert_post_tool_use_hook_entry(
+            &mut root,
+            capture_errors_path
+                .to_str()
+                .context("Hook path contains invalid UTF-8")?,
+            "Bash",
+        );
+        settings_changed = true;
+    }
+
+    if !corrections_present {
+        insert_post_tool_use_hook_entry(
+            &mut root,
+            capture_corrections_path
+                .to_str()
+                .context("Hook path contains invalid UTF-8")?,
+            "Write|Edit",
+        );
+        settings_changed = true;
+    }
+
+    if !changes_present {
+        insert_post_tool_use_hook_entry(
+            &mut root,
+            capture_code_changes_path
+                .to_str()
+                .context("Hook path contains invalid UTF-8")?,
+            "Write|Edit|Bash",
+        );
+        settings_changed = true;
+    }
+
+    // Write settings.json if anything changed
+    if settings_changed {
+        let serialized =
+            serde_json::to_string_pretty(&root).context("Failed to serialize settings.json")?;
+        atomic_write(&settings_path, &serialized)?;
+
+        if verbose > 0 {
+            eprintln!("  Registered capture hooks in settings.json");
+        }
+    } else if verbose > 0 {
+        eprintln!("  Capture hooks already registered in settings.json");
+    }
+
+    Ok(newly_installed)
+}
+
+/// Check if a PostToolUse hook is already registered for the given command.
+fn post_tool_use_hook_already_present(
+    root: &serde_json::Value,
+    hook_command_path: &std::path::Path,
+) -> bool {
+    let hook_command = match hook_command_path.to_str() {
+        Some(s) => s,
+        None => return false,
+    };
+
+    let post_tool_use_array = match root
+        .get("hooks")
+        .and_then(|h| h.get("PostToolUse"))
+        .and_then(|s| s.as_array())
+    {
+        Some(arr) => arr,
+        None => return false,
+    };
+
+    post_tool_use_array
+        .iter()
+        .filter_map(|entry| entry.get("hooks")?.as_array())
+        .flatten()
+        .filter_map(|hook| hook.get("command")?.as_str())
+        .any(|cmd| cmd == hook_command || (cmd.contains("capture-") && hook_command.contains("capture-")))
+}
+
+/// Deep-merge a PostToolUse hook entry into settings.json, preserving existing hooks.
+fn insert_post_tool_use_hook_entry(
+    root: &mut serde_json::Value,
+    hook_command: &str,
+    matcher: &str,
+) {
+    let root_obj = match root.as_object_mut() {
+        Some(obj) => obj,
+        None => {
+            *root = serde_json::json!({});
+            root.as_object_mut()
+                .expect("Just created object, must succeed")
+        }
+    };
+
+    let hooks = root_obj
+        .entry("hooks")
+        .or_insert_with(|| serde_json::json!({}))
+        .as_object_mut()
+        .expect("hooks must be an object");
+
+    let post_tool_use = hooks
+        .entry("PostToolUse")
+        .or_insert_with(|| serde_json::json!([]))
+        .as_array_mut()
+        .expect("PostToolUse must be an array");
+
+    post_tool_use.push(serde_json::json!({
+        "matcher": matcher,
         "hooks": [{
             "type": "command",
             "command": hook_command
@@ -614,5 +849,104 @@ mod tests {
         // Stop added
         let stop = json["hooks"]["Stop"].as_array().unwrap();
         assert_eq!(stop.len(), 1);
+    }
+
+    #[test]
+    fn test_capture_errors_hook_embedded() {
+        assert!(CAPTURE_ERRORS_HOOK.starts_with("#!/usr/bin/env node"));
+        assert!(CAPTURE_ERRORS_HOOK.contains("require('../lib/utils')"));
+    }
+
+    #[test]
+    fn test_capture_corrections_hook_embedded() {
+        assert!(CAPTURE_CORRECTIONS_HOOK.starts_with("#!/usr/bin/env node"));
+        assert!(CAPTURE_CORRECTIONS_HOOK.contains("require('../lib/utils')"));
+    }
+
+    #[test]
+    fn test_capture_code_changes_hook_embedded() {
+        assert!(CAPTURE_CODE_CHANGES_HOOK.starts_with("#!/usr/bin/env node"));
+        assert!(CAPTURE_CODE_CHANGES_HOOK.contains("require('../lib/utils')"));
+    }
+
+    #[test]
+    fn test_hook_utils_embedded() {
+        assert!(HOOK_UTILS.contains("module.exports"));
+        assert!(HOOK_UTILS.contains("function commandExists"));
+        assert!(HOOK_UTILS.contains("function log"));
+    }
+
+    #[test]
+    fn test_post_tool_use_hook_already_present_exact() {
+        let json = serde_json::json!({
+            "hooks": {
+                "PostToolUse": [{
+                    "matcher": "Bash",
+                    "hooks": [{
+                        "type": "command",
+                        "command": "/Users/test/.claude/hooks/basidiocarp/capture-errors.js"
+                    }]
+                }]
+            }
+        });
+
+        let path = std::path::Path::new("/Users/test/.claude/hooks/basidiocarp/capture-errors.js");
+        assert!(post_tool_use_hook_already_present(&json, path));
+    }
+
+    #[test]
+    fn test_post_tool_use_hook_not_present_empty() {
+        let json = serde_json::json!({});
+        let path = std::path::Path::new("/Users/test/.claude/hooks/basidiocarp/capture-errors.js");
+        assert!(!post_tool_use_hook_already_present(&json, path));
+    }
+
+    #[test]
+    fn test_insert_post_tool_use_hook_entry_empty() {
+        let mut json = serde_json::json!({});
+        insert_post_tool_use_hook_entry(
+            &mut json,
+            "/test/capture-errors.js",
+            "Bash",
+        );
+
+        let post_tool_use = json["hooks"]["PostToolUse"].as_array().unwrap();
+        assert_eq!(post_tool_use.len(), 1);
+        assert_eq!(
+            post_tool_use[0]["matcher"].as_str().unwrap(),
+            "Bash"
+        );
+        assert_eq!(
+            post_tool_use[0]["hooks"][0]["command"].as_str().unwrap(),
+            "/test/capture-errors.js"
+        );
+    }
+
+    #[test]
+    fn test_insert_post_tool_use_hook_preserves_stop_hooks() {
+        let mut json = serde_json::json!({
+            "hooks": {
+                "Stop": [{
+                    "matcher": "",
+                    "hooks": [{
+                        "type": "command",
+                        "command": "/test/session-summary.sh"
+                    }]
+                }]
+            }
+        });
+
+        insert_post_tool_use_hook_entry(
+            &mut json,
+            "/test/capture-errors.js",
+            "Bash",
+        );
+
+        // Stop preserved
+        assert!(json["hooks"]["Stop"].is_array());
+        assert_eq!(json["hooks"]["Stop"].as_array().unwrap().len(), 1);
+        // PostToolUse added
+        assert!(json["hooks"]["PostToolUse"].is_array());
+        assert_eq!(json["hooks"]["PostToolUse"].as_array().unwrap().len(), 1);
     }
 }
