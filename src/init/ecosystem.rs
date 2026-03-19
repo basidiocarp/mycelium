@@ -41,8 +41,26 @@ fn claude_is_available() -> bool {
         .is_ok_and(|o| o.status.success())
 }
 
-/// Register an MCP server with Claude Code.
-fn register_mcp(name: &str, args: &[&str], verbose: u8) -> Result<bool> {
+/// Check if an MCP server is already registered with Claude Code.
+fn mcp_exists(name: &str) -> bool {
+    Command::new("claude")
+        .args(["mcp", "get", name])
+        .output()
+        .is_ok_and(|o| o.status.success())
+}
+
+/// Register an MCP server with Claude Code. Returns:
+/// - `Ok(Some("registered"))` if newly registered
+/// - `Ok(Some("already registered"))` if already present
+/// - `Ok(None)` if registration failed
+fn register_mcp(name: &str, args: &[&str], verbose: u8) -> Result<Option<&'static str>> {
+    if mcp_exists(name) {
+        if verbose > 0 {
+            eprintln!("  {name} MCP already registered");
+        }
+        return Ok(Some("already registered"));
+    }
+
     let mut cmd = Command::new("claude");
     cmd.arg("mcp")
         .arg("add")
@@ -63,7 +81,11 @@ fn register_mcp(name: &str, args: &[&str], verbose: u8) -> Result<bool> {
     }
 
     let output = cmd.output()?;
-    Ok(output.status.success())
+    if output.status.success() {
+        Ok(Some("registered"))
+    } else {
+        Ok(None)
+    }
 }
 
 /// Main entry point for `mycelium init --ecosystem`.
@@ -114,8 +136,12 @@ pub fn run_ecosystem(client: Option<&str>, verbose: u8) -> Result<()> {
         // Register hyphae MCP if installed
         if hyphae_info.is_some() {
             match register_mcp("hyphae", &["hyphae", "serve"], verbose) {
-                Ok(true) => configured.push("hyphae MCP"),
-                Ok(false) => eprintln!("  {} Failed to register hyphae MCP", "!".yellow()),
+                Ok(Some(status)) => configured.push(if status == "already registered" {
+                    "hyphae MCP (already registered)"
+                } else {
+                    "hyphae MCP"
+                }),
+                Ok(None) => eprintln!("  {} Failed to register hyphae MCP", "!".yellow()),
                 Err(e) => eprintln!("  {} hyphae MCP registration error: {}", "!".yellow(), e),
             }
         }
@@ -135,8 +161,12 @@ pub fn run_ecosystem(client: Option<&str>, verbose: u8) -> Result<()> {
         // Register rhizome MCP if installed
         if rhizome_info.is_some() {
             match register_mcp("rhizome", &["rhizome", "serve", "--expanded"], verbose) {
-                Ok(true) => configured.push("rhizome MCP"),
-                Ok(false) => eprintln!("  {} Failed to register rhizome MCP", "!".yellow()),
+                Ok(Some(status)) => configured.push(if status == "already registered" {
+                    "rhizome MCP (already registered)"
+                } else {
+                    "rhizome MCP"
+                }),
+                Ok(None) => eprintln!("  {} Failed to register rhizome MCP", "!".yellow()),
                 Err(e) => eprintln!("  {} rhizome MCP registration error: {}", "!".yellow(), e),
             }
         }
