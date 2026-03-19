@@ -13,7 +13,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { spawnSync } = require('child_process');
-const { log, commandExists, getProjectName } = require('../lib/utils');
+const { log, commandExists, getProjectName, logHookError } = require('../lib/utils');
 
 const MAX_STDIN = 1024 * 1024;
 const CORRECTION_WINDOW_MS = 5 * 60 * 1000;  // 5 minutes
@@ -145,7 +145,7 @@ function storeCorrectionInHyphae(filePath, correctedEdit, newOldStr, newNewStr) 
       encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 3000
     });
     log(`[capture-corrections] Stored correction for ${fileName} in hyphae`);
-  } catch {
-    // Non-critical
+  } catch (err) {
+    logHookError('capture-corrections', err);
   }
 }

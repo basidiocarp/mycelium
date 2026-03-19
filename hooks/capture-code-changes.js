@@ -14,7 +14,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
-const { log, commandExists, getProjectName } = require('../lib/utils');
+const { log, commandExists, getProjectName, logHookError } = require('../lib/utils');
 
 const MAX_STDIN = 1024 * 1024;
 let data = '';
@@ -147,7 +147,7 @@ function triggerRhizomeExport() {
     }
 
     log('[capture-code-changes] Triggered rhizome export asynchronously');
-  } catch {
-    // Non-critical — if rhizome export fails, we just skip it
+  } catch (err) {
+    logHookError('capture-code-changes', err);
   }
 }

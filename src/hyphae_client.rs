@@ -1,15 +1,15 @@
 //! MCP client for Hyphae — stores large command output as retrievable chunks.
 //!
-//! Uses a persistent `hyphae serve` subprocess (cached via `OnceLock`) to avoid
-//! cold start overhead for each call. The subprocess is spawned on first use and
-//! reused for all subsequent `store_output()` calls within the same process
-//! lifetime.
+//! Uses a persistent `hyphae serve` subprocess to avoid cold start overhead for
+//! each call. The subprocess is spawned on first use and reused for all
+//! subsequent `store_output()` calls. If the subprocess crashes, a new one is
+//! automatically spawned on the next call.
 
 use anyhow::{anyhow, Context, Result, bail};
 use serde::Deserialize;
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, Command, Stdio, ChildStdout};
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Mutex, MutexGuard};
 
 /// Summary returned by Hyphae after chunking command output.
 #[derive(Debug, Deserialize)]
@@ -23,10 +23,10 @@ pub struct ChunkSummary {
 /// ─────────────────────────────────────────────────────────────────────────────
 /// Persistent Hyphae MCP connection
 /// ─────────────────────────────────────────────────────────────────────────────
-
+///
 /// Cached Hyphae process — initialized on first use, reused for all subsequent
-/// calls during this process lifetime. Avoids spawning a new subprocess per call.
-static HYPHAE_PROCESS: OnceLock<Mutex<HyphaeConnection>> = OnceLock::new();
+/// calls. If the subprocess crashes, a new one is spawned on the next call.
+static HYPHAE_PROCESS: Mutex<Option<HyphaeConnection>> = Mutex::new(None);
 
 struct HyphaeConnection {
     child: Child,
@@ -55,6 +55,11 @@ impl HyphaeConnection {
         let stdout_reader = BufReader::new(stdout);
 
         Ok(HyphaeConnection { child, stdout_reader })
+    }
+
+    /// Check if the child process is still running.
+    fn is_alive(&mut self) -> bool {
+        self.child.try_wait().ok().flatten().is_none()
     }
 
     /// Send a request and read the response line-by-line. Returns the parsed
@@ -91,33 +96,48 @@ impl HyphaeConnection {
     }
 }
 
-/// Get or initialize the persistent Hyphae connection.
-fn get_hyphae() -> Result<&'static Mutex<HyphaeConnection>> {
-    // Use get_or_init to initialize the Hyphae connection on first call.
-    // We panic on init failure, which is acceptable since Hyphae is optional.
-    let conn = HYPHAE_PROCESS.get_or_init(|| {
-        match HyphaeConnection::init() {
-            Ok(c) => Mutex::new(c),
-            Err(e) => {
-                // Panic only on init; errors during calls are handled in call()
-                panic!("Failed to initialize Hyphae connection: {}", e);
-            }
-        }
-    });
+/// Get or establish the persistent Hyphae connection.
+///
+/// Checks if a connection exists and is alive. If not, attempts to create a new
+/// one. Returns `Err` if initialization fails (not a panic, since Hyphae is
+/// optional).
+fn get_or_connect() -> Result<MutexGuard<'static, Option<HyphaeConnection>>> {
+    let mut guard = HYPHAE_PROCESS
+        .lock()
+        .map_err(|e| anyhow!("Hyphae lock poisoned: {e}"))?;
 
-    Ok(conn)
+    // Check if we have a connection and it's still alive. Return if alive, otherwise
+    // attempt to establish a new connection below.
+    if let Some(conn) = guard.as_mut() {
+        if conn.is_alive() {
+            return Ok(guard);
+        }
+    }
+
+    // Connection missing or dead — try to create a new one
+    match HyphaeConnection::init() {
+        Ok(conn) => {
+            *guard = Some(conn);
+            Ok(guard)
+        }
+        Err(e) => {
+            *guard = None;
+            Err(e)
+        }
+    }
 }
 
 /// ─────────────────────────────────────────────────────────────────────────────
 /// Public API
 /// ─────────────────────────────────────────────────────────────────────────────
-
+///
 /// Store command output in Hyphae's chunked storage.
 ///
 /// Uses a persistent MCP connection to avoid subprocess spawn overhead per call.
+/// If the Hyphae subprocess crashes, it will be respawned on the next call.
 ///
-/// Returns `Err` on any failure (timeout, parse error, Hyphae crash) — caller
-/// should fall back to local filtering.
+/// Returns `Err` on any failure (timeout, parse error, Hyphae crash, etc.) —
+/// caller should fall back to local filtering.
 pub fn store_output(command: &str, output: &str, project: Option<&str>) -> Result<ChunkSummary> {
     let project_name = project
         .map(|s| s.to_string())
@@ -125,14 +145,19 @@ pub fn store_output(command: &str, output: &str, project: Option<&str>) -> Resul
 
     let request = build_request(command, output, &project_name);
 
-    let hyphae_conn = get_hyphae()?;
-    let mut conn = hyphae_conn
-        .lock()
-        .map_err(|e| anyhow!("Hyphae connection lock poisoned: {}", e))?;
+    let mut guard = get_or_connect()?;
 
-    let response = conn.call(&request)?;
+    // SAFETY: guard holds the lock and is Some after get_or_connect succeeds
+    let conn = guard.as_mut().expect("connection should exist after get_or_connect");
 
-    parse_response(&response)
+    match conn.call(&request) {
+        Ok(response) => parse_response(&response),
+        Err(e) => {
+            // Drop the connection on call failure so next call reconnects
+            *guard = None;
+            Err(e)
+        }
+    }
 }
 
 fn build_request(command: &str, output: &str, project: &str) -> String {
@@ -155,7 +180,7 @@ fn build_request(command: &str, output: &str, project: &str) -> String {
 /// ─────────────────────────────────────────────────────────────────────────────
 /// Response parsing
 /// ─────────────────────────────────────────────────────────────────────────────
-
+///
 fn parse_response(json: &serde_json::Value) -> Result<ChunkSummary> {
     // Look for the result.content[0].text field
     if let Some(text) = json

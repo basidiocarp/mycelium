@@ -483,6 +483,34 @@ function grepFile(filePath, pattern) {
   return results;
 }
 
+/**
+ * Log a hook error to a temp file for observability.
+ * Caps the log at 100 lines to avoid unbounded growth.
+ * Never throws — safe to call in any catch block.
+ */
+function logHookError(hookName, error) {
+  try {
+    const logPath = path.join(os.tmpdir(), 'hyphae-hook-errors.log');
+    const timestamp = new Date().toISOString();
+    const message = error instanceof Error ? error.message : String(error);
+    const line = `${timestamp} [${hookName}] ${message}\n`;
+    fs.appendFileSync(logPath, line, 'utf8');
+
+    // Cap at 100 lines
+    try {
+      const content = fs.readFileSync(logPath, 'utf8');
+      const lines = content.split('\n');
+      if (lines.length > 100) {
+        fs.writeFileSync(logPath, lines.slice(-100).join('\n'), 'utf8');
+      }
+    } catch {
+      // ignore truncation errors
+    }
+  } catch {
+    // Never fail — this is error logging for error logging
+  }
+}
+
 module.exports = {
   // Platform info
   isWindows,
@@ -525,5 +553,8 @@ module.exports = {
   commandExists,
   runCommand,
   isGitRepo,
-  getGitModifiedFiles
+  getGitModifiedFiles,
+
+  // Error observability
+  logHookError
 };

@@ -13,7 +13,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { spawnSync } = require('child_process');
-const { log, commandExists, getProjectName } = require('../lib/utils');
+const { log, commandExists, getProjectName, logHookError } = require('../lib/utils');
 
 const MAX_STDIN = 1024 * 1024;
 let data = '';
@@ -140,8 +140,8 @@ function storeErrorInHyphae(command, output) {
     spawnSync('hyphae', args, {
       encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 3000
     });
-  } catch {
-    // Non-critical
+  } catch (err) {
+    logHookError('capture-errors', err);
   }
 }
 
