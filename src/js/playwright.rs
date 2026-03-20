@@ -111,8 +111,8 @@ impl OutputParser for PlaywrightParser {
                         ParseResult::Degraded(result, vec![format!("JSON parse failed: {}", e)])
                     }
                     None => {
-                        // Tier 3: Passthrough
-                        ParseResult::Passthrough(truncate_output(input, 500))
+                        // Tier 3: Passthrough — E2E failures need room for stack traces
+                        ParseResult::Passthrough(truncate_output(input, 4000))
                     }
                 }
             }
@@ -312,8 +312,15 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
     let stderr = String::from_utf8_lossy(&output.stderr);
     let raw = format!("{}\n{}", stdout, stderr);
 
-    // Parse output using PlaywrightParser
-    let parse_result = PlaywrightParser::parse(&stdout);
+    // Parse output — try stdout first, fall back to combined
+    let parse_result = {
+        let r = PlaywrightParser::parse(&stdout);
+        if matches!(r, ParseResult::Passthrough(_)) && !stderr.is_empty() {
+            PlaywrightParser::parse(&raw)
+        } else {
+            r
+        }
+    };
     let mode = FormatMode::from_verbosity(verbose);
     let parse_tier: u8 = match &parse_result {
         ParseResult::Full(_) => 1,

@@ -68,7 +68,7 @@ impl OutputParser for PnpmListParser {
                     }
                     None => {
                         // Tier 3: Passthrough
-                        ParseResult::Passthrough(truncate_output(input, 500))
+                        ParseResult::Passthrough(truncate_output(input, 2000))
                     }
                 }
             }
@@ -195,7 +195,7 @@ impl OutputParser for PnpmOutdatedParser {
                     }
                     None => {
                         // Tier 3: Passthrough
-                        ParseResult::Passthrough(truncate_output(input, 500))
+                        ParseResult::Passthrough(truncate_output(input, 2000))
                     }
                 }
             }
