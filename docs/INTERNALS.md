@@ -8,8 +8,9 @@ This document explains how Mycelium works internally: command dispatch, filterin
 2. [Command Rewriting](#command-rewriting)
 3. [Filter System](#filter-system)
 4. [Output Routing](#output-routing)
-5. [Token Tracking](#token-tracking)
-6. [Ecosystem Integration](#ecosystem-integration)
+5. [Test Runner Fixes](#test-runner-fixes)
+6. [Token Tracking](#token-tracking)
+7. [Ecosystem Integration](#ecosystem-integration)
 
 ---
 
@@ -319,6 +320,48 @@ pub fn store_output(command: &str, output: &str, project: Option<&str>) -> Resul
 - `hyphae serve` startup takes ~100ms
 - Mycelium targets <10ms execution
 - Persistent subprocess amortizes startup cost
+
+---
+
+## Test Runner Fixes
+
+### Vitest and Playwright Passthrough Truncation
+
+Vitest and Playwright test runners often emit large, structured output. Mycelium v0.4.3 increased passthrough truncation limits for these tools:
+
+**Change:** Test runner passthrough output increased from 500 chars to 4000 chars.
+
+**Rationale:**
+- Allows more meaningful test failure context without destructive filtering
+- Reduces token savings (shorter truncation) but improves debugging
+- Large outputs still route to Hyphae when available, falling back to 4000-char summary
+
+**Affected commands:**
+- `mycelium vitest run`
+- `mycelium playwright test`
+- Any tool using test runner passthrough
+
+**Configuration** (`~/.config/mycelium/config.toml`):
+```toml
+[filters.test]
+passthrough_truncate_chars = 4000  # Increased from 500
+```
+
+### Stderr Fallback Parsing
+
+When test runners output failures only on stderr (not stdout), Mycelium now parses stderr as fallback:
+
+**Flow:**
+1. Try stdout parsing first
+2. If stdout is empty/non-matching, parse stderr
+3. If both empty, return raw command output (passthrough)
+
+**Affected runners:**
+- Some Jest/Vitest configurations
+- Playwright headless mode
+- Custom test harnesses
+
+This ensures test failures aren't missed due to output redirection quirks.
 
 ---
 
