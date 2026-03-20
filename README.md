@@ -1,15 +1,16 @@
-Mycelium:
----
+# Mycelium
 
-mycelium filters and compresses command outputs before they reach your LLM context. Single Rust binary, zero dependencies, <10ms overhead.
+Token-optimized CLI proxy. Filters and compresses command output before it reaches your LLM context. Single Rust binary, zero dependencies, <10ms overhead. 60-90% token savings on 70+ command types.
+
+Part of the [Basidiocarp ecosystem](https://github.com/basidiocarp) — see the [Technical Overview](https://github.com/basidiocarp/.github/blob/main/profile/README.md#technical-overview) for how Mycelium fits with Hyphae, Rhizome, Cap, and Lamella.
 
 ## The Ecosystem
 
-Mycelium is part of a fungal-themed suite of developer tools, named after the biology of fungi.
-
-- **mycelium** — Filters and compresses command output before it reaches your LLM context.
-- **[hyphae](https://github.com/basidiocarp/hyphae)** — Persistent memory system for AI agents with instrumentation and tracing.
-- **[cap](https://github.com/basidiocarp/cap)** — Web dashboard for memory browsing and token analytics.
+- **mycelium** — Filters and compresses command output (this project). See [Token Optimization](https://github.com/basidiocarp/.github/blob/main/profile/README.md#token-optimization--mycelium).
+- **[hyphae](https://github.com/basidiocarp/hyphae)** — Persistent memory with [RAG pipeline](https://github.com/basidiocarp/.github/blob/main/profile/README.md#retrieval-augmented-generation-rag--hyphae--lamella), [vector search](https://github.com/basidiocarp/.github/blob/main/profile/README.md#vector-database--hybrid-search--hyphae), and [feedback loop](https://github.com/basidiocarp/.github/blob/main/profile/README.md#feedback-loop--lesson-extraction--hyphae--lamella).
+- **[rhizome](https://github.com/basidiocarp/rhizome)** — Code intelligence with [tree-sitter](https://github.com/basidiocarp/.github/blob/main/profile/README.md#tree-sitter-code-parsing--rhizome) and [LSP auto-management](https://github.com/basidiocarp/.github/blob/main/profile/README.md#lsp-auto-management--rhizome).
+- **[cap](https://github.com/basidiocarp/cap)** — Web dashboard for memory browsing, token analytics, and code exploration.
+- **[lamella](https://github.com/basidiocarp/lamella)** — Skills, hooks, and [feedback capture](https://github.com/basidiocarp/.github/blob/main/profile/README.md#feedback-loop--lesson-extraction--hyphae--lamella) for Claude Code.
 
 ## Savings (30-min Claude Code Session)
 
@@ -29,52 +30,18 @@ Mycelium is part of a fungal-themed suite of developer tools, named after the bi
 | `docker ps`               | 3x        | 900          | 180         | -80%     |
 | **Total**                 |           | **~118,000** | **~23,900** | **-80%** |
 
-> Estimates based on medium-sized TypeScript/Rust projects. Actual savings vary by project size.
-
 ## Installation
 
-### Quick Install (Linux/macOS)
-
 ```bash
-curl -fsSL install.sh | sh
+# Quick install (all ecosystem tools)
+curl -fsSL https://raw.githubusercontent.com/basidiocarp/.github/main/install.sh | sh
+
+# Mycelium only
+cargo install --git https://github.com/basidiocarp/mycelium
+
+# Setup (hooks, MCP servers, capture hooks)
+mycelium init --ecosystem
 ```
-
-> Installs to `~/.local/bin`. Add to PATH if needed:
-> ```bash
-> echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc  # or ~/.zshrc
-> ```
-
-### Cargo
-
-```bash
-cargo install --git
-```
-
-### Pre-built Binaries
-
-Download from [releases](https://github.com/basidiocarp/mycelium):
-- macOS: `mycelium-x86_64-apple-darwin.tar.gz` / `mycelium-aarch64-apple-darwin.tar.gz`
-- Linux: `mycelium-x86_64-unknown-linux-musl.tar.gz` / `mycelium-aarch64-unknown-linux-gnu.tar.gz`
-- Windows: `mycelium-x86_64-pc-windows-msvc.zip`
-
-### Verify Installation
-
-```bash
-mycelium --version   # Should show "mycelium 0.2.2"
-mycelium gain        # Should show token savings stats
-```
-## Quick Start
-
-```bash
-# 1. Install hook for Claude Code (recommended)
-mycelium init --global
-# Follow instructions to register in ~/.claude/settings.json
-
-# 2. Restart Claude Code, then test
-git status  # Automatically rewritten to mycelium git status
-```
-
-The hook transparently rewrites commands (e.g., `git status` -> `mycelium git status`) before execution. Claude never sees the rewrite, it just gets compressed output.
 
 ## How It Works
 
@@ -92,265 +59,34 @@ flowchart LR
     end
 ```
 
-Filtering strategies by command type:
+### Filtering Strategies
 
-1. Smart filtering — Removes noise (comments, whitespace, boilerplate)
-2. Grouping — Aggregates similar items (files by directory, errors by type)
-3. Truncation — Keeps relevant context, cuts redundancy
-4. Deduplication — Collapses repeated log lines with counts
-5. Adaptive filtering — Size-aware compression: small outputs (<50 lines) pass through untouched, medium outputs get light filtering, large outputs (>500 lines) get full structured compression—preserving errors, TODOs, and actionable comments
-6. Hyphae routing *(optional)* — When [Hyphae](https://github.com/basidiocarp/hyphae) is installed, large outputs (>500 lines) are stored in Hyphae's chunked storage instead of being destructively filtered, preserving full output for later retrieval while returning a concise summary
-7. Rhizome code intelligence *(optional)* — When [Rhizome](https://github.com/basidiocarp/rhizome) is installed, `mycelium read` uses tree-sitter and LSP structural outlines for large code files (≥200 lines) instead of destructive comment/body filtering
+1. **Smart filtering** — Removes noise (comments, whitespace, boilerplate)
+2. **Grouping** — Aggregates similar items (files by directory, errors by type)
+3. **Truncation** — Keeps relevant context, cuts redundancy
+4. **Deduplication** — Collapses repeated log lines with counts
+5. **Adaptive sizing** — Small (<50 lines) pass through, medium get filtered, large (>500 lines) get full compression
+6. **Hyphae routing** — Large outputs stored as retrievable chunks in Hyphae (when installed)
+7. **Rhizome code intelligence** — `mycelium read` uses tree-sitter structural outlines for large code files (when installed)
 
-## Commands
+### Ecosystem Integration
 
-### Files
-```bash
-mycelium ls .                        # Token-optimized directory tree
-mycelium read file.rs                # Smart file reading
-mycelium read file.rs -l aggressive  # Signatures only (strips bodies)
-mycelium smart file.rs               # 2-line heuristic code summary
-mycelium find "*.rs" .               # Compact find results
-mycelium grep "pattern" .            # Grouped search results
-mycelium diff file1 file2            # Condensed diff
-```
-
-### Git
-```bash
-mycelium git status                  # Compact status
-mycelium git log -n 10               # One-line commits
-mycelium git diff                    # Condensed diff
-mycelium git add                     # -> "ok"
-mycelium git commit -m "msg"         # -> "ok abc1234"
-mycelium git push                    # -> "ok main"
-mycelium git pull                    # -> "ok 3 files +10 -2"
-```
-
-### GitHub CLI
-```bash
-mycelium gh pr list                  # Compact PR listing
-mycelium gh pr view 42               # PR details + checks
-mycelium gh issue list               # Compact issue listing
-mycelium gh run list                 # Workflow run status
-```
-
-### Test Runners
-```bash
-mycelium test cargo test             # Show failures only (-90%)
-mycelium err npm run build           # Errors/warnings only
-mycelium vitest run                  # Vitest compact (failures only)
-mycelium playwright test             # E2E results (failures only)
-mycelium pytest                      # Python tests (-90%)
-mycelium go test                     # Go tests (NDJSON, -90%)
-mycelium cargo test                  # Cargo tests (-90%)
-```
-
-### Build & Lint
-```bash
-mycelium lint                        # ESLint grouped by rule/file
-mycelium lint biome                  # Supports other linters
-mycelium tsc                         # TypeScript errors grouped by file
-mycelium next build                  # Next.js build compact
-mycelium prettier --check .          # Files needing formatting
-mycelium cargo build                 # Cargo build (-80%)
-mycelium cargo clippy                # Cargo clippy (-80%)
-mycelium ruff check                  # Python linting (JSON, -80%)
-mycelium golangci-lint run           # Go linting (JSON, -85%)
-```
-
-### Package Managers
-```bash
-mycelium pnpm list                   # Compact dependency tree
-mycelium pip list                    # Python packages (auto-detect uv)
-mycelium pip outdated                # Outdated packages
-mycelium prisma generate             # Schema generation (no ASCII art)
-```
-
-### Containers
-```bash
-mycelium docker ps                   # Compact container list
-mycelium docker images               # Compact image list
-mycelium docker logs <container>     # Deduplicated logs
-mycelium docker compose ps           # Compose services
-mycelium kubectl pods                # Compact pod list
-mycelium kubectl logs <pod>          # Deduplicated logs
-mycelium kubectl services            # Compact service list
-```
-
-### Data & Analytics
-```bash
-mycelium json config.json            # Structure without values
-mycelium deps                        # Dependencies summary
-mycelium env -f AWS                  # Filtered env vars
-mycelium log app.log                 # Deduplicated logs
-mycelium curl <url>                  # Auto-detect JSON + schema
-mycelium wget <url>                  # Download, strip progress bars
-mycelium summary <long command>      # Heuristic summary
-mycelium proxy <command>             # Raw passthrough + tracking
-```
-
-### Token Savings Analytics
-```bash
-mycelium gain                        # Summary stats
-mycelium gain --graph                # ASCII graph (last 30 days)
-mycelium gain --history              # Recent command history
-mycelium gain --daily                # Day-by-day breakdown
-mycelium gain --all --format json    # JSON export for dashboards
-
-mycelium discover                    # Find missed savings opportunities
-mycelium discover --all --since 7    # All projects, last 7 days
-```
-
-## Global Flags
-
-```bash
--u, --ultra-compact    # ASCII icons, inline format (extra token savings)
--v, --verbose          # Increase verbosity (-v, -vv, -vvv)
-```
-
-## Examples
-
-Directory listing:
-```
-# ls -la (45 lines, ~800 tokens)        # mycelium ls (12 lines, ~150 tokens)
-drwxr-xr-x  15 user staff 480 ...       my-project/
--rw-r--r--   1 user staff 1234 ...       +-- src/ (8 files)
-...                                      |   +-- main.rs
-                                         +-- Cargo.toml
-```
-
-Git operations:
-```
-# git push (15 lines, ~200 tokens)       # mycelium git push (1 line, ~10 tokens)
-Enumerating objects: 5, done.             ok main
-Counting objects: 100% (5/5), done.
-Delta compression using up to 8 threads
-...
-```
-
-Test output:
-```
-# cargo test (200+ lines on failure)     # mycelium test cargo test (~20 lines)
-running 15 tests                          FAILED: 2/15 tests
-test utils::test_parse ... ok               test_edge_case: assertion failed
-test utils::test_format ... ok              test_overflow: panic at utils.rs:18
-...
-```
-
-## Auto-Rewrite Hook
-
-The hook transparently intercepts Bash commands and rewrites them to mycelium equivalents before execution. This provides 100% mycelium adoption across all conversations and subagents with zero token overhead.
-
-### Setup
-
-```bash
-mycelium init -g                 # Install hook + Mycelium.md (recommended)
-mycelium init -g --auto-patch    # Non-interactive (CI/CD)
-mycelium init -g --hook-only     # Hook only, no Mycelium.md
-mycelium init --show             # Verify installation
-```
-
-After install, **restart Claude Code**.
-
-### Commands Rewritten
-
-| Raw Command                                | Rewritten To              |
-|--------------------------------------------|---------------------------|
-| `git status/diff/log/add/commit/push/pull` | `mycelium git ...`        |
-| `gh pr/issue/run`                          | `mycelium gh ...`         |
-| `cargo test/build/clippy`                  | `mycelium cargo ...`      |
-| `cat/head/tail <file>`                     | `mycelium read <file>`    |
-| `rg/grep <pattern>`                        | `mycelium grep <pattern>` |
-| `ls`                                       | `mycelium ls`             |
-| `vitest/jest`                              | `mycelium vitest run`     |
-| `tsc`                                      | `mycelium tsc`            |
-| `eslint/biome`                             | `mycelium lint`           |
-| `prettier`                                 | `mycelium prettier`       |
-| `playwright`                               | `mycelium playwright`     |
-| `prisma`                                   | `mycelium prisma`         |
-| `ruff check/format`                        | `mycelium ruff ...`       |
-| `pytest`                                   | `mycelium pytest`         |
-| `pip list/install`                         | `mycelium pip ...`        |
-| `go test/build/vet`                        | `mycelium go ...`         |
-| `golangci-lint`                            | `mycelium golangci-lint`  |
-| `docker ps/images/logs`                    | `mycelium docker ...`     |
-| `kubectl get/logs`                         | `mycelium kubectl ...`    |
-| `curl`                                     | `mycelium curl`           |
-| `pnpm list/outdated`                       | `mycelium pnpm ...`       |
-| `atmos terraform/describe/validate/...`    | `mycelium atmos ...`      |
-
-Commands already using `mycelium`, heredocs (`<<`), and unrecognized commands pass through unchanged.
-
-## Configuration
-
-### Config File
-
-`~/.config/mycelium/config.toml` (macOS: `~/Library/Application Support/mycelium/config.toml`):
-
-```toml
-[tracking]
-database_path = "/path/to/custom.db"  # default: ~/.local/share/mycelium/history.db
-
-[hooks]
-exclude_commands = ["curl", "playwright"]  # skip rewrite for these
-
-[tee]
-enabled = true          # save raw output on failure (default: true)
-mode = "failures"       # "failures", "always", or "never"
-max_files = 20          # rotation limit
-
-[filter.adaptive]
-small_lines = 50        # outputs below this pass through unfiltered (default: 50)
-small_bytes = 2048      # byte threshold for passthrough (default: 2048)
-large_lines = 500       # outputs above this get full compression (default: 500)
-
-[filters.hyphae]
-# enabled = true   # Force on (default: auto-detect from PATH)
-# enabled = false  # Force off (never use Hyphae)
-
-[filters.rhizome]
-# enabled = true   # Force on (default: auto-detect from PATH)
-# enabled = false  # Force off (never use Rhizome)
-```
-
-### Releasing
-
-Use the release script to bump the version, run quality checks, and tag:
-
-```bash
-./scripts/release.sh v0.1.3
-```
-
-This will:
-1. Update `Cargo.toml` and `Cargo.lock` with the new version
-2. Run `cargo fmt --check`, `clippy`, and `test` as a gate
-3. Commit the version bump and create an annotated git tag
-4. Print the push command (does not push automatically)
-
-### Uninstall
-
-```bash
-mycelium init -g --uninstall     # Remove hook, Mycelium.md, settings.json entry
-cargo uninstall mycelium          # Remove binary
-```
-
-## Plugins
-
-Mycelium supports custom filter plugins for tools not built in. See [docs/PLUGINS.md](docs/PLUGINS.md) for the full guide.
-
-Shipped plugins (install with `./scripts/install-plugin.sh <name>`):
-- **atmos** — filters [Atmos](https://atmos.tools/) infrastructure orchestration output
+Mycelium is also the ecosystem orchestrator:
+- `mycelium init --ecosystem` — detects tools, registers MCP servers, installs hooks, initializes databases
+- Installs **Hyphae capture hooks** (errors, corrections, test results, code changes) into `~/.claude/hooks/`
+- Persistent Hyphae connection with auto-reconnect for large output chunking
+- Session summary hook captures task description, files modified, tools used, errors resolved
 
 ## Documentation
 
-- [FEATURES.md](docs/FEATURES.md) – Feature overview and savings summary
-- [COMMANDS.md](docs/COMMANDS.md) – Complete command reference (45+ commands)
-- [ANALYTICS.md](docs/ANALYTICS.md) – Analytics, hooks, configuration, tee system
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md) – Technical architecture
-- [EXTENDING.md](docs/EXTENDING.md) – Adding new commands, development patterns
-- [PLUGINS.md](docs/PLUGINS.md) – Write custom filter plugins
-- [COST_ANALYSIS.md](docs/COST_ANALYSIS.md) – Economics math and accuracy
-- [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) – Fix common issues
-- [INSTALL.md](INSTALL.md) – Detailed installation guide
-- [SECURITY.md](SECURITY.md) – Security policy and PR review process
-- [AUDIT_GUIDE.md](docs/AUDIT_GUIDE.md) – Token savings analytics guide
+- [FEATURES.md](docs/FEATURES.md) — Feature overview and savings summary
+- [COMMANDS.md](docs/COMMANDS.md) — Complete command reference (70+ commands)
+- [ANALYTICS.md](docs/ANALYTICS.md) — Token savings analytics and hooks
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) — Technical architecture
+- [EXTENDING.md](docs/EXTENDING.md) — Adding new commands
+- [PLUGINS.md](docs/PLUGINS.md) — Custom filter plugins
+- [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) — Common issues
+
+## License
+
+MIT
