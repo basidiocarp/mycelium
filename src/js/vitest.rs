@@ -98,8 +98,9 @@ impl OutputParser for VitestParser {
                         ParseResult::Degraded(result, vec![format!("JSON parse failed: {}", e)])
                     }
                     None => {
-                        // Tier 3: Passthrough
-                        ParseResult::Passthrough(truncate_output(input, 500))
+                        // Tier 3: Passthrough — use higher limit for test output
+                        // (failure messages need room)
+                        ParseResult::Passthrough(truncate_output(input, 4000))
                     }
                 }
             }
@@ -254,8 +255,15 @@ fn run_vitest(args: &[String], verbose: u8) -> Result<()> {
     let stderr = String::from_utf8_lossy(&output.stderr);
     let combined = format!("{}{}", stdout, stderr);
 
-    // Parse output using VitestParser
-    let parse_result = VitestParser::parse(&stdout);
+    // Parse output — try stdout first, fall back to combined (vitest may mix streams)
+    let parse_result = {
+        let r = VitestParser::parse(&stdout);
+        if matches!(r, ParseResult::Passthrough(_)) && !stderr.is_empty() {
+            VitestParser::parse(&combined)
+        } else {
+            r
+        }
+    };
     let mode = FormatMode::from_verbosity(verbose);
     let parse_tier: u8 = match &parse_result {
         ParseResult::Full(_) => 1,
