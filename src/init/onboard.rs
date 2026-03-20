@@ -282,7 +282,10 @@ fn build_missing_list<'a>(
         ));
     }
     if cap.is_none() {
-        missing.push(("cap", "git clone https://github.com/basidiocarp/cap && cd cap && npm i && npm run dev:all"));
+        missing.push((
+            "cap",
+            "git clone https://github.com/basidiocarp/cap && cd cap && npm i && npm run dev:all",
+        ));
     }
     missing
 }

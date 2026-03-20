@@ -233,7 +233,10 @@ pub fn run_ecosystem(client: Option<&str>, verbose: u8) -> Result<()> {
         ));
     }
     if cap_version.is_none() {
-        missing.push(("cap", "git clone https://github.com/basidiocarp/cap && cd cap && npm i && npm run dev:all"));
+        missing.push((
+            "cap",
+            "git clone https://github.com/basidiocarp/cap && cd cap && npm i && npm run dev:all",
+        ));
     }
 
     if !missing.is_empty() {
@@ -566,7 +569,9 @@ fn post_tool_use_hook_already_present(
         .filter_map(|entry| entry.get("hooks")?.as_array())
         .flatten()
         .filter_map(|hook| hook.get("command")?.as_str())
-        .any(|cmd| cmd == hook_command || (cmd.contains("capture-") && hook_command.contains("capture-")))
+        .any(|cmd| {
+            cmd == hook_command || (cmd.contains("capture-") && hook_command.contains("capture-"))
+        })
 }
 
 /// Deep-merge a PostToolUse hook entry into settings.json, preserving existing hooks.
@@ -618,7 +623,9 @@ fn print_tool_status(name: &str, version: Option<&str>) {
         }
         None => {
             let hint = match name {
-                "cap" => " (optional: git clone https://github.com/basidiocarp/cap && cd cap && npm i && npm run dev:all)",
+                "cap" => {
+                    " (optional: git clone https://github.com/basidiocarp/cap && cd cap && npm i && npm run dev:all)"
+                }
                 _ => "",
             };
             println!(
@@ -934,18 +941,11 @@ mod tests {
     #[test]
     fn test_insert_post_tool_use_hook_entry_empty() {
         let mut json = serde_json::json!({});
-        insert_post_tool_use_hook_entry(
-            &mut json,
-            "/test/capture-errors.js",
-            "Bash",
-        );
+        insert_post_tool_use_hook_entry(&mut json, "/test/capture-errors.js", "Bash");
 
         let post_tool_use = json["hooks"]["PostToolUse"].as_array().unwrap();
         assert_eq!(post_tool_use.len(), 1);
-        assert_eq!(
-            post_tool_use[0]["matcher"].as_str().unwrap(),
-            "Bash"
-        );
+        assert_eq!(post_tool_use[0]["matcher"].as_str().unwrap(), "Bash");
         assert_eq!(
             post_tool_use[0]["hooks"][0]["command"].as_str().unwrap(),
             "/test/capture-errors.js"
@@ -966,11 +966,7 @@ mod tests {
             }
         });
 
-        insert_post_tool_use_hook_entry(
-            &mut json,
-            "/test/capture-errors.js",
-            "Bash",
-        );
+        insert_post_tool_use_hook_entry(&mut json, "/test/capture-errors.js", "Bash");
 
         // Stop preserved
         assert!(json["hooks"]["Stop"].is_array());

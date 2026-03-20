@@ -5,10 +5,10 @@
 //! subsequent `store_output()` calls. If the subprocess crashes, a new one is
 //! automatically spawned on the next call.
 
-use anyhow::{anyhow, Context, Result, bail};
+use anyhow::{Context, Result, anyhow, bail};
 use serde::Deserialize;
 use std::io::{BufRead, BufReader, Write};
-use std::process::{Child, Command, Stdio, ChildStdout};
+use std::process::{Child, ChildStdout, Command, Stdio};
 use std::sync::{Mutex, MutexGuard};
 
 /// Summary returned by Hyphae after chunking command output.
@@ -36,8 +36,7 @@ struct HyphaeConnection {
 impl HyphaeConnection {
     /// Initialize persistent Hyphae MCP connection.
     fn init() -> Result<Self> {
-        let hyphae_bin = crate::hyphae::hyphae_binary()
-            .context("Hyphae binary not found")?;
+        let hyphae_bin = crate::hyphae::hyphae_binary().context("Hyphae binary not found")?;
 
         let mut child = Command::new(hyphae_bin)
             .arg("serve")
@@ -47,14 +46,14 @@ impl HyphaeConnection {
             .spawn()
             .context("Failed to spawn hyphae serve")?;
 
-        let stdout = child
-            .stdout
-            .take()
-            .context("Failed to get stdout pipe")?;
+        let stdout = child.stdout.take().context("Failed to get stdout pipe")?;
 
         let stdout_reader = BufReader::new(stdout);
 
-        Ok(HyphaeConnection { child, stdout_reader })
+        Ok(HyphaeConnection {
+            child,
+            stdout_reader,
+        })
     }
 
     /// Check if the child process is still running.
@@ -148,7 +147,9 @@ pub fn store_output(command: &str, output: &str, project: Option<&str>) -> Resul
     let mut guard = get_or_connect()?;
 
     // SAFETY: guard holds the lock and is Some after get_or_connect succeeds
-    let conn = guard.as_mut().expect("connection should exist after get_or_connect");
+    let conn = guard
+        .as_mut()
+        .expect("connection should exist after get_or_connect");
 
     match conn.call(&request) {
         Ok(response) => parse_response(&response),
@@ -173,8 +174,7 @@ fn build_request(command: &str, output: &str, project: &str) -> String {
         }),
     );
     // Use line-delimited format (not Content-Length) since hyphae uses that
-    serde_json::to_string(&request).expect("Request serialization cannot fail")
-        + "\n"
+    serde_json::to_string(&request).expect("Request serialization cannot fail") + "\n"
 }
 
 /// ─────────────────────────────────────────────────────────────────────────────
