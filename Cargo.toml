@@ -36,7 +36,7 @@ tempfile = "3"
 sha2 = "0.10"
 ureq = "3"
 strip-ansi-escapes = "0.2"
-spore = { git = "https://github.com/basidiocarp/spore", tag = "v0.1.0" }
+spore = { git = "https://github.com/basidiocarp/spore", tag = "v0.2.1" }
 
 [build-dependencies]
 clap = { version = "4", features = ["derive"] }
