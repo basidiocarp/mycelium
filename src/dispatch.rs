@@ -51,7 +51,7 @@ pub fn run_fallback(parse_error: clap::Error) -> Result<()> {
                             &raw,
                             &filtered,
                         );
-                        tracking::record_parse_failure_silent(&raw_command, &error_message, true);
+                        tracking::record_parse_failure_silent(&raw_command, &error_message, true, None);
                         print!("{}", filtered);
                         return Ok(());
                     }
@@ -79,14 +79,14 @@ pub fn run_fallback(parse_error: clap::Error) -> Result<()> {
         Ok(s) => {
             timer.track_passthrough(&raw_command, &format!("mycelium fallback: {}", raw_command));
 
-            tracking::record_parse_failure_silent(&raw_command, &error_message, true);
+            tracking::record_parse_failure_silent(&raw_command, &error_message, true, None);
 
             if !s.success() {
                 std::process::exit(s.code().unwrap_or(1));
             }
         }
         Err(e) => {
-            tracking::record_parse_failure_silent(&raw_command, &error_message, false);
+            tracking::record_parse_failure_silent(&raw_command, &error_message, false, None);
             // Command not found or other OS error — show Clap's original error
             eprintln!("[mycelium: fallback failed: {}]", e);
             parse_error.exit();
@@ -1036,7 +1036,7 @@ fn dispatch_gt_commands(command: GtCommands, verbose: u8) -> Result<()> {
 fn dispatch_init_commands(
     global: bool,
     show: bool,
-    claude_md: Option<String>,
+    claude_md: bool,
     hook_only: bool,
     ecosystem: bool,
     onboard: bool,
