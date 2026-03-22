@@ -2,6 +2,21 @@
 
 All notable changes to Mycelium are documented in this file.
 
+## v0.4.5 - 2026-03-22
+
+### Fixed
+
+- **Plugin PID race condition**: Timeout thread now checks a cancellation flag before sending SIGTERM, preventing signals to recycled PIDs.
+- **Plugin ownership check**: Replaced unreliable `$UID` environment variable with `libc::getuid()` for correct user detection in all shell contexts.
+- **smart_truncate count**: Omission markers now report the actual section size instead of total remaining lines.
+
+### Changed
+
+- **dispatch() refactor**: Decomposed 852-line monolithic function into 13 per-family helpers (git, gh, cargo, docker, etc.).
+- **Tracker reuse**: `record_parse_failure_silent` accepts optional `&Tracker` to avoid double SQLite opens on fallback paths.
+- **Deprecated hooks removed**: JS/shell capture hooks replaced by cortina (v0.4.4).
+- **Spore v0.4.0**: Self-update and token estimation use shared spore modules.
+
 ## v0.3.2
 
 ### Features
