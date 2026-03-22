@@ -723,7 +723,7 @@ dependencies = [
 
 [[package]]
 name = "mycelium"
-version = "0.4.3"
+version = "0.4.5"
 dependencies = [
  "anyhow",
  "clap",
@@ -1112,8 +1112,8 @@ checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 
 [[package]]
 name = "spore"
-version = "0.3.0"
-source = "git+https://github.com/basidiocarp/spore?tag=v0.3.0#58c4d5e099dc58abd2e3290364ef2b18dac4aef1"
+version = "0.4.0"
+source = "git+https://github.com/basidiocarp/spore?tag=v0.4.0#bd4843d2797f5918c9b6927bad42f98a23e34592"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1121,6 +1121,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+ "thiserror",
  "toml 0.8.23",
  "tracing",
  "tracing-subscriber",

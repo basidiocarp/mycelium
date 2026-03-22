@@ -1051,9 +1051,16 @@ fn dispatch_init_commands(
     } else if uninstall {
         init::uninstall(global, verbose)?;
     } else if onboard {
-        init::run_onboard(verbose)?;
+        eprintln!("[!] Onboarding has moved to stipe.");
+        eprintln!("    Run: stipe init");
+        std::process::exit(1);
     } else if ecosystem {
-        init::run_ecosystem(client.as_deref(), verbose)?;
+        eprintln!("[!] Ecosystem setup has moved to stipe.");
+        eprintln!("    Run: stipe init");
+        if let Some(c) = client {
+            eprintln!("    or: stipe init --client {}", c);
+        }
+        std::process::exit(1);
     } else {
         let patch_mode = if auto_patch {
             init::PatchMode::Auto
