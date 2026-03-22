@@ -460,7 +460,7 @@ pub fn smart_truncate(content: &str, max_lines: usize, _lang: &Language) -> Stri
 
     let mut result = Vec::with_capacity(max_lines);
     let mut kept_lines = 0;
-    let mut skipped_section = false;
+    let mut skipped_count = 0;
 
     for line in &lines {
         let trimmed = line.trim();
@@ -474,17 +474,16 @@ pub fn smart_truncate(content: &str, max_lines: usize, _lang: &Language) -> Stri
             || trimmed == "{";
 
         if is_important || kept_lines < max_lines / 2 {
-            if skipped_section {
-                result.push(format!(
-                    "    // ... {} lines omitted",
-                    lines.len() - kept_lines
-                ));
-                skipped_section = false;
+            // Emit omission marker when transitioning from skip to keep
+            if skipped_count > 0 {
+                result.push(format!("    // ... {} lines omitted", skipped_count));
+                skipped_count = 0;
             }
             result.push((*line).to_string());
             kept_lines += 1;
         } else {
-            skipped_section = true;
+            // Track each skipped line
+            skipped_count += 1;
         }
 
         if kept_lines >= max_lines - 1 {
@@ -492,10 +491,12 @@ pub fn smart_truncate(content: &str, max_lines: usize, _lang: &Language) -> Stri
         }
     }
 
-    if skipped_section || kept_lines < lines.len() {
+    // Emit final summary line if we skipped anything or reached the limit
+    if skipped_count > 0 || kept_lines < lines.len() {
+        let remaining = lines.len() - result.len();
         result.push(format!(
             "// ... {} more lines (total: {})",
-            lines.len() - kept_lines,
+            remaining,
             lines.len()
         ));
     }

@@ -229,7 +229,6 @@ pub fn run_ecosystem(client: Option<&str>, verbose: u8) -> Result<()> {
     Ok(())
 }
 
-
 /// Print a single tool's status line.
 fn print_tool_status(name: &str, version: Option<&str>) {
     match version {
@@ -399,5 +398,4 @@ mod tests {
     fn test_claude_is_available_does_not_panic() {
         let _result = claude_is_available();
     }
-
 }

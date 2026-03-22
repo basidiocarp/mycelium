@@ -111,6 +111,9 @@ pub fn dispatch(cli: Cli) -> Result<()> {
     }
 
     match cli.command {
+        // ─────────────────────────────────────────────────────────────────────────────
+        // File Operations
+        // ─────────────────────────────────────────────────────────────────────────────
         Commands::Ls { args } => {
             ls_cmd::run(&args, cli.verbose)?;
         }
@@ -140,6 +143,9 @@ pub fn dispatch(cli: Cli) -> Result<()> {
             local_llm::run(&file, &model, force_download, cli.verbose)?;
         }
 
+        // ─────────────────────────────────────────────────────────────────────────────
+        // Git Commands
+        // ─────────────────────────────────────────────────────────────────────────────
         Commands::Git {
             directory,
             config_override,
@@ -151,201 +157,30 @@ pub fn dispatch(cli: Cli) -> Result<()> {
             literal_pathspecs,
             command,
         } => {
-            // Build global git args (inserted between "git" and subcommand)
-            let mut global_args: Vec<String> = Vec::new();
-            for dir in &directory {
-                global_args.push("-C".to_string());
-                global_args.push(dir.clone());
-            }
-            for cfg in &config_override {
-                global_args.push("-c".to_string());
-                global_args.push(cfg.clone());
-            }
-            if let Some(ref dir) = git_dir {
-                global_args.push("--git-dir".to_string());
-                global_args.push(dir.clone());
-            }
-            if let Some(ref tree) = work_tree {
-                global_args.push("--work-tree".to_string());
-                global_args.push(tree.clone());
-            }
-            if no_pager {
-                global_args.push("--no-pager".to_string());
-            }
-            if no_optional_locks {
-                global_args.push("--no-optional-locks".to_string());
-            }
-            if bare {
-                global_args.push("--bare".to_string());
-            }
-            if literal_pathspecs {
-                global_args.push("--literal-pathspecs".to_string());
-            }
-
-            match command {
-                GitCommands::Diff { args } => {
-                    git::run(
-                        git::GitCommand::Diff,
-                        &args,
-                        None,
-                        cli.verbose,
-                        &global_args,
-                    )?;
-                }
-                GitCommands::Log { args } => {
-                    git::run(git::GitCommand::Log, &args, None, cli.verbose, &global_args)?;
-                }
-                GitCommands::Status { args } => {
-                    git::run(
-                        git::GitCommand::Status,
-                        &args,
-                        None,
-                        cli.verbose,
-                        &global_args,
-                    )?;
-                }
-                GitCommands::Show { args } => {
-                    git::run(
-                        git::GitCommand::Show,
-                        &args,
-                        None,
-                        cli.verbose,
-                        &global_args,
-                    )?;
-                }
-                GitCommands::Add { args } => {
-                    git::run(git::GitCommand::Add, &args, None, cli.verbose, &global_args)?;
-                }
-                GitCommands::Commit { args } => {
-                    git::run(
-                        git::GitCommand::Commit,
-                        &args,
-                        None,
-                        cli.verbose,
-                        &global_args,
-                    )?;
-                }
-                GitCommands::Push { args } => {
-                    git::run(
-                        git::GitCommand::Push,
-                        &args,
-                        None,
-                        cli.verbose,
-                        &global_args,
-                    )?;
-                }
-                GitCommands::Pull { args } => {
-                    git::run(
-                        git::GitCommand::Pull,
-                        &args,
-                        None,
-                        cli.verbose,
-                        &global_args,
-                    )?;
-                }
-                GitCommands::Branch { args } => {
-                    git::run(
-                        git::GitCommand::Branch,
-                        &args,
-                        None,
-                        cli.verbose,
-                        &global_args,
-                    )?;
-                }
-                GitCommands::Fetch { args } => {
-                    git::run(
-                        git::GitCommand::Fetch,
-                        &args,
-                        None,
-                        cli.verbose,
-                        &global_args,
-                    )?;
-                }
-                GitCommands::Stash { subcommand, args } => {
-                    git::run(
-                        git::GitCommand::Stash { subcommand },
-                        &args,
-                        None,
-                        cli.verbose,
-                        &global_args,
-                    )?;
-                }
-                GitCommands::Worktree { args } => {
-                    git::run(
-                        git::GitCommand::Worktree,
-                        &args,
-                        None,
-                        cli.verbose,
-                        &global_args,
-                    )?;
-                }
-                GitCommands::Other(args) => {
-                    git::run_passthrough(&args, &global_args, cli.verbose)?;
-                }
-            }
+            dispatch_git_commands(
+                directory,
+                config_override,
+                git_dir,
+                work_tree,
+                no_pager,
+                no_optional_locks,
+                bare,
+                literal_pathspecs,
+                command,
+                cli.verbose,
+            )?;
         }
 
-        Commands::Gh { command } => match command {
-            GhCommands::Pr { command } => {
-                let (sub, raw_args) = match command {
-                    GhPrCommands::List { args } => ("list", args),
-                    GhPrCommands::View { args } => ("view", args),
-                    GhPrCommands::Checks { args } => ("checks", args),
-                    GhPrCommands::Status { args } => ("status", args),
-                    GhPrCommands::Create { args } => ("create", args),
-                    GhPrCommands::Merge { args } => ("merge", args),
-                    GhPrCommands::Diff { args } => ("diff", args),
-                    GhPrCommands::Comment { args } => ("comment", args),
-                    GhPrCommands::Edit { args } => ("edit", args),
-                    GhPrCommands::Other(args) => {
-                        let borrowed: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-                        gh_cmd::run_passthrough_gh(&borrowed, cli.verbose)?;
-                        return Ok(());
-                    }
-                };
-                let borrowed: Vec<&str> = raw_args.iter().map(|s| s.as_str()).collect();
-                gh_cmd::run_pr(sub, &borrowed, cli.verbose, cli.ultra_compact)?;
-            }
-            GhCommands::Issue { command } => {
-                let (sub, raw_args) = match command {
-                    GhIssueCommands::List { args } => ("list", args),
-                    GhIssueCommands::View { args } => ("view", args),
-                    GhIssueCommands::Other(args) => {
-                        let borrowed: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-                        gh_cmd::run_passthrough_gh(&borrowed, cli.verbose)?;
-                        return Ok(());
-                    }
-                };
-                let borrowed: Vec<&str> = raw_args.iter().map(|s| s.as_str()).collect();
-                gh_cmd::run_issue(sub, &borrowed, cli.verbose)?;
-            }
-            GhCommands::Run { command } => {
-                let (sub, raw_args) = match command {
-                    GhRunCommands::List { args } => ("list", args),
-                    GhRunCommands::View { args } => ("view", args),
-                    GhRunCommands::Other(args) => {
-                        let borrowed: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-                        gh_cmd::run_passthrough_gh(&borrowed, cli.verbose)?;
-                        return Ok(());
-                    }
-                };
-                let borrowed: Vec<&str> = raw_args.iter().map(|s| s.as_str()).collect();
-                gh_cmd::run_run(sub, &borrowed, cli.verbose, cli.ultra_compact)?;
-            }
-            GhCommands::Repo { args } => {
-                let borrowed: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-                gh_cmd::run_repo(&borrowed, cli.verbose, cli.ultra_compact)?;
-            }
-            GhCommands::Api { args } => {
-                let borrowed: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-                gh_cmd::run_api(&borrowed, cli.verbose)?;
-            }
-            GhCommands::Other(args) => {
-                let borrowed: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-                gh_cmd::run_passthrough_gh(&borrowed, cli.verbose)?;
-            }
-        },
+        // ─────────────────────────────────────────────────────────────────────────────
+        // GitHub Commands
+        // ─────────────────────────────────────────────────────────────────────────────
+        Commands::Gh { command } => {
+            dispatch_gh_commands(command, cli.verbose, cli.ultra_compact)?;
+        }
 
+        // ─────────────────────────────────────────────────────────────────────────────
+        // AWS Commands
+        // ─────────────────────────────────────────────────────────────────────────────
         Commands::Aws { command } => match command {
             AwsCommands::Sts { args } => aws_cmd::run_sts(&args, cli.verbose)?,
             AwsCommands::S3 { args } => aws_cmd::run_s3(&args, cli.verbose)?,
@@ -369,33 +204,110 @@ pub fn dispatch(cli: Cli) -> Result<()> {
             psql_cmd::run(&args, cli.verbose)?;
         }
 
-        Commands::Pnpm { command } => match command {
-            PnpmCommands::List { depth, args } => {
-                js::pnpm::run(js::pnpm::PnpmCommand::List { depth }, &args, cli.verbose)?;
-            }
-            PnpmCommands::Outdated { args } => {
-                js::pnpm::run(js::pnpm::PnpmCommand::Outdated, &args, cli.verbose)?;
-            }
-            PnpmCommands::Install { packages } => {
-                let (pkg_list, extra_args): (Vec<String>, Vec<String>) =
-                    packages.into_iter().partition(|a| !a.starts_with('-'));
-                js::pnpm::run(
-                    js::pnpm::PnpmCommand::Install { packages: pkg_list },
-                    &extra_args,
-                    cli.verbose,
-                )?;
-            }
-            PnpmCommands::Build { args } => {
-                js::next::run(&args, cli.verbose)?;
-            }
-            PnpmCommands::Typecheck { args } => {
-                js::tsc::run(&args, cli.verbose)?;
-            }
-            PnpmCommands::Other(args) => {
-                js::pnpm::run_passthrough(&args, cli.verbose)?;
+        // ─────────────────────────────────────────────────────────────────────────────
+        // JavaScript/Node Commands
+        // ─────────────────────────────────────────────────────────────────────────────
+        Commands::Pnpm { command } => {
+            dispatch_pnpm_commands(command, cli.verbose)?;
+        }
+
+        Commands::Vitest { command } => match command {
+            VitestCommands::Run { args } => {
+                js::vitest::run(js::vitest::VitestCommand::Run, &args, cli.verbose)?;
             }
         },
 
+        Commands::Prisma { command } => {
+            dispatch_prisma_commands(command, cli.verbose)?;
+        }
+
+        Commands::Tsc { args } => {
+            js::tsc::run(&args, cli.verbose)?;
+        }
+
+        Commands::Next { args } => {
+            js::next::run(&args, cli.verbose)?;
+        }
+
+        Commands::Lint { args } => {
+            lint_cmd::run(&args, cli.verbose)?;
+        }
+
+        Commands::Prettier { args } => {
+            js::prettier::run(&args, cli.verbose)?;
+        }
+
+        Commands::Format { args } => {
+            format_cmd::run(&args, cli.verbose)?;
+        }
+
+        Commands::Playwright { args } => {
+            js::playwright::run(&args, cli.verbose)?;
+        }
+
+        Commands::Npm { args } => {
+            js::npm::run(&args, cli.verbose, cli.skip_env)?;
+        }
+
+        Commands::Npx { ref args } => {
+            dispatch_npx(args, &cli)?;
+        }
+
+        // ─────────────────────────────────────────────────────────────────────────────
+        // Cargo Commands
+        // ─────────────────────────────────────────────────────────────────────────────
+        Commands::Cargo { command } => {
+            dispatch_cargo_commands(command, cli.verbose)?;
+        }
+
+        // ─────────────────────────────────────────────────────────────────────────────
+        // Container Commands
+        // ─────────────────────────────────────────────────────────────────────────────
+        Commands::Docker { command } => {
+            dispatch_docker_commands(command, cli.verbose)?;
+        }
+
+        Commands::Kubectl { command } => {
+            dispatch_kubectl_commands(command, cli.verbose)?;
+        }
+
+        // ─────────────────────────────────────────────────────────────────────────────
+        // Python Commands
+        // ─────────────────────────────────────────────────────────────────────────────
+        Commands::Ruff { command } => {
+            dispatch_ruff_commands(command, cli.verbose)?;
+        }
+
+        Commands::Pytest { args } => {
+            python::pytest::run(&args, cli.verbose)?;
+        }
+
+        Commands::Mypy { args } => {
+            python::mypy::run(&args, cli.verbose)?;
+        }
+
+        Commands::Pip { command } => {
+            dispatch_pip_commands(command, cli.verbose)?;
+        }
+
+        // ─────────────────────────────────────────────────────────────────────────────
+        // Go Commands
+        // ─────────────────────────────────────────────────────────────────────────────
+        Commands::Go { command } => {
+            dispatch_go_commands(command, cli.verbose)?;
+        }
+
+        Commands::GolangciLint { args } => {
+            go_eco::golangci::run(&args, cli.verbose)?;
+        }
+
+        Commands::Gt { command } => {
+            dispatch_gt_commands(command, cli.verbose)?;
+        }
+
+        // ─────────────────────────────────────────────────────────────────────────────
+        // Analysis & Utility Commands
+        // ─────────────────────────────────────────────────────────────────────────────
         Commands::Err { command } => {
             let cmd = command.join(" ");
             runner_cmd::run_err(&cmd, cli.verbose)?;
@@ -442,73 +354,6 @@ pub fn dispatch(cli: Cli) -> Result<()> {
             }
         }
 
-        Commands::Docker { command } => match command {
-            DockerCommands::Ps => {
-                container_cmd::run(container_cmd::ContainerCmd::DockerPs, &[], cli.verbose)?;
-            }
-            DockerCommands::Images => {
-                container_cmd::run(container_cmd::ContainerCmd::DockerImages, &[], cli.verbose)?;
-            }
-            DockerCommands::Logs { container: c } => {
-                container_cmd::run(container_cmd::ContainerCmd::DockerLogs, &[c], cli.verbose)?;
-            }
-            DockerCommands::Compose { command: compose } => match compose {
-                ComposeCommands::Ps => {
-                    container_cmd::run_compose_ps(cli.verbose)?;
-                }
-                ComposeCommands::Logs { service } => {
-                    container_cmd::run_compose_logs(service.as_deref(), cli.verbose)?;
-                }
-                ComposeCommands::Build { service } => {
-                    container_cmd::run_compose_build(service.as_deref(), cli.verbose)?;
-                }
-                ComposeCommands::Other(args) => {
-                    container_cmd::run_compose_passthrough(&args, cli.verbose)?;
-                }
-            },
-            DockerCommands::Other(args) => {
-                container_cmd::run_docker_passthrough(&args, cli.verbose)?;
-            }
-        },
-
-        Commands::Kubectl { command } => match command {
-            KubectlCommands::Pods { namespace, all } => {
-                let mut args: Vec<String> = Vec::new();
-                if all {
-                    args.push("-A".to_string());
-                } else if let Some(n) = namespace {
-                    args.push("-n".to_string());
-                    args.push(n);
-                }
-                container_cmd::run(container_cmd::ContainerCmd::KubectlPods, &args, cli.verbose)?;
-            }
-            KubectlCommands::Services { namespace, all } => {
-                let mut args: Vec<String> = Vec::new();
-                if all {
-                    args.push("-A".to_string());
-                } else if let Some(n) = namespace {
-                    args.push("-n".to_string());
-                    args.push(n);
-                }
-                container_cmd::run(
-                    container_cmd::ContainerCmd::KubectlServices,
-                    &args,
-                    cli.verbose,
-                )?;
-            }
-            KubectlCommands::Logs { pod, container: c } => {
-                let mut args = vec![pod];
-                if let Some(cont) = c {
-                    args.push("-c".to_string());
-                    args.push(cont);
-                }
-                container_cmd::run(container_cmd::ContainerCmd::KubectlLogs, &args, cli.verbose)?;
-            }
-            KubectlCommands::Other(args) => {
-                container_cmd::run_kubectl_passthrough(&args, cli.verbose)?;
-            }
-        },
-
         Commands::Summary { command } => {
             let cmd = command.join(" ");
             summary_cmd::run(&cmd, cli.verbose)?;
@@ -536,36 +381,8 @@ pub fn dispatch(cli: Cli) -> Result<()> {
             )?;
         }
 
-        Commands::Init {
-            global,
-            show,
-            claude_md,
-            hook_only,
-            ecosystem,
-            onboard,
-            client,
-            auto_patch,
-            no_patch,
-            uninstall,
-        } => {
-            if show {
-                init::show_config()?;
-            } else if uninstall {
-                init::uninstall(global, cli.verbose)?;
-            } else if onboard {
-                init::run_onboard(cli.verbose)?;
-            } else if ecosystem {
-                init::run_ecosystem(client.as_deref(), cli.verbose)?;
-            } else {
-                let patch_mode = if auto_patch {
-                    init::PatchMode::Auto
-                } else if no_patch {
-                    init::PatchMode::Skip
-                } else {
-                    init::PatchMode::Ask
-                };
-                init::run(global, claude_md, hook_only, patch_mode, cli.verbose)?;
-            }
+        Commands::Curl { args } => {
+            curl_cmd::run(&args, cli.verbose)?;
         }
 
         Commands::Wget { url, stdout, args } => {
@@ -578,6 +395,36 @@ pub fn dispatch(cli: Cli) -> Result<()> {
 
         Commands::Wc { args } => {
             wc_cmd::run(&args, cli.verbose)?;
+        }
+
+        // ─────────────────────────────────────────────────────────────────────────────
+        // Meta & Configuration Commands
+        // ─────────────────────────────────────────────────────────────────────────────
+        Commands::Init {
+            global,
+            show,
+            claude_md,
+            hook_only,
+            ecosystem,
+            onboard,
+            client,
+            auto_patch,
+            no_patch,
+            uninstall,
+        } => {
+            dispatch_init_commands(
+                global,
+                show,
+                claude_md,
+                hook_only,
+                ecosystem,
+                onboard,
+                client,
+                auto_patch,
+                no_patch,
+                uninstall,
+                cli.verbose,
+            )?;
         }
 
         Commands::Gain {
@@ -638,106 +485,6 @@ pub fn dispatch(cli: Cli) -> Result<()> {
             }
         }
 
-        Commands::Vitest { command } => match command {
-            VitestCommands::Run { args } => {
-                js::vitest::run(js::vitest::VitestCommand::Run, &args, cli.verbose)?;
-            }
-        },
-
-        Commands::Prisma { command } => match command {
-            PrismaCommands::Generate { args } => {
-                js::prisma::run(js::prisma::PrismaCommand::Generate, &args, cli.verbose)?;
-            }
-            PrismaCommands::Migrate { command } => match command {
-                PrismaMigrateCommands::Dev { name, args } => {
-                    js::prisma::run(
-                        js::prisma::PrismaCommand::Migrate {
-                            subcommand: js::prisma::MigrateSubcommand::Dev { name },
-                        },
-                        &args,
-                        cli.verbose,
-                    )?;
-                }
-                PrismaMigrateCommands::Status { args } => {
-                    js::prisma::run(
-                        js::prisma::PrismaCommand::Migrate {
-                            subcommand: js::prisma::MigrateSubcommand::Status,
-                        },
-                        &args,
-                        cli.verbose,
-                    )?;
-                }
-                PrismaMigrateCommands::Deploy { args } => {
-                    js::prisma::run(
-                        js::prisma::PrismaCommand::Migrate {
-                            subcommand: js::prisma::MigrateSubcommand::Deploy,
-                        },
-                        &args,
-                        cli.verbose,
-                    )?;
-                }
-            },
-            PrismaCommands::DbPush { args } => {
-                js::prisma::run(js::prisma::PrismaCommand::DbPush, &args, cli.verbose)?;
-            }
-        },
-
-        Commands::Tsc { args } => {
-            js::tsc::run(&args, cli.verbose)?;
-        }
-
-        Commands::Next { args } => {
-            js::next::run(&args, cli.verbose)?;
-        }
-
-        Commands::Lint { args } => {
-            lint_cmd::run(&args, cli.verbose)?;
-        }
-
-        Commands::Prettier { args } => {
-            js::prettier::run(&args, cli.verbose)?;
-        }
-
-        Commands::Format { args } => {
-            format_cmd::run(&args, cli.verbose)?;
-        }
-
-        Commands::Playwright { args } => {
-            js::playwright::run(&args, cli.verbose)?;
-        }
-
-        Commands::Cargo { command } => match command {
-            CargoCommands::Build { args } => {
-                cargo_cmd::run(cargo_cmd::CargoCommand::Build, &args, cli.verbose)?;
-            }
-            CargoCommands::Test { args } => {
-                cargo_cmd::run(cargo_cmd::CargoCommand::Test, &args, cli.verbose)?;
-            }
-            CargoCommands::Clippy { args } => {
-                cargo_cmd::run(cargo_cmd::CargoCommand::Clippy, &args, cli.verbose)?;
-            }
-            CargoCommands::Check { args } => {
-                cargo_cmd::run(cargo_cmd::CargoCommand::Check, &args, cli.verbose)?;
-            }
-            CargoCommands::Install { args } => {
-                cargo_cmd::run(cargo_cmd::CargoCommand::Install, &args, cli.verbose)?;
-            }
-            CargoCommands::Nextest { args } => {
-                cargo_cmd::run(cargo_cmd::CargoCommand::Nextest, &args, cli.verbose)?;
-            }
-            CargoCommands::Other(args) => {
-                cargo_cmd::run_passthrough(&args, cli.verbose)?;
-            }
-        },
-
-        Commands::Npm { args } => {
-            js::npm::run(&args, cli.verbose, cli.skip_env)?;
-        }
-
-        Commands::Curl { args } => {
-            curl_cmd::run(&args, cli.verbose)?;
-        }
-
         Commands::Discover {
             project,
             limit,
@@ -784,104 +531,8 @@ pub fn dispatch(cli: Cli) -> Result<()> {
             )?;
         }
 
-        Commands::Npx { ref args } => {
-            dispatch_npx(args, &cli)?;
-        }
-
-        Commands::Ruff { command } => match command {
-            RuffCommands::Check { args } => {
-                python::ruff::run_check(&args, cli.verbose)?;
-            }
-            RuffCommands::Format { args } => {
-                python::ruff::run_format(&args, cli.verbose)?;
-            }
-            RuffCommands::Other(raw) => {
-                let args: Vec<String> = raw
-                    .iter()
-                    .map(|a| a.to_string_lossy().into_owned())
-                    .collect();
-                let looks_like_path = args
-                    .first()
-                    .map(|a| !a.starts_with('-') && a != "version" && a != "rule" && a != "help")
-                    .unwrap_or(false);
-                if looks_like_path {
-                    python::ruff::run_check(&args, cli.verbose)?;
-                } else {
-                    python::ruff::run_passthrough(&args, cli.verbose)?;
-                }
-            }
-        },
-
-        Commands::Pytest { args } => {
-            python::pytest::run(&args, cli.verbose)?;
-        }
-
-        Commands::Mypy { args } => {
-            python::mypy::run(&args, cli.verbose)?;
-        }
-
-        Commands::Pip { command } => match command {
-            PipCommands::List { args } => {
-                python::pip::run_list(&args, cli.verbose)?;
-            }
-            PipCommands::Outdated { args } => {
-                python::pip::run_outdated(&args, cli.verbose)?;
-            }
-            PipCommands::Install { args } => {
-                python::pip::run_install(&args, cli.verbose)?;
-            }
-            PipCommands::Uninstall { args } => {
-                python::pip::run_uninstall(&args, cli.verbose)?;
-            }
-            PipCommands::Show { args } => {
-                python::pip::run_show(&args, cli.verbose)?;
-            }
-            PipCommands::Other(args) => {
-                python::pip::run_other(&args, cli.verbose)?;
-            }
-        },
-
-        Commands::Go { command } => match command {
-            GoCommands::Test { args } => {
-                go_eco::commands::run_test(&args, cli.verbose)?;
-            }
-            GoCommands::Build { args } => {
-                go_eco::commands::run_build(&args, cli.verbose)?;
-            }
-            GoCommands::Vet { args } => {
-                go_eco::commands::run_vet(&args, cli.verbose)?;
-            }
-            GoCommands::Other(args) => {
-                go_eco::commands::run_other(&args, cli.verbose)?;
-            }
-        },
-
-        Commands::Gt { command } => match command {
-            GtCommands::Log { args } => {
-                gt_cmd::run_log(&args, cli.verbose)?;
-            }
-            GtCommands::Submit { args } => {
-                gt_cmd::run_submit(&args, cli.verbose)?;
-            }
-            GtCommands::Sync { args } => {
-                gt_cmd::run_sync(&args, cli.verbose)?;
-            }
-            GtCommands::Restack { args } => {
-                gt_cmd::run_restack(&args, cli.verbose)?;
-            }
-            GtCommands::Create { args } => {
-                gt_cmd::run_create(&args, cli.verbose)?;
-            }
-            GtCommands::Branch { args } => {
-                gt_cmd::run_branch(&args, cli.verbose)?;
-            }
-            GtCommands::Other(args) => {
-                gt_cmd::run_other(&args, cli.verbose)?;
-            }
-        },
-
-        Commands::GolangciLint { args } => {
-            go_eco::golangci::run(&args, cli.verbose)?;
+        Commands::Terraform { command } => {
+            dispatch_terraform_commands(command, cli.verbose)?;
         }
 
         Commands::HookAudit { since } => {
@@ -906,27 +557,6 @@ pub fn dispatch(cli: Cli) -> Result<()> {
 
         Commands::Completions { shell } => completions_cmd::run(&shell)?,
 
-        Commands::Terraform { command } => match command {
-            TerraformCommands::Plan { args } => {
-                terraform_cmd::run_plan(&args, cli.verbose)?;
-            }
-            TerraformCommands::Apply { args } => {
-                terraform_cmd::run_apply(&args, cli.verbose)?;
-            }
-            TerraformCommands::Init { args } => {
-                terraform_cmd::run_init(&args, cli.verbose)?;
-            }
-            TerraformCommands::Other(args) => {
-                terraform_cmd::run_passthrough(
-                    &args
-                        .iter()
-                        .map(|s| s.to_string_lossy().to_string())
-                        .collect::<Vec<_>>(),
-                    cli.verbose,
-                )?;
-            }
-        },
-
         Commands::SelfUpdate { check } => self_update_cmd::run(check)?,
 
         Commands::Benchmark { ci } => {
@@ -945,6 +575,520 @@ pub fn dispatch(cli: Cli) -> Result<()> {
                 }
             }
         },
+    }
+
+    Ok(())
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helper Dispatch Functions (Organized by Command Family)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Route git subcommands to git::run with global arguments.
+fn dispatch_git_commands(
+    directory: Vec<String>,
+    config_override: Vec<String>,
+    git_dir: Option<String>,
+    work_tree: Option<String>,
+    no_pager: bool,
+    no_optional_locks: bool,
+    bare: bool,
+    literal_pathspecs: bool,
+    command: GitCommands,
+    verbose: u8,
+) -> Result<()> {
+    // Build global git args (inserted between "git" and subcommand)
+    let mut global_args: Vec<String> = Vec::new();
+    for dir in &directory {
+        global_args.push("-C".to_string());
+        global_args.push(dir.clone());
+    }
+    for cfg in &config_override {
+        global_args.push("-c".to_string());
+        global_args.push(cfg.clone());
+    }
+    if let Some(ref dir) = git_dir {
+        global_args.push("--git-dir".to_string());
+        global_args.push(dir.clone());
+    }
+    if let Some(ref tree) = work_tree {
+        global_args.push("--work-tree".to_string());
+        global_args.push(tree.clone());
+    }
+    if no_pager {
+        global_args.push("--no-pager".to_string());
+    }
+    if no_optional_locks {
+        global_args.push("--no-optional-locks".to_string());
+    }
+    if bare {
+        global_args.push("--bare".to_string());
+    }
+    if literal_pathspecs {
+        global_args.push("--literal-pathspecs".to_string());
+    }
+
+    match command {
+        GitCommands::Diff { args } => {
+            git::run(git::GitCommand::Diff, &args, None, verbose, &global_args)?;
+        }
+        GitCommands::Log { args } => {
+            git::run(git::GitCommand::Log, &args, None, verbose, &global_args)?;
+        }
+        GitCommands::Status { args } => {
+            git::run(git::GitCommand::Status, &args, None, verbose, &global_args)?;
+        }
+        GitCommands::Show { args } => {
+            git::run(git::GitCommand::Show, &args, None, verbose, &global_args)?;
+        }
+        GitCommands::Add { args } => {
+            git::run(git::GitCommand::Add, &args, None, verbose, &global_args)?;
+        }
+        GitCommands::Commit { args } => {
+            git::run(git::GitCommand::Commit, &args, None, verbose, &global_args)?;
+        }
+        GitCommands::Push { args } => {
+            git::run(git::GitCommand::Push, &args, None, verbose, &global_args)?;
+        }
+        GitCommands::Pull { args } => {
+            git::run(git::GitCommand::Pull, &args, None, verbose, &global_args)?;
+        }
+        GitCommands::Branch { args } => {
+            git::run(git::GitCommand::Branch, &args, None, verbose, &global_args)?;
+        }
+        GitCommands::Fetch { args } => {
+            git::run(git::GitCommand::Fetch, &args, None, verbose, &global_args)?;
+        }
+        GitCommands::Stash { subcommand, args } => {
+            git::run(
+                git::GitCommand::Stash { subcommand },
+                &args,
+                None,
+                verbose,
+                &global_args,
+            )?;
+        }
+        GitCommands::Worktree { args } => {
+            git::run(
+                git::GitCommand::Worktree,
+                &args,
+                None,
+                verbose,
+                &global_args,
+            )?;
+        }
+        GitCommands::Other(args) => {
+            git::run_passthrough(&args, &global_args, verbose)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Route GitHub CLI commands (pr, issue, run, repo, api, etc).
+fn dispatch_gh_commands(command: GhCommands, verbose: u8, ultra_compact: bool) -> Result<()> {
+    match command {
+        GhCommands::Pr { command } => {
+            let (sub, raw_args) = match command {
+                GhPrCommands::List { args } => ("list", args),
+                GhPrCommands::View { args } => ("view", args),
+                GhPrCommands::Checks { args } => ("checks", args),
+                GhPrCommands::Status { args } => ("status", args),
+                GhPrCommands::Create { args } => ("create", args),
+                GhPrCommands::Merge { args } => ("merge", args),
+                GhPrCommands::Diff { args } => ("diff", args),
+                GhPrCommands::Comment { args } => ("comment", args),
+                GhPrCommands::Edit { args } => ("edit", args),
+                GhPrCommands::Other(args) => {
+                    let borrowed: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+                    gh_cmd::run_passthrough_gh(&borrowed, verbose)?;
+                    return Ok(());
+                }
+            };
+            let borrowed: Vec<&str> = raw_args.iter().map(|s| s.as_str()).collect();
+            gh_cmd::run_pr(sub, &borrowed, verbose, ultra_compact)?;
+        }
+        GhCommands::Issue { command } => {
+            let (sub, raw_args) = match command {
+                GhIssueCommands::List { args } => ("list", args),
+                GhIssueCommands::View { args } => ("view", args),
+                GhIssueCommands::Other(args) => {
+                    let borrowed: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+                    gh_cmd::run_passthrough_gh(&borrowed, verbose)?;
+                    return Ok(());
+                }
+            };
+            let borrowed: Vec<&str> = raw_args.iter().map(|s| s.as_str()).collect();
+            gh_cmd::run_issue(sub, &borrowed, verbose)?;
+        }
+        GhCommands::Run { command } => {
+            let (sub, raw_args) = match command {
+                GhRunCommands::List { args } => ("list", args),
+                GhRunCommands::View { args } => ("view", args),
+                GhRunCommands::Other(args) => {
+                    let borrowed: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+                    gh_cmd::run_passthrough_gh(&borrowed, verbose)?;
+                    return Ok(());
+                }
+            };
+            let borrowed: Vec<&str> = raw_args.iter().map(|s| s.as_str()).collect();
+            gh_cmd::run_run(sub, &borrowed, verbose, ultra_compact)?;
+        }
+        GhCommands::Repo { args } => {
+            let borrowed: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+            gh_cmd::run_repo(&borrowed, verbose, ultra_compact)?;
+        }
+        GhCommands::Api { args } => {
+            let borrowed: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+            gh_cmd::run_api(&borrowed, verbose)?;
+        }
+        GhCommands::Other(args) => {
+            let borrowed: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+            gh_cmd::run_passthrough_gh(&borrowed, verbose)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Route pnpm subcommands (list, outdated, install, build, typecheck).
+fn dispatch_pnpm_commands(command: PnpmCommands, verbose: u8) -> Result<()> {
+    match command {
+        PnpmCommands::List { depth, args } => {
+            js::pnpm::run(js::pnpm::PnpmCommand::List { depth }, &args, verbose)?;
+        }
+        PnpmCommands::Outdated { args } => {
+            js::pnpm::run(js::pnpm::PnpmCommand::Outdated, &args, verbose)?;
+        }
+        PnpmCommands::Install { packages } => {
+            let (pkg_list, extra_args): (Vec<String>, Vec<String>) =
+                packages.into_iter().partition(|a| !a.starts_with('-'));
+            js::pnpm::run(
+                js::pnpm::PnpmCommand::Install { packages: pkg_list },
+                &extra_args,
+                verbose,
+            )?;
+        }
+        PnpmCommands::Build { args } => {
+            js::next::run(&args, verbose)?;
+        }
+        PnpmCommands::Typecheck { args } => {
+            js::tsc::run(&args, verbose)?;
+        }
+        PnpmCommands::Other(args) => {
+            js::pnpm::run_passthrough(&args, verbose)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Route prisma subcommands (generate, migrate, db push).
+fn dispatch_prisma_commands(command: PrismaCommands, verbose: u8) -> Result<()> {
+    match command {
+        PrismaCommands::Generate { args } => {
+            js::prisma::run(js::prisma::PrismaCommand::Generate, &args, verbose)?;
+        }
+        PrismaCommands::Migrate { command } => match command {
+            PrismaMigrateCommands::Dev { name, args } => {
+                js::prisma::run(
+                    js::prisma::PrismaCommand::Migrate {
+                        subcommand: js::prisma::MigrateSubcommand::Dev { name },
+                    },
+                    &args,
+                    verbose,
+                )?;
+            }
+            PrismaMigrateCommands::Status { args } => {
+                js::prisma::run(
+                    js::prisma::PrismaCommand::Migrate {
+                        subcommand: js::prisma::MigrateSubcommand::Status,
+                    },
+                    &args,
+                    verbose,
+                )?;
+            }
+            PrismaMigrateCommands::Deploy { args } => {
+                js::prisma::run(
+                    js::prisma::PrismaCommand::Migrate {
+                        subcommand: js::prisma::MigrateSubcommand::Deploy,
+                    },
+                    &args,
+                    verbose,
+                )?;
+            }
+        },
+        PrismaCommands::DbPush { args } => {
+            js::prisma::run(js::prisma::PrismaCommand::DbPush, &args, verbose)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Route cargo subcommands (build, test, clippy, check, install, nextest).
+fn dispatch_cargo_commands(command: CargoCommands, verbose: u8) -> Result<()> {
+    match command {
+        CargoCommands::Build { args } => {
+            cargo_cmd::run(cargo_cmd::CargoCommand::Build, &args, verbose)?;
+        }
+        CargoCommands::Test { args } => {
+            cargo_cmd::run(cargo_cmd::CargoCommand::Test, &args, verbose)?;
+        }
+        CargoCommands::Clippy { args } => {
+            cargo_cmd::run(cargo_cmd::CargoCommand::Clippy, &args, verbose)?;
+        }
+        CargoCommands::Check { args } => {
+            cargo_cmd::run(cargo_cmd::CargoCommand::Check, &args, verbose)?;
+        }
+        CargoCommands::Install { args } => {
+            cargo_cmd::run(cargo_cmd::CargoCommand::Install, &args, verbose)?;
+        }
+        CargoCommands::Nextest { args } => {
+            cargo_cmd::run(cargo_cmd::CargoCommand::Nextest, &args, verbose)?;
+        }
+        CargoCommands::Other(args) => {
+            cargo_cmd::run_passthrough(&args, verbose)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Route docker subcommands (ps, images, logs, compose).
+fn dispatch_docker_commands(command: DockerCommands, verbose: u8) -> Result<()> {
+    match command {
+        DockerCommands::Ps => {
+            container_cmd::run(container_cmd::ContainerCmd::DockerPs, &[], verbose)?;
+        }
+        DockerCommands::Images => {
+            container_cmd::run(container_cmd::ContainerCmd::DockerImages, &[], verbose)?;
+        }
+        DockerCommands::Logs { container: c } => {
+            container_cmd::run(container_cmd::ContainerCmd::DockerLogs, &[c], verbose)?;
+        }
+        DockerCommands::Compose { command: compose } => match compose {
+            ComposeCommands::Ps => {
+                container_cmd::run_compose_ps(verbose)?;
+            }
+            ComposeCommands::Logs { service } => {
+                container_cmd::run_compose_logs(service.as_deref(), verbose)?;
+            }
+            ComposeCommands::Build { service } => {
+                container_cmd::run_compose_build(service.as_deref(), verbose)?;
+            }
+            ComposeCommands::Other(args) => {
+                container_cmd::run_compose_passthrough(&args, verbose)?;
+            }
+        },
+        DockerCommands::Other(args) => {
+            container_cmd::run_docker_passthrough(&args, verbose)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Route kubectl subcommands (pods, services, logs).
+fn dispatch_kubectl_commands(command: KubectlCommands, verbose: u8) -> Result<()> {
+    match command {
+        KubectlCommands::Pods { namespace, all } => {
+            let mut args: Vec<String> = Vec::new();
+            if all {
+                args.push("-A".to_string());
+            } else if let Some(n) = namespace {
+                args.push("-n".to_string());
+                args.push(n);
+            }
+            container_cmd::run(container_cmd::ContainerCmd::KubectlPods, &args, verbose)?;
+        }
+        KubectlCommands::Services { namespace, all } => {
+            let mut args: Vec<String> = Vec::new();
+            if all {
+                args.push("-A".to_string());
+            } else if let Some(n) = namespace {
+                args.push("-n".to_string());
+                args.push(n);
+            }
+            container_cmd::run(container_cmd::ContainerCmd::KubectlServices, &args, verbose)?;
+        }
+        KubectlCommands::Logs { pod, container: c } => {
+            let mut args = vec![pod];
+            if let Some(cont) = c {
+                args.push("-c".to_string());
+                args.push(cont);
+            }
+            container_cmd::run(container_cmd::ContainerCmd::KubectlLogs, &args, verbose)?;
+        }
+        KubectlCommands::Other(args) => {
+            container_cmd::run_kubectl_passthrough(&args, verbose)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Route ruff subcommands (check, format).
+fn dispatch_ruff_commands(command: RuffCommands, verbose: u8) -> Result<()> {
+    match command {
+        RuffCommands::Check { args } => {
+            python::ruff::run_check(&args, verbose)?;
+        }
+        RuffCommands::Format { args } => {
+            python::ruff::run_format(&args, verbose)?;
+        }
+        RuffCommands::Other(raw) => {
+            let args: Vec<String> = raw
+                .iter()
+                .map(|a| a.to_string_lossy().into_owned())
+                .collect();
+            let looks_like_path = args
+                .first()
+                .map(|a| !a.starts_with('-') && a != "version" && a != "rule" && a != "help")
+                .unwrap_or(false);
+            if looks_like_path {
+                python::ruff::run_check(&args, verbose)?;
+            } else {
+                python::ruff::run_passthrough(&args, verbose)?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Route pip subcommands (list, outdated, install, uninstall, show).
+fn dispatch_pip_commands(command: PipCommands, verbose: u8) -> Result<()> {
+    match command {
+        PipCommands::List { args } => {
+            python::pip::run_list(&args, verbose)?;
+        }
+        PipCommands::Outdated { args } => {
+            python::pip::run_outdated(&args, verbose)?;
+        }
+        PipCommands::Install { args } => {
+            python::pip::run_install(&args, verbose)?;
+        }
+        PipCommands::Uninstall { args } => {
+            python::pip::run_uninstall(&args, verbose)?;
+        }
+        PipCommands::Show { args } => {
+            python::pip::run_show(&args, verbose)?;
+        }
+        PipCommands::Other(args) => {
+            python::pip::run_other(&args, verbose)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Route go subcommands (test, build, vet).
+fn dispatch_go_commands(command: GoCommands, verbose: u8) -> Result<()> {
+    match command {
+        GoCommands::Test { args } => {
+            go_eco::commands::run_test(&args, verbose)?;
+        }
+        GoCommands::Build { args } => {
+            go_eco::commands::run_build(&args, verbose)?;
+        }
+        GoCommands::Vet { args } => {
+            go_eco::commands::run_vet(&args, verbose)?;
+        }
+        GoCommands::Other(args) => {
+            go_eco::commands::run_other(&args, verbose)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Route gt subcommands (log, submit, sync, restack, create, branch).
+fn dispatch_gt_commands(command: GtCommands, verbose: u8) -> Result<()> {
+    match command {
+        GtCommands::Log { args } => {
+            gt_cmd::run_log(&args, verbose)?;
+        }
+        GtCommands::Submit { args } => {
+            gt_cmd::run_submit(&args, verbose)?;
+        }
+        GtCommands::Sync { args } => {
+            gt_cmd::run_sync(&args, verbose)?;
+        }
+        GtCommands::Restack { args } => {
+            gt_cmd::run_restack(&args, verbose)?;
+        }
+        GtCommands::Create { args } => {
+            gt_cmd::run_create(&args, verbose)?;
+        }
+        GtCommands::Branch { args } => {
+            gt_cmd::run_branch(&args, verbose)?;
+        }
+        GtCommands::Other(args) => {
+            gt_cmd::run_other(&args, verbose)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Route init subcommands and options.
+fn dispatch_init_commands(
+    global: bool,
+    show: bool,
+    claude_md: Option<String>,
+    hook_only: bool,
+    ecosystem: bool,
+    onboard: bool,
+    client: Option<String>,
+    auto_patch: bool,
+    no_patch: bool,
+    uninstall: bool,
+    verbose: u8,
+) -> Result<()> {
+    if show {
+        init::show_config()?;
+    } else if uninstall {
+        init::uninstall(global, verbose)?;
+    } else if onboard {
+        init::run_onboard(verbose)?;
+    } else if ecosystem {
+        init::run_ecosystem(client.as_deref(), verbose)?;
+    } else {
+        let patch_mode = if auto_patch {
+            init::PatchMode::Auto
+        } else if no_patch {
+            init::PatchMode::Skip
+        } else {
+            init::PatchMode::Ask
+        };
+        init::run(global, claude_md, hook_only, patch_mode, verbose)?;
+    }
+
+    Ok(())
+}
+
+/// Route terraform subcommands (plan, apply, init).
+fn dispatch_terraform_commands(command: TerraformCommands, verbose: u8) -> Result<()> {
+    match command {
+        TerraformCommands::Plan { args } => {
+            terraform_cmd::run_plan(&args, verbose)?;
+        }
+        TerraformCommands::Apply { args } => {
+            terraform_cmd::run_apply(&args, verbose)?;
+        }
+        TerraformCommands::Init { args } => {
+            terraform_cmd::run_init(&args, verbose)?;
+        }
+        TerraformCommands::Other(args) => {
+            terraform_cmd::run_passthrough(
+                &args
+                    .iter()
+                    .map(|s| s.to_string_lossy().to_string())
+                    .collect::<Vec<_>>(),
+                verbose,
+            )?;
+        }
     }
 
     Ok(())

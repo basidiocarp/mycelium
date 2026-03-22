@@ -72,10 +72,30 @@ pub(crate) fn project_filter_params(
 ///
 /// Silently ignores all errors — intended for use in fallback paths where a
 /// secondary failure must not interrupt the primary command execution.
-pub fn record_parse_failure_silent(raw_command: &str, error_message: &str, succeeded: bool) {
-    if let Ok(tracker) = super::Tracker::new() {
-        let _ = tracker.record_parse_failure(raw_command, error_message, succeeded);
-    }
+///
+/// If `tracker` is provided, it will be reused. Otherwise, a new Tracker will
+/// be created. This allows callers with an existing tracker to avoid creating
+/// a second one for consistency and performance.
+pub fn record_parse_failure_silent(
+    raw_command: &str,
+    error_message: &str,
+    succeeded: bool,
+    tracker: Option<&super::Tracker>,
+) {
+    let owned_tracker;
+    let tracker_ref = if let Some(t) = tracker {
+        t
+    } else {
+        match super::Tracker::new() {
+            Ok(t) => {
+                owned_tracker = t;
+                &owned_tracker
+            }
+            Err(_) => return,
+        }
+    };
+
+    let _ = tracker_ref.record_parse_failure(raw_command, error_message, succeeded);
 }
 
 /// Estimate token count from text using the ~4 chars = 1 token heuristic.

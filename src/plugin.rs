@@ -101,6 +101,8 @@ fn find_plugin_in_dir_with_config(config: &PluginConfig, command: &str) -> Optio
 pub fn run_plugin(plugin_path: &Path, raw_output: &str) -> Result<String> {
     use std::io::Write;
     use std::process::{Command, Stdio};
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
 
     let mut child = Command::new(plugin_path)
         .stdin(Stdio::piped())
@@ -119,14 +121,22 @@ pub fn run_plugin(plugin_path: &Path, raw_output: &str) -> Result<String> {
     }
 
     // Timeout: kill the plugin if it hasn't finished within 10 seconds.
-    std::thread::spawn(move || {
+    // Use cancellation flag to avoid PID reuse race condition.
+    let cancel = Arc::new(AtomicBool::new(false));
+    let cancel_clone = Arc::clone(&cancel);
+    let _handle = std::thread::spawn(move || {
         std::thread::sleep(std::time::Duration::from_secs(10));
-        kill_process(child_pid);
+        if !cancel_clone.load(Ordering::Relaxed) {
+            kill_process(child_pid);
+        }
     });
 
     let output = child
         .wait_with_output()
         .context("Failed to wait for plugin")?;
+
+    // Signal the timeout thread that the plugin finished normally
+    cancel.store(true, Ordering::Relaxed);
 
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
@@ -162,9 +172,8 @@ fn is_executable(_path: &Path) -> bool {
 
 /// Security check: reject world-writable plugins or plugins not owned by the current user.
 ///
-/// Ownership is verified via the `UID` environment variable (set by the shell on most Unix
-/// systems). If `UID` is unavailable, the ownership check is skipped and only
-/// world-writability is checked.
+/// Ownership is verified via libc::getuid(). This is more reliable than the UID env var,
+/// which is not guaranteed to be set by all shells.
 #[cfg(unix)]
 fn is_secure(path: &Path) -> bool {
     use std::os::unix::fs::MetadataExt;
@@ -177,14 +186,18 @@ fn is_secure(path: &Path) -> bool {
     let mode = meta.permissions().mode();
     let world_writable = mode & 0o002 != 0;
 
-    // Verify ownership using UID env var (libc not available in this build).
-    let owned_by_current_user = std::env::var("UID")
-        .ok()
-        .and_then(|s| s.parse::<u32>().ok())
-        .map(|uid| meta.uid() == uid)
-        .unwrap_or(true); // Skip check if UID unavailable
+    // Verify ownership using libc::getuid() for reliable UID detection
+    let current_uid = current_uid();
+    let owned_by_current_user = meta.uid() == current_uid;
 
     !world_writable && owned_by_current_user
+}
+
+/// Get the current process's effective user ID.
+#[cfg(unix)]
+fn current_uid() -> u32 {
+    // SAFETY: getuid() is always safe to call and has no preconditions
+    unsafe { libc::getuid() }
 }
 
 #[cfg(not(unix))]
