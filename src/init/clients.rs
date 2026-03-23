@@ -1,11 +1,12 @@
 //! Multi-client MCP detection and registration.
 //!
-//! Detects installed MCP clients (Cursor, Windsurf, Cline, Continue, Claude Desktop)
-//! and registers hyphae/rhizome MCP servers in each client's config.
+//! Detects installed MCP clients (Cursor, Windsurf, Cline, Continue, Claude Desktop,
+//! Codex CLI) and registers hyphae/rhizome MCP servers in each client's config.
 
 use anyhow::{Context, Result};
 use colored::Colorize;
 use serde_json::{Map, Value, json};
+use toml::{self, Value as TomlValue};
 use std::fmt;
 use std::fs;
 use std::path::PathBuf;
@@ -15,6 +16,7 @@ use std::process::Command;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum McpClient {
     ClaudeCode,
+    CodexCli,
     Cursor,
     Windsurf,
     Cline,
@@ -27,6 +29,7 @@ impl McpClient {
     pub fn name(self) -> &'static str {
         match self {
             Self::ClaudeCode => "Claude Code",
+            Self::CodexCli => "Codex CLI",
             Self::Cursor => "Cursor",
             Self::Windsurf => "Windsurf",
             Self::Cline => "Cline",
@@ -40,6 +43,7 @@ impl McpClient {
     pub fn flag(self) -> &'static str {
         match self {
             Self::ClaudeCode => "claude-code",
+            Self::CodexCli => "codex-cli",
             Self::Cursor => "cursor",
             Self::Windsurf => "windsurf",
             Self::Cline => "cline",
@@ -52,6 +56,7 @@ impl McpClient {
     pub fn from_flag(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "claude-code" | "claude" => Some(Self::ClaudeCode),
+            "codex-cli" | "codex" => Some(Self::CodexCli),
             "cursor" => Some(Self::Cursor),
             "windsurf" => Some(Self::Windsurf),
             "cline" => Some(Self::Cline),
@@ -66,6 +71,7 @@ impl McpClient {
         let home = dirs::home_dir()?;
         match self {
             Self::ClaudeCode => Some(home.join(".claude.json")),
+            Self::CodexCli => Some(home.join(".codex").join("config.toml")),
             Self::Cursor => Some(home.join(".cursor").join("mcp.json")),
             Self::Windsurf => Some(home.join(".windsurf").join("mcp.json")),
             Self::Cline => vscode_cline_settings_path(),
@@ -97,8 +103,9 @@ impl fmt::Display for McpClient {
 }
 
 /// All known clients in detection order.
-const ALL_CLIENTS: [McpClient; 6] = [
+const ALL_CLIENTS: [McpClient; 7] = [
     McpClient::ClaudeCode,
+    McpClient::CodexCli,
     McpClient::Cursor,
     McpClient::Windsurf,
     McpClient::Cline,
@@ -115,12 +122,32 @@ pub fn detect_clients() -> Vec<McpClient> {
         .collect()
 }
 
+/// Detect installed host clients that can run the ecosystem's primary setup path.
+pub fn detect_host_clients() -> Vec<McpClient> {
+    detect_clients()
+        .into_iter()
+        .filter(|client| is_host_client(*client))
+        .collect()
+}
+
+/// Whether the client is a primary host for ecosystem setup.
+pub fn is_host_client(client: McpClient) -> bool {
+    matches!(client, McpClient::ClaudeCode | McpClient::CodexCli)
+}
+
 /// Check if a client appears to be installed.
 fn is_installed(client: McpClient) -> bool {
     match client {
         McpClient::ClaudeCode => {
             // Check CLI first, fall back to config file
             Command::new("claude")
+                .arg("--version")
+                .output()
+                .is_ok_and(|o| o.status.success())
+                || client.config_path().is_some_and(|p| p.exists())
+        }
+        McpClient::CodexCli => {
+            Command::new("codex")
                 .arg("--version")
                 .output()
                 .is_ok_and(|o| o.status.success())
@@ -151,6 +178,7 @@ pub struct ServerConfig {
 pub fn register_servers(client: McpClient, servers: &[ServerConfig], verbose: u8) -> Result<bool> {
     match client {
         McpClient::ClaudeCode => register_claude_code(servers, verbose),
+        McpClient::CodexCli => register_codex_cli(servers, verbose),
         McpClient::Cursor | McpClient::Windsurf => {
             register_json_mcp_config(client, servers, verbose)
         }
@@ -225,6 +253,78 @@ fn register_claude_code(servers: &[ServerConfig], verbose: u8) -> Result<bool> {
         }
     }
     Ok(all_ok)
+}
+
+// ── Codex CLI ───────────────────────────────────────────────────────────────
+
+fn register_codex_cli(servers: &[ServerConfig], verbose: u8) -> Result<bool> {
+    let config_path = McpClient::CodexCli
+        .config_path()
+        .context("no Codex config path")?;
+
+    if let Some(parent) = config_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    let mut root: TomlValue = if config_path.exists() {
+        let backup = config_path.with_extension("toml.bak");
+        fs::copy(&config_path, &backup)?;
+        if verbose > 0 {
+            eprintln!(
+                "  Backed up {} → {}",
+                config_path.display(),
+                backup.display()
+            );
+        }
+        let content = fs::read_to_string(&config_path)?;
+        content
+            .parse()
+            .unwrap_or_else(|_| TomlValue::Table(toml::map::Map::new()))
+    } else {
+        TomlValue::Table(toml::map::Map::new())
+    };
+
+    let root_table = root
+        .as_table_mut()
+        .context("config root is not a TOML table")?;
+    let mcp_servers = root_table
+        .entry("mcp_servers")
+        .or_insert_with(|| TomlValue::Table(toml::map::Map::new()));
+    let servers_table = mcp_servers
+        .as_table_mut()
+        .context("mcp_servers is not a TOML table")?;
+
+    for server in servers {
+        let mut entry = toml::map::Map::new();
+        entry.insert(
+            "command".to_string(),
+            TomlValue::String(server.command.clone()),
+        );
+        entry.insert(
+            "args".to_string(),
+            TomlValue::Array(
+                server
+                    .args
+                    .iter()
+                    .map(|arg| TomlValue::String(arg.clone()))
+                    .collect(),
+            ),
+        );
+        servers_table.insert(server.name.clone(), TomlValue::Table(entry));
+    }
+
+    let content = toml::to_string_pretty(&root)?;
+    fs::write(&config_path, content)?;
+
+    if verbose > 0 {
+        eprintln!(
+            "  Wrote {} server(s) to {}",
+            servers.len(),
+            config_path.display()
+        );
+    }
+
+    Ok(true)
 }
 
 // ── JSON-based clients (Cursor, Windsurf, Claude Desktop) ───────────────────
@@ -471,8 +571,16 @@ mod tests {
     #[test]
     fn test_from_flag_aliases() {
         assert_eq!(McpClient::from_flag("claude"), Some(McpClient::ClaudeCode));
+        assert_eq!(McpClient::from_flag("codex"), Some(McpClient::CodexCli));
         assert_eq!(McpClient::from_flag("CURSOR"), Some(McpClient::Cursor));
         assert_eq!(McpClient::from_flag("unknown"), None);
+    }
+
+    #[test]
+    fn test_codex_config_path_shape() {
+        let path = McpClient::CodexCli.config_path().unwrap();
+        assert!(path.to_string_lossy().contains(".codex"));
+        assert!(path.to_string_lossy().ends_with("config.toml"));
     }
 
     #[test]

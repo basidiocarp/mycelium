@@ -1,8 +1,8 @@
 //! `mycelium init --onboard` — interactive onboarding wizard.
 //!
 //! Walks the user through first-time setup of the Basidiocarp ecosystem:
-//! detect tools, configure Claude Code, store first hyphae memory,
-//! scan with rhizome, export code graph, and print a summary.
+//! detect tools, configure the available host client, store first hyphae
+//! memory, scan with rhizome, export code graph, and print a summary.
 //!
 //! Falls back to `--ecosystem` when stdin is not a TTY (CI, pipes).
 
@@ -11,6 +11,8 @@ use colored::Colorize;
 use spore::{Tool, ToolInfo, discover, discover_all};
 use std::io::{self, BufRead, IsTerminal, Write};
 use std::process::Command;
+
+use super::clients::{self, McpClient, ServerConfig};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public API
@@ -52,25 +54,33 @@ pub fn run_onboard(verbose: u8) -> Result<()> {
         }
     }
 
-    // ── Step 2: Configure Claude Code ────────────────────────────────────
+    // ── Step 2: Configure host adapters ─────────────────────────────────
     println!();
-    println!("{}", "Step 2/5: Configure Claude Code".bold());
+    println!("{}", "Step 2/5: Configure host adapters".bold());
     println!();
 
-    let claude_available = claude_is_available();
-    if claude_available {
-        if confirm("Register MCP servers and install hooks?") {
-            configure_claude_code(&hyphae_info, &rhizome_info, verbose)?;
+    let host_clients = clients::detect_host_clients();
+    if !host_clients.is_empty() {
+        let host_label = host_clients
+            .iter()
+            .map(|client| client.name())
+            .collect::<Vec<_>>()
+            .join(", ");
+        println!("  Detected host clients: {host_label}");
+        if confirm("Register host MCP servers and install Claude hooks when available?") {
+            configure_host_adapters(&host_clients, &hyphae_info, &rhizome_info, verbose)?;
         } else {
-            println!("  Skipped Claude Code configuration.");
+            println!("  Skipped host-adapter configuration.");
         }
     } else {
         println!(
-            "  {} {} not found in PATH — skipping.",
-            "!".yellow(),
-            "claude".bold()
+            "  {} No supported host client detected (Claude Code or Codex CLI) — skipping.",
+            "!".yellow()
         );
-        println!("  Install Claude Code first, then re-run: mycelium init --onboard");
+        println!(
+            "  {}",
+            "Install Claude Code or Codex CLI, then re-run: mycelium init --onboard".dimmed()
+        );
     }
 
     // ── Step 3: First hyphae memory ──────────────────────────────────────
@@ -145,7 +155,7 @@ pub fn run_onboard(verbose: u8) -> Result<()> {
     // ── Summary ──────────────────────────────────────────────────────────
     println!();
     println!("{}", "\u{2500}".repeat(60));
-    print_summary(&tools, &cap_version, claude_available);
+    print_summary(&tools, &cap_version, &host_clients);
 
     Ok(())
 }
@@ -193,7 +203,7 @@ fn print_banner() {
     println!();
     println!("  This wizard will set up the Basidiocarp ecosystem:");
     println!("    1. Detect installed tools");
-    println!("    2. Configure Claude Code (hooks, MCP servers)");
+    println!("    2. Configure your host client (Claude Code or Codex CLI)");
     println!("    3. Store a first memory in Hyphae");
     println!("    4. Scan your project with Rhizome");
     println!("    5. Export code graph to Hyphae");
@@ -290,13 +300,6 @@ fn build_missing_list<'a>(
     missing
 }
 
-fn claude_is_available() -> bool {
-    Command::new("claude")
-        .arg("--version")
-        .output()
-        .is_ok_and(|o| o.status.success())
-}
-
 fn has_source_files(dir: &std::path::Path) -> bool {
     const EXTENSIONS: &[&str] = &[
         "rs", "py", "js", "ts", "go", "java", "c", "cpp", "rb", "ex", "zig",
@@ -323,49 +326,63 @@ fn has_source_files(dir: &std::path::Path) -> bool {
 // Step implementations
 // ─────────────────────────────────────────────────────────────────────────────
 
-fn configure_claude_code(
+fn configure_host_adapters(
+    host_clients: &[McpClient],
     hyphae_info: &Option<ToolInfo>,
     rhizome_info: &Option<ToolInfo>,
     verbose: u8,
 ) -> Result<()> {
     let mut configured = Vec::new();
 
-    // Register hyphae MCP
+    let mut servers = Vec::new();
     if hyphae_info.is_some() {
-        match register_mcp("hyphae", &["hyphae", "serve"], verbose) {
-            Ok(true) => configured.push("hyphae MCP"),
-            Ok(false) => eprintln!("  {} Failed to register hyphae MCP", "!".yellow()),
-            Err(e) => eprintln!("  {} hyphae MCP: {}", "!".yellow(), e),
-        }
+        servers.push(ServerConfig {
+            name: "hyphae".to_string(),
+            command: "hyphae".to_string(),
+            args: vec!["serve".to_string()],
+        });
     }
-
-    // Initialize hyphae database if needed
-    if let Some(data_dir) = hyphae_info
-        .as_ref()
-        .and(dirs::data_dir())
-        .map(|d| d.join("hyphae"))
-        .filter(|d| !d.join("hyphae.db").exists())
-    {
-        let _ = std::fs::create_dir_all(&data_dir);
-        let _ = Command::new("hyphae").arg("stats").output();
-        configured.push("hyphae database initialized");
-    }
-
-    // Register rhizome MCP
     if rhizome_info.is_some() {
-        match register_mcp("rhizome", &["rhizome", "serve", "--expanded"], verbose) {
-            Ok(true) => configured.push("rhizome MCP"),
-            Ok(false) => eprintln!("  {} Failed to register rhizome MCP", "!".yellow()),
-            Err(e) => eprintln!("  {} rhizome MCP: {}", "!".yellow(), e),
+        servers.push(ServerConfig {
+            name: "rhizome".to_string(),
+            command: "rhizome".to_string(),
+            args: vec!["serve".to_string(), "--expanded".to_string()],
+        });
+    }
+
+    if !servers.is_empty() {
+        for client in host_clients {
+            match clients::register_servers(*client, &servers, verbose) {
+                Ok(true) => configured.push(client.name().to_string()),
+                Ok(false) => eprintln!("  {} Failed to configure {}", "!".yellow(), client.name()),
+                Err(e) => eprintln!("  {} {}: {}", "!".yellow(), client.name(), e),
+            }
         }
     }
 
-    // Run mycelium init --global for hooks + CLAUDE.md
-    let patch_mode = super::PatchMode::Auto;
-    if let Err(e) = super::run(true, false, false, patch_mode, verbose) {
-        eprintln!("  {} Mycelium global init failed: {}", "!".yellow(), e);
-    } else {
-        configured.push("mycelium hooks + CLAUDE.md");
+    if hyphae_info.is_some() {
+        if let Some(data_dir) = hyphae_info
+            .as_ref()
+            .and(dirs::data_dir())
+            .map(|d| d.join("hyphae"))
+            .filter(|d| !d.join("hyphae.db").exists())
+        {
+            let _ = std::fs::create_dir_all(&data_dir);
+            let _ = Command::new("hyphae").arg("stats").output();
+            configured.push("hyphae database initialized".to_string());
+        }
+    }
+
+    if host_clients
+        .iter()
+        .any(|client| matches!(client, McpClient::ClaudeCode))
+    {
+        let patch_mode = super::PatchMode::Auto;
+        if let Err(e) = super::run(true, false, false, patch_mode, verbose) {
+            eprintln!("  {} Mycelium global init failed: {}", "!".yellow(), e);
+        } else {
+            configured.push("mycelium hooks + CLAUDE.md".to_string());
+        }
     }
 
     if !configured.is_empty() {
@@ -377,30 +394,6 @@ fn configure_claude_code(
     }
 
     Ok(())
-}
-
-fn register_mcp(name: &str, args: &[&str], verbose: u8) -> Result<bool> {
-    let mut cmd = Command::new("claude");
-    cmd.arg("mcp")
-        .arg("add")
-        .arg("--scope")
-        .arg("user")
-        .arg(name)
-        .arg("--");
-    for arg in args {
-        cmd.arg(arg);
-    }
-
-    if verbose > 0 {
-        eprintln!(
-            "  Running: claude mcp add --scope user {} -- {}",
-            name,
-            args.join(" ")
-        );
-    }
-
-    let output = cmd.output().context("Failed to run claude mcp add")?;
-    Ok(output.status.success())
 }
 
 fn store_welcome_memory(verbose: u8) -> Result<()> {
@@ -507,7 +500,7 @@ fn export_to_hyphae(verbose: u8) -> Result<()> {
 // Summary
 // ─────────────────────────────────────────────────────────────────────────────
 
-fn print_summary(tools: &[ToolInfo], cap_version: &Option<String>, claude_available: bool) {
+fn print_summary(tools: &[ToolInfo], cap_version: &Option<String>, host_clients: &[McpClient]) {
     println!();
     println!("{}", "  Onboarding Complete!".bold().green());
     println!();
@@ -516,18 +509,34 @@ fn print_summary(tools: &[ToolInfo], cap_version: &Option<String>, claude_availa
     let total = 4; // mycelium, hyphae, rhizome, cap
     println!("  Tools: {}/{} installed", installed_count, total);
 
-    if claude_available {
-        println!("  Claude Code: configured");
+    if host_clients.is_empty() {
+        println!("  Host clients: not detected");
     } else {
-        println!("  Claude Code: not found (install and re-run)");
+        for host in host_clients {
+            println!("  {}: configured", host.name());
+        }
     }
 
     println!();
     println!("  {}", "Next steps:".bold());
-    println!(
-        "    - Start Claude Code and test: {}",
-        "git status".dimmed()
-    );
+    if host_clients
+        .iter()
+        .any(|client| matches!(client, McpClient::ClaudeCode))
+    {
+        println!(
+            "    - Start Claude Code and test: {}",
+            "git status".dimmed()
+        );
+    }
+    if host_clients
+        .iter()
+        .any(|client| matches!(client, McpClient::CodexCli))
+    {
+        println!(
+            "    - Start Codex CLI and check: {}",
+            "cat ~/.codex/config.toml".dimmed()
+        );
+    }
     println!(
         "    - Check token savings:        {}",
         "mycelium gain".dimmed()
@@ -584,6 +593,11 @@ mod tests {
     #[test]
     fn test_discover_cap_does_not_panic() {
         let _result = discover_cap();
+    }
+
+    #[test]
+    fn test_detect_host_clients_does_not_panic() {
+        let _result = clients::detect_host_clients();
     }
 
     #[test]

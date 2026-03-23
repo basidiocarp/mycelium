@@ -1,4 +1,4 @@
-//! `mycelium init --ecosystem` — detect sibling tools and configure MCP clients.
+//! `mycelium init --ecosystem` — detect sibling tools and configure host clients.
 
 use anyhow::Result;
 use colored::Colorize;
@@ -22,61 +22,6 @@ fn discover_cap() -> Option<String> {
         .unwrap_or("unknown")
         .to_string();
     Some(version)
-}
-
-/// Check if `claude` binary is in PATH.
-fn claude_is_available() -> bool {
-    Command::new("claude")
-        .arg("--version")
-        .output()
-        .is_ok_and(|o| o.status.success())
-}
-
-/// Check if an MCP server is already registered with Claude Code.
-fn mcp_exists(name: &str) -> bool {
-    Command::new("claude")
-        .args(["mcp", "get", name])
-        .output()
-        .is_ok_and(|o| o.status.success())
-}
-
-/// Register an MCP server with Claude Code. Returns:
-/// - `Ok(Some("registered"))` if newly registered
-/// - `Ok(Some("already registered"))` if already present
-/// - `Ok(None)` if registration failed
-fn register_mcp(name: &str, args: &[&str], verbose: u8) -> Result<Option<&'static str>> {
-    if mcp_exists(name) {
-        if verbose > 0 {
-            eprintln!("  {name} MCP already registered");
-        }
-        return Ok(Some("already registered"));
-    }
-
-    let mut cmd = Command::new("claude");
-    cmd.arg("mcp")
-        .arg("add")
-        .arg("--scope")
-        .arg("user")
-        .arg(name);
-    cmd.arg("--");
-    for arg in args {
-        cmd.arg(arg);
-    }
-
-    if verbose > 0 {
-        eprintln!(
-            "  Running: claude mcp add --scope user {} -- {}",
-            name,
-            args.join(" ")
-        );
-    }
-
-    let output = cmd.output()?;
-    if output.status.success() {
-        Ok(Some("registered"))
-    } else {
-        Ok(None)
-    }
 }
 
 /// Main entry point for `mycelium init --ecosystem`.
@@ -117,76 +62,7 @@ pub fn run_ecosystem(client: Option<&str>, verbose: u8) -> Result<()> {
 
     println!();
 
-    // ── 3. Configure Claude Code (if available) ────────────────────────────
-    if claude_is_available() {
-        println!("{}", "Configuring Claude Code...".bold());
-        println!();
-
-        let mut configured = Vec::new();
-
-        // Register hyphae MCP if installed
-        if hyphae_info.is_some() {
-            match register_mcp("hyphae", &["hyphae", "serve"], verbose) {
-                Ok(Some(status)) => configured.push(if status == "already registered" {
-                    "hyphae MCP (already registered)"
-                } else {
-                    "hyphae MCP"
-                }),
-                Ok(None) => eprintln!("  {} Failed to register hyphae MCP", "!".yellow()),
-                Err(e) => eprintln!("  {} hyphae MCP registration error: {}", "!".yellow(), e),
-            }
-        }
-
-        // Initialize hyphae database if it doesn't exist
-        if let Some(data_dir) = hyphae_info
-            .as_ref()
-            .and(dirs::data_dir())
-            .map(|d| d.join("hyphae"))
-            .filter(|d| !d.join("hyphae.db").exists())
-        {
-            let _ = std::fs::create_dir_all(&data_dir);
-            let _ = Command::new("hyphae").arg("stats").output();
-            configured.push("hyphae database initialized");
-        }
-
-        // Register rhizome MCP if installed
-        if rhizome_info.is_some() {
-            match register_mcp("rhizome", &["rhizome", "serve", "--expanded"], verbose) {
-                Ok(Some(status)) => configured.push(if status == "already registered" {
-                    "rhizome MCP (already registered)"
-                } else {
-                    "rhizome MCP"
-                }),
-                Ok(None) => eprintln!("  {} Failed to register rhizome MCP", "!".yellow()),
-                Err(e) => eprintln!("  {} rhizome MCP registration error: {}", "!".yellow(), e),
-            }
-        }
-
-        // Run the existing init --global logic for mycelium instructions
-        let patch_mode = super::PatchMode::Auto;
-        if let Err(e) = super::run(true, false, false, patch_mode, verbose) {
-            eprintln!("  {} Mycelium global init failed: {}", "!".yellow(), e);
-        } else {
-            configured.push("mycelium hooks + CLAUDE.md");
-        }
-
-        if !configured.is_empty() {
-            println!();
-            println!("  {} Configured:", "\u{2713}".green());
-            for item in &configured {
-                println!("    - {}", item);
-            }
-        }
-    } else {
-        println!(
-            "  {} {} not found in PATH — skipping Claude Code configuration.",
-            "!".yellow(),
-            "claude".bold()
-        );
-        println!("    Install Claude Code first, then re-run: mycelium init --ecosystem");
-    }
-
-    // ── 3b. Configure additional MCP clients ────────────────────────────────
+    // ── 3. Configure detected MCP clients ──────────────────────────────────
     configure_detected_clients(client, &hyphae_info, &rhizome_info, verbose);
 
     // ── 4. Print missing tool instructions ─────────────────────────────────
@@ -278,7 +154,7 @@ fn build_server_configs() -> Vec<ServerConfig> {
     servers
 }
 
-/// Configure detected MCP clients (other than Claude Code, which is handled separately).
+/// Configure detected MCP clients.
 fn configure_detected_clients(
     client_filter: Option<&str>,
     hyphae_info: &Option<spore::ToolInfo>,
@@ -301,17 +177,13 @@ fn configure_detected_clients(
         });
     }
 
-    if servers.is_empty() {
-        return;
-    }
-
-    // Determine which clients to configure
+    // Determine which clients to configure.
     let targets: Vec<McpClient> = if let Some(name) = client_filter {
         match McpClient::from_flag(name) {
             Some(c) => vec![c],
             None => {
                 eprintln!(
-                    "  {} Unknown client '{}'. Known: claude-code, cursor, windsurf, cline, continue, claude-desktop",
+                    "  {} Unknown client '{}'. Known: claude-code, codex-cli, cursor, windsurf, cline, continue, claude-desktop",
                     "!".yellow(),
                     name
                 );
@@ -319,11 +191,7 @@ fn configure_detected_clients(
             }
         }
     } else {
-        // No filter: detect all installed, skip Claude Code (already handled above)
         clients::detect_clients()
-            .into_iter()
-            .filter(|c| *c != McpClient::ClaudeCode)
-            .collect()
     };
 
     if targets.is_empty() {
@@ -331,34 +199,48 @@ fn configure_detected_clients(
     }
 
     println!();
-    println!("{}", "Configuring additional MCP clients...".bold());
+    println!("{}", "Configuring detected MCP clients...".bold());
 
-    let mut client_configured = Vec::new();
+    let mut client_configured: Vec<String> = Vec::new();
+    let needs_claude_init = targets
+        .iter()
+        .any(|client| matches!(client, McpClient::ClaudeCode));
+
+    if servers.is_empty() && !needs_claude_init {
+        return;
+    }
 
     for target in &targets {
-        if *target == McpClient::ClaudeCode && client_filter.is_none() {
-            continue;
+        if !servers.is_empty() {
+            match clients::register_servers(*target, &servers, verbose) {
+                Ok(true) => {
+                    client_configured.push(target.name().to_string());
+                }
+                Ok(false) => {
+                    eprintln!(
+                        "  {} {} registration returned false",
+                        "!".yellow(),
+                        target.name()
+                    );
+                }
+                Err(e) => {
+                    eprintln!(
+                        "  {} {} registration failed: {}",
+                        "!".yellow(),
+                        target.name(),
+                        e
+                    );
+                }
+            }
         }
+    }
 
-        match clients::register_servers(*target, &servers, verbose) {
-            Ok(true) => {
-                client_configured.push(target.name());
-            }
-            Ok(false) => {
-                eprintln!(
-                    "  {} {} registration returned false",
-                    "!".yellow(),
-                    target.name()
-                );
-            }
-            Err(e) => {
-                eprintln!(
-                    "  {} {} registration failed: {}",
-                    "!".yellow(),
-                    target.name(),
-                    e
-                );
-            }
+    if needs_claude_init {
+        let patch_mode = super::PatchMode::Auto;
+        if let Err(e) = super::run(true, false, false, patch_mode, verbose) {
+            eprintln!("  {} Mycelium global init failed: {}", "!".yellow(), e);
+        } else {
+            client_configured.push("mycelium hooks + CLAUDE.md".to_string());
         }
     }
 
@@ -395,7 +277,7 @@ mod tests {
     }
 
     #[test]
-    fn test_claude_is_available_does_not_panic() {
-        let _result = claude_is_available();
+    fn test_detect_host_clients_does_not_panic() {
+        let _result = clients::detect_host_clients();
     }
 }

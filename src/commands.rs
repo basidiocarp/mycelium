@@ -597,7 +597,7 @@ pub enum Commands {
         #[arg(long = "hook-only", group = "mode")]
         hook_only: bool,
 
-        /// Detect sibling ecosystem tools and configure them for Claude Code
+        /// Detect sibling ecosystem tools and configure the available host clients
         #[arg(long, group = "mode")]
         ecosystem: bool,
 
@@ -605,7 +605,7 @@ pub enum Commands {
         #[arg(long, group = "mode")]
         onboard: bool,
 
-        /// Target a specific MCP client (cursor, windsurf, cline, continue, claude-desktop, generic)
+        /// Target a specific MCP client (claude-code, codex-cli, cursor, windsurf, cline, continue, claude-desktop, generic)
         #[arg(long)]
         client: Option<String>,
 

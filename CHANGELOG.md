@@ -2,6 +2,17 @@
 
 All notable changes to Mycelium are documented in this file.
 
+## v0.7.0 - 2026-03-23
+
+### Added
+
+- **Codex-aware ecosystem setup**: `mycelium init --ecosystem` now recognizes Codex CLI as a first-class host client and can register Hyphae and Rhizome MCP servers into `~/.codex/config.toml`.
+
+### Changed
+
+- **Host-aware onboarding**: `mycelium init --onboard` now guides users through configuring the detected host client instead of assuming Claude Code is mandatory.
+- **Host-specific next steps**: Onboarding summaries and help text now show Claude and Codex follow-up steps based on the clients actually detected on the machine.
+
 ## v0.6.0 - 2026-03-23
 
 ### Added
