@@ -74,10 +74,7 @@ fn resolve(cmd: &str) -> RewriteResolution {
             input,
             rewritten: Some(rewritten),
             source: RewriteSource::LearnedCorrection,
-            reason: format!(
-                "exact match in {}",
-                corrections_store::CORRECTIONS_JSON
-            ),
+            reason: format!("exact match in {}", corrections_store::CORRECTIONS_JSON),
         };
     }
 
@@ -134,11 +131,7 @@ fn source_label(source: RewriteSource) -> &'static str {
     }
 }
 
-fn explain_registry_match(
-    input: &str,
-    excluded: &[String],
-    source: RewriteSource,
-) -> String {
+fn explain_registry_match(input: &str, excluded: &[String], source: RewriteSource) -> String {
     if matches!(source, RewriteSource::Passthrough) {
         return "command already starts with `mycelium`".to_string();
     }
@@ -184,7 +177,8 @@ fn explain_registry_match(
 
 fn explain_no_rewrite(input: &str, excluded: &[String]) -> String {
     if input.contains("<<") || input.contains("$((") {
-        return "command contains heredoc or arithmetic expansion, so it is not rewritten".to_string();
+        return "command contains heredoc or arithmetic expansion, so it is not rewritten"
+            .to_string();
     }
 
     let segments = registry::split_command_chain(input);

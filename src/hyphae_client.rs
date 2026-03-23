@@ -107,10 +107,10 @@ fn get_or_connect() -> Result<MutexGuard<'static, Option<HyphaeConnection>>> {
 
     // Check if we have a connection and it's still alive. Return if alive, otherwise
     // attempt to establish a new connection below.
-    if let Some(conn) = guard.as_mut() {
-        if conn.is_alive() {
-            return Ok(guard);
-        }
+    if let Some(conn) = guard.as_mut()
+        && conn.is_alive()
+    {
+        return Ok(guard);
     }
 
     // Connection missing or dead — try to create a new one

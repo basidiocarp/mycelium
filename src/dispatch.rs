@@ -51,7 +51,12 @@ pub fn run_fallback(parse_error: clap::Error) -> Result<()> {
                             &raw,
                             &filtered,
                         );
-                        tracking::record_parse_failure_silent(&raw_command, &error_message, true, None);
+                        tracking::record_parse_failure_silent(
+                            &raw_command,
+                            &error_message,
+                            true,
+                            None,
+                        );
                         print!("{}", filtered);
                         return Ok(());
                     }
@@ -585,6 +590,7 @@ pub fn dispatch(cli: Cli) -> Result<()> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Route git subcommands to git::run with global arguments.
+#[allow(clippy::too_many_arguments)]
 fn dispatch_git_commands(
     directory: Vec<String>,
     config_override: Vec<String>,
@@ -1033,6 +1039,7 @@ fn dispatch_gt_commands(command: GtCommands, verbose: u8) -> Result<()> {
 }
 
 /// Route init subcommands and options.
+#[allow(clippy::too_many_arguments)]
 fn dispatch_init_commands(
     global: bool,
     show: bool,

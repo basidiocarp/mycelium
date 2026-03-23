@@ -1,6 +1,36 @@
 use super::*;
 use std::ffi::OsString;
 use std::path::PathBuf;
+use std::sync::{Mutex, OnceLock};
+
+use tempfile::tempdir;
+
+fn tracking_test_lock() -> &'static Mutex<()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
+}
+
+fn with_test_db<T>(test_name: &str, f: impl FnOnce(&str) -> T) -> T {
+    let _guard = tracking_test_lock()
+        .lock()
+        .expect("tracking test lock poisoned");
+    let dir = tempdir().expect("failed to create tempdir");
+    let path = dir.path().join(format!("{test_name}.db"));
+    let path_str = path.to_string_lossy().to_string();
+    f(&path_str)
+}
+
+fn with_test_db_env<T>(test_name: &str, f: impl FnOnce() -> T) -> T {
+    with_test_db(test_name, |path| {
+        // SAFETY: tracking tests serialize access with a global mutex, so process-wide
+        // environment mutation is isolated to this test.
+        unsafe { std::env::set_var("MYCELIUM_DB_PATH", path) };
+        let result = f();
+        // SAFETY: see rationale above for set_var.
+        unsafe { std::env::remove_var("MYCELIUM_DB_PATH") };
+        result
+    })
+}
 
 // 1. estimate_tokens -- verify ~4 chars/token ratio
 #[test]
@@ -26,101 +56,105 @@ fn test_args_display() {
 // 3. Tracker::record + get_recent -- round-trip DB
 #[test]
 fn test_tracker_record_and_recent() {
-    let tracker = Tracker::new().expect("Failed to create tracker");
+    with_test_db("test_tracker_record_and_recent", |db_path| {
+        let tracker = Tracker::new_with_override(Some(db_path)).expect("Failed to create tracker");
 
-    // Use unique test identifier to avoid conflicts with other tests
-    let test_cmd = format!("mycelium git status test_{}", std::process::id());
+        // Use unique test identifier to avoid conflicts with other tests
+        let test_cmd = format!("mycelium git status test_{}", std::process::id());
 
-    tracker
-        .record("git status", &test_cmd, 100, 20, 50)
-        .expect("Failed to record");
+        tracker
+            .record("git status", &test_cmd, 100, 20, 50)
+            .expect("Failed to record");
 
-    let recent = tracker.get_recent(10).expect("Failed to get recent");
+        let recent = tracker.get_recent(10).expect("Failed to get recent");
 
-    // Find our specific test record
-    let test_record = recent
-        .iter()
-        .find(|r| r.mycelium_cmd == test_cmd)
-        .expect("Test record not found in recent commands");
+        // Find our specific test record
+        let test_record = recent
+            .iter()
+            .find(|r| r.mycelium_cmd == test_cmd)
+            .expect("Test record not found in recent commands");
 
-    assert_eq!(test_record.saved_tokens, 80);
-    assert_eq!(test_record.savings_pct, 80.0);
+        assert_eq!(test_record.saved_tokens, 80);
+        assert_eq!(test_record.savings_pct, 80.0);
+    });
 }
 
 // 4. track_passthrough doesn't dilute stats (input=0, output=0)
 #[test]
 fn test_track_passthrough_no_dilution() {
-    let tracker = Tracker::new().expect("Failed to create tracker");
+    with_test_db("test_track_passthrough_no_dilution", |db_path| {
+        let tracker = Tracker::new_with_override(Some(db_path)).expect("Failed to create tracker");
 
-    // Use unique test identifiers
-    let pid = std::process::id();
-    let cmd1 = format!("mycelium cmd1_test_{}", pid);
-    let cmd2 = format!("mycelium cmd2_passthrough_test_{}", pid);
+        // Use unique test identifiers
+        let pid = std::process::id();
+        let cmd1 = format!("mycelium cmd1_test_{}", pid);
+        let cmd2 = format!("mycelium cmd2_passthrough_test_{}", pid);
 
-    // Record one real command with 80% savings
-    tracker
-        .record("cmd1", &cmd1, 1000, 200, 10)
-        .expect("Failed to record cmd1");
+        // Record one real command with 80% savings
+        tracker
+            .record("cmd1", &cmd1, 1000, 200, 10)
+            .expect("Failed to record cmd1");
 
-    // Record passthrough (0, 0)
-    tracker
-        .record("cmd2", &cmd2, 0, 0, 5)
-        .expect("Failed to record passthrough");
+        // Record passthrough (0, 0)
+        tracker
+            .record("cmd2", &cmd2, 0, 0, 5)
+            .expect("Failed to record passthrough");
 
-    // Verify both records exist in recent history
-    let recent = tracker.get_recent(20).expect("Failed to get recent");
+        // Verify both records exist in recent history
+        let recent = tracker.get_recent(20).expect("Failed to get recent");
 
-    let record1 = recent
-        .iter()
-        .find(|r| r.mycelium_cmd == cmd1)
-        .expect("cmd1 record not found");
-    let record2 = recent
-        .iter()
-        .find(|r| r.mycelium_cmd == cmd2)
-        .expect("passthrough record not found");
+        let record1 = recent
+            .iter()
+            .find(|r| r.mycelium_cmd == cmd1)
+            .expect("cmd1 record not found");
+        let record2 = recent
+            .iter()
+            .find(|r| r.mycelium_cmd == cmd2)
+            .expect("passthrough record not found");
 
-    // Verify cmd1 has 80% savings
-    assert_eq!(record1.saved_tokens, 800);
-    assert_eq!(record1.savings_pct, 80.0);
+        // Verify cmd1 has 80% savings
+        assert_eq!(record1.saved_tokens, 800);
+        assert_eq!(record1.savings_pct, 80.0);
 
-    // Verify passthrough has 0% savings
-    assert_eq!(record2.saved_tokens, 0);
-    assert_eq!(record2.savings_pct, 0.0);
-
-    // This validates that passthrough (0 input, 0 output) doesn't dilute stats
-    // because the savings calculation is correct for both cases
+        // Verify passthrough has 0% savings
+        assert_eq!(record2.saved_tokens, 0);
+        assert_eq!(record2.savings_pct, 0.0);
+    });
 }
 
 // 5. TimedExecution::track records with exec_time > 0
 #[test]
 fn test_timed_execution_records_time() {
-    let timer = TimedExecution::start();
-    std::thread::sleep(std::time::Duration::from_millis(10));
-    timer.track("test cmd", "mycelium test", "raw input data", "filtered");
+    with_test_db_env("test_timed_execution_records_time", || {
+        let timer = TimedExecution::start();
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        timer.track("test cmd", "mycelium test", "raw input data", "filtered");
 
-    // Verify via DB that record exists
-    let tracker = Tracker::new().expect("Failed to create tracker");
-    let recent = tracker.get_recent(5).expect("Failed to get recent");
-    assert!(recent.iter().any(|r| r.mycelium_cmd == "mycelium test"));
+        // Verify via DB that record exists
+        let tracker = Tracker::new().expect("Failed to create tracker");
+        let recent = tracker.get_recent(5).expect("Failed to get recent");
+        assert!(recent.iter().any(|r| r.mycelium_cmd == "mycelium test"));
+    });
 }
 
 // 6. TimedExecution::track_passthrough records with 0 tokens
 #[test]
 fn test_timed_execution_passthrough() {
-    let timer = TimedExecution::start();
-    timer.track_passthrough("git tag", "mycelium git tag (passthrough)");
+    with_test_db_env("test_timed_execution_passthrough", || {
+        let timer = TimedExecution::start();
+        timer.track_passthrough("git tag", "mycelium git tag (passthrough)");
 
-    let tracker = Tracker::new().expect("Failed to create tracker");
-    let recent = tracker.get_recent(5).expect("Failed to get recent");
+        let tracker = Tracker::new().expect("Failed to create tracker");
+        let recent = tracker.get_recent(5).expect("Failed to get recent");
 
-    let pt = recent
-        .iter()
-        .find(|r| r.mycelium_cmd.contains("passthrough"))
-        .expect("Passthrough record not found");
+        let pt = recent
+            .iter()
+            .find(|r| r.mycelium_cmd.contains("passthrough"))
+            .expect("Passthrough record not found");
 
-    // savings_pct should be 0 for passthrough
-    assert_eq!(pt.savings_pct, 0.0);
-    assert_eq!(pt.saved_tokens, 0);
+        assert_eq!(pt.savings_pct, 0.0);
+        assert_eq!(pt.saved_tokens, 0);
+    });
 }
 
 // 7. get_db_path respects an explicit override path
@@ -179,110 +213,106 @@ fn test_project_filter_params_underscore_safe() {
 // 12. record_parse_failure + get_parse_failure_summary roundtrip
 #[test]
 fn test_parse_failure_roundtrip() {
-    let tracker = Tracker::new().expect("Failed to create tracker");
-    let test_cmd = format!("git -C /path status test_{}", std::process::id());
+    with_test_db("test_parse_failure_roundtrip", |db_path| {
+        let tracker = Tracker::new_with_override(Some(db_path)).expect("Failed to create tracker");
+        let test_cmd = format!("git -C /path status test_{}", std::process::id());
 
-    tracker
-        .record_parse_failure(&test_cmd, "unrecognized subcommand", true)
-        .expect("Failed to record parse failure");
+        tracker
+            .record_parse_failure(&test_cmd, "unrecognized subcommand", true)
+            .expect("Failed to record parse failure");
 
-    let summary = tracker
-        .get_parse_failure_summary()
-        .expect("Failed to get summary");
+        let summary = tracker
+            .get_parse_failure_summary()
+            .expect("Failed to get summary");
 
-    assert!(summary.total >= 1);
-    assert!(summary.recent.iter().any(|r| r.raw_command == test_cmd));
+        assert!(summary.total >= 1);
+        assert!(summary.recent.iter().any(|r| r.raw_command == test_cmd));
+    });
 }
 
 // 13. recovery_rate calculation
 #[test]
 fn test_parse_failure_recovery_rate() {
-    let tracker = Tracker::new().expect("Failed to create tracker");
-    let pid = std::process::id();
+    with_test_db("test_parse_failure_recovery_rate", |db_path| {
+        let tracker = Tracker::new_with_override(Some(db_path)).expect("Failed to create tracker");
+        let pid = std::process::id();
 
-    // 2 successes, 1 failure
-    tracker
-        .record_parse_failure(&format!("cmd_ok1_{}", pid), "err", true)
-        .unwrap();
-    tracker
-        .record_parse_failure(&format!("cmd_ok2_{}", pid), "err", true)
-        .unwrap();
-    tracker
-        .record_parse_failure(&format!("cmd_fail_{}", pid), "err", false)
-        .unwrap();
+        tracker
+            .record_parse_failure(&format!("cmd_ok1_{}", pid), "err", true)
+            .unwrap();
+        tracker
+            .record_parse_failure(&format!("cmd_ok2_{}", pid), "err", true)
+            .unwrap();
+        tracker
+            .record_parse_failure(&format!("cmd_fail_{}", pid), "err", false)
+            .unwrap();
 
-    let summary = tracker.get_parse_failure_summary().unwrap();
-    // We can't assert the exact rate because other tests may have added records,
-    // but we can verify recovery_rate is between 0 and 100
-    assert!(summary.recovery_rate >= 0.0 && summary.recovery_rate <= 100.0);
+        let summary = tracker.get_parse_failure_summary().unwrap();
+        assert!(summary.recovery_rate >= 0.0 && summary.recovery_rate <= 100.0);
+    });
 }
 
 // 14. get_by_project groups by project_path and returns sorted results
 #[test]
 fn test_get_by_project() {
-    let tracker = Tracker::new().expect("Failed to create tracker");
-    let pid = std::process::id();
+    with_test_db("test_get_by_project", |db_path| {
+        let tracker = Tracker::new_with_override(Some(db_path)).expect("Failed to create tracker");
+        let pid = std::process::id();
 
-    // Insert records with distinct project paths via raw SQL so we control project_path
-    let ts = jiff::Timestamp::now().to_string();
-    for (project, saved) in &[
-        (format!("/tmp/proj_a_{}", pid), 500),
-        (format!("/tmp/proj_a_{}", pid), 300),
-        (format!("/tmp/proj_b_{}", pid), 1000),
-    ] {
-        tracker
-            .conn
-            .execute(
-                "INSERT INTO commands (timestamp, original_cmd, mycelium_cmd, project_path, \
-                 input_tokens, output_tokens, saved_tokens, savings_pct, exec_time_ms) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-                rusqlite::params![
-                    ts,
-                    "test cmd",
-                    "mycelium test",
-                    project,
-                    *saved * 2,
-                    *saved,
-                    *saved,
-                    50.0,
-                    10
-                ],
-            )
-            .expect("insert failed");
-    }
+        let ts = jiff::Timestamp::now().to_string();
+        for (project, saved) in &[
+            (format!("/tmp/proj_a_{}", pid), 500),
+            (format!("/tmp/proj_a_{}", pid), 300),
+            (format!("/tmp/proj_b_{}", pid), 1000),
+        ] {
+            tracker
+                .conn
+                .execute(
+                    "INSERT INTO commands (timestamp, original_cmd, mycelium_cmd, project_path, \
+                     input_tokens, output_tokens, saved_tokens, savings_pct, exec_time_ms) \
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                    rusqlite::params![
+                        ts,
+                        "test cmd",
+                        "mycelium test",
+                        project,
+                        *saved * 2,
+                        *saved,
+                        *saved,
+                        50.0,
+                        10
+                    ],
+                )
+                .expect("insert failed");
+        }
 
-    let results = tracker.get_by_project().expect("get_by_project failed");
+        let results = tracker.get_by_project().expect("get_by_project failed");
 
-    // Find our test projects
-    let proj_a = results
-        .iter()
-        .find(|r| r.project_path == format!("/tmp/proj_a_{}", pid));
-    let proj_b = results
-        .iter()
-        .find(|r| r.project_path == format!("/tmp/proj_b_{}", pid));
+        let proj_a = results
+            .iter()
+            .find(|r| r.project_path == format!("/tmp/proj_a_{}", pid))
+            .expect("proj_a not found in results");
+        let proj_b = results
+            .iter()
+            .find(|r| r.project_path == format!("/tmp/proj_b_{}", pid))
+            .expect("proj_b not found in results");
 
-    let proj_a = proj_a.expect("proj_a not found in results");
-    let proj_b = proj_b.expect("proj_b not found in results");
+        assert_eq!(proj_a.commands, 2);
+        assert_eq!(proj_b.commands, 1);
+        assert_eq!(proj_a.saved_tokens, 800);
+        assert_eq!(proj_b.saved_tokens, 1000);
 
-    // proj_a has 2 commands, proj_b has 1
-    assert_eq!(proj_a.commands, 2);
-    assert_eq!(proj_b.commands, 1);
-
-    // proj_a saved 800 total (500+300), proj_b saved 1000
-    assert_eq!(proj_a.saved_tokens, 800);
-    assert_eq!(proj_b.saved_tokens, 1000);
-
-    // Results are ordered by saved DESC, so proj_b should come before proj_a
-    let idx_a = results
-        .iter()
-        .position(|r| r.project_path == format!("/tmp/proj_a_{}", pid))
-        .unwrap();
-    let idx_b = results
-        .iter()
-        .position(|r| r.project_path == format!("/tmp/proj_b_{}", pid))
-        .unwrap();
-    assert!(
-        idx_b < idx_a,
-        "proj_b (1000 saved) should appear before proj_a (800 saved)"
-    );
+        let idx_a = results
+            .iter()
+            .position(|r| r.project_path == format!("/tmp/proj_a_{}", pid))
+            .unwrap();
+        let idx_b = results
+            .iter()
+            .position(|r| r.project_path == format!("/tmp/proj_b_{}", pid))
+            .unwrap();
+        assert!(
+            idx_b < idx_a,
+            "proj_b (1000 saved) should appear before proj_a (800 saved)"
+        );
+    });
 }

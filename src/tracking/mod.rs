@@ -281,7 +281,11 @@ impl Tracker {
     /// # Ok::<(), anyhow::Error>(())
     /// ```
     pub fn new() -> Result<Self> {
-        let db_path = get_db_path(None)?;
+        Self::new_with_override(None)
+    }
+
+    fn new_with_override(override_path: Option<&str>) -> Result<Self> {
+        let db_path = get_db_path(override_path)?;
         if let Some(parent) = db_path.parent() {
             std::fs::create_dir_all(parent)?;
         }
