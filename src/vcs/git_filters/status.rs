@@ -2,6 +2,8 @@
 
 /// Format porcelain output into compact Mycelium status display
 pub(crate) fn format_status_output(porcelain: &str) -> String {
+    const MAX_STATUS_FILES: usize = 75;
+
     let lines: Vec<&str> = porcelain.lines().collect();
 
     if lines.is_empty() {
@@ -58,9 +60,9 @@ pub(crate) fn format_status_output(porcelain: &str) -> String {
         }
     }
 
-    // Build summary with 50-file total cap
+    // Build summary with a modest total cap so large worktrees still fit in context.
     let total = staged_files.len() + modified_files.len() + untracked_files.len();
-    let mut remaining_budget = 50usize;
+    let mut remaining_budget = MAX_STATUS_FILES;
 
     if staged > 0 {
         output.push_str(&format!("Staged: {} files\n", staged));
@@ -87,8 +89,11 @@ pub(crate) fn format_status_output(porcelain: &str) -> String {
         }
     }
 
-    if total > 50 {
-        output.push_str(&format!("   ... +{} more files\n", total - 50));
+    if total > MAX_STATUS_FILES {
+        output.push_str(&format!(
+            "   ... +{} more files\n",
+            total - MAX_STATUS_FILES
+        ));
     }
 
     if conflicts > 0 {
@@ -267,7 +272,7 @@ A  added.rs
 
     #[test]
     fn test_format_status_output_truncation() {
-        // Test with 7 staged files - all shown since < 50 budget
+        // Test with 7 staged files - all shown since < 75 budget
         let porcelain = r#"## main
 M  file1.rs
 M  file2.rs
@@ -285,29 +290,29 @@ M  file7.rs
     }
 
     #[test]
-    fn test_format_status_output_50_file_budget() {
-        // Test that 20+20+20=60 files total shows "... +10 more files"
+    fn test_format_status_output_75_file_budget() {
+        // Test that 30+30+30=90 files total shows "... +15 more files"
         let mut porcelain = "## main\n".to_string();
 
-        // Add 20 staged files
-        for i in 1..=20 {
+        // Add 30 staged files
+        for i in 1..=30 {
             porcelain.push_str(&format!("M  staged{}.rs\n", i));
         }
-        // Add 20 modified files
-        for i in 1..=20 {
+        // Add 30 modified files
+        for i in 1..=30 {
             porcelain.push_str(&format!(" M modified{}.rs\n", i));
         }
-        // Add 20 untracked files
-        for i in 1..=20 {
+        // Add 30 untracked files
+        for i in 1..=30 {
             porcelain.push_str(&format!("?? untracked{}.txt\n", i));
         }
 
         let result = format_status_output(&porcelain);
 
         // Should show summary lines
-        assert!(result.contains("Staged: 20 files"));
-        assert!(result.contains("Modified: 20 files"));
-        assert!(result.contains("Untracked: 20 files"));
+        assert!(result.contains("Staged: 30 files"));
+        assert!(result.contains("Modified: 30 files"));
+        assert!(result.contains("Untracked: 30 files"));
 
         // Should show first few from each category
         assert!(result.contains("staged1.rs"));
@@ -315,16 +320,16 @@ M  file7.rs
         assert!(result.contains("untracked1.txt"));
 
         // Should show budget overflow message
-        assert!(result.contains("... +10 more files"));
+        assert!(result.contains("... +15 more files"));
 
-        // Staged and modified should all appear (first 40 of budget)
-        assert!(result.contains("staged20.rs"));
-        assert!(result.contains("modified20.rs"));
+        // Staged and modified should all appear (first 60 of budget)
+        assert!(result.contains("staged30.rs"));
+        assert!(result.contains("modified30.rs"));
 
-        // Only first 10 untracked should appear (budget exhausted)
-        assert!(result.contains("untracked10.txt"));
-        assert!(!result.contains("untracked11.txt"));
-        assert!(!result.contains("untracked20.txt"));
+        // Only first 15 untracked should appear (budget exhausted)
+        assert!(result.contains("untracked15.txt"));
+        assert!(!result.contains("untracked16.txt"));
+        assert!(!result.contains("untracked30.txt"));
     }
 
     #[test]

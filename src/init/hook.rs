@@ -15,6 +15,90 @@ use super::claude_md::resolve_claude_dir;
 #[cfg(unix)]
 pub(crate) const REWRITE_HOOK: &str = include_str!("../../hooks/mycelium-rewrite.sh");
 
+#[cfg(unix)]
+const MYCELIUM_BIN_PLACEHOLDER: &str = "__MYCELIUM_BIN__";
+#[cfg(unix)]
+const JQ_BIN_PLACEHOLDER: &str = "__JQ_BIN__";
+
+#[cfg(unix)]
+fn shell_single_quote(value: &str) -> String {
+    if value.is_empty() {
+        return "''".to_string();
+    }
+
+    let mut quoted = String::from("'");
+    for ch in value.chars() {
+        if ch == '\'' {
+            quoted.push_str("'\"'\"'");
+        } else {
+            quoted.push(ch);
+        }
+    }
+    quoted.push('\'');
+    quoted
+}
+
+#[cfg(unix)]
+fn resolve_path_on_path(command: &str) -> Option<PathBuf> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let path_var = std::env::var_os("PATH")?;
+    for dir in std::env::split_paths(&path_var) {
+        let candidate = dir.join(command);
+        let metadata = match fs::metadata(&candidate) {
+            Ok(metadata) => metadata,
+            Err(_) => continue,
+        };
+
+        if metadata.is_file() && metadata.permissions().mode() & 0o111 != 0 {
+            return Some(candidate);
+        }
+    }
+
+    None
+}
+
+#[cfg(unix)]
+pub(crate) fn command_on_path(command: &str) -> bool {
+    resolve_path_on_path(command).is_some()
+}
+
+#[cfg(unix)]
+pub(crate) fn extract_quoted_assignment(content: &str, name: &str) -> Option<String> {
+    let prefix = format!("{name}=");
+    let value = content
+        .lines()
+        .find_map(|line| line.strip_prefix(&prefix))?;
+
+    if value == "''" {
+        return Some(String::new());
+    }
+
+    let unquoted = value.strip_prefix('\'')?.strip_suffix('\'')?;
+    Some(unquoted.replace("'\"'\"'", "'"))
+}
+
+#[cfg(unix)]
+pub(crate) fn render_rewrite_hook(mycelium_bin: Option<&Path>, jq_bin: Option<&Path>) -> String {
+    let mycelium_bin = mycelium_bin
+        .map(|path| shell_single_quote(&path.display().to_string()))
+        .unwrap_or_else(|| "''".to_string());
+    let jq_bin = jq_bin
+        .map(|path| shell_single_quote(&path.display().to_string()))
+        .unwrap_or_else(|| "''".to_string());
+
+    REWRITE_HOOK
+        .replace(MYCELIUM_BIN_PLACEHOLDER, &mycelium_bin)
+        .replace(JQ_BIN_PLACEHOLDER, &jq_bin)
+}
+
+#[cfg(unix)]
+fn resolve_hook_dependencies() -> (Option<PathBuf>, Option<PathBuf>) {
+    let mycelium_bin = std::env::current_exe().ok();
+    let jq_bin = resolve_path_on_path("jq");
+    (mycelium_bin, jq_bin)
+}
+
 /// Prepare hook directory and return paths (hook_dir, hook_path) — Unix-only
 #[cfg(unix)]
 pub(crate) fn prepare_hook_paths() -> Result<(PathBuf, PathBuf)> {
@@ -29,17 +113,20 @@ pub(crate) fn prepare_hook_paths() -> Result<(PathBuf, PathBuf)> {
 /// Write hook file if missing or outdated, return true if changed
 #[cfg(unix)]
 pub(crate) fn ensure_hook_installed(hook_path: &Path, verbose: u8) -> Result<bool> {
+    let (mycelium_bin, jq_bin) = resolve_hook_dependencies();
+    let rendered_hook = render_rewrite_hook(mycelium_bin.as_deref(), jq_bin.as_deref());
+
     let changed = if hook_path.exists() {
         let existing = fs::read_to_string(hook_path)
             .with_context(|| format!("Failed to read existing hook: {}", hook_path.display()))?;
 
-        if existing == REWRITE_HOOK {
+        if existing == rendered_hook {
             if verbose > 0 {
                 eprintln!("Hook already up to date: {}", hook_path.display());
             }
             false
         } else {
-            fs::write(hook_path, REWRITE_HOOK)
+            fs::write(hook_path, rendered_hook)
                 .with_context(|| format!("Failed to write hook to {}", hook_path.display()))?;
             if verbose > 0 {
                 eprintln!("Updated hook: {}", hook_path.display());
@@ -47,7 +134,7 @@ pub(crate) fn ensure_hook_installed(hook_path: &Path, verbose: u8) -> Result<boo
             true
         }
     } else {
-        fs::write(hook_path, REWRITE_HOOK)
+        fs::write(hook_path, rendered_hook)
             .with_context(|| format!("Failed to write hook to {}", hook_path.display()))?;
         if verbose > 0 {
             eprintln!("Created hook: {}", hook_path.display());
@@ -146,15 +233,41 @@ mod tests {
     #[test]
     #[cfg(unix)]
     fn test_hook_has_guards() {
-        assert!(REWRITE_HOOK.contains("command -v mycelium"));
-        assert!(REWRITE_HOOK.contains("command -v jq"));
+        assert!(REWRITE_HOOK.contains("__MYCELIUM_BIN__"));
+        assert!(REWRITE_HOOK.contains("__JQ_BIN__"));
+        assert!(REWRITE_HOOK.contains("_resolve_command()"));
+        assert!(REWRITE_HOOK.contains("command -v \"$fallback\""));
         // Guards (mycelium/jq availability checks) must appear before the actual delegation call.
         // The thin delegating hook no longer uses set -euo pipefail.
-        let jq_pos = REWRITE_HOOK.find("command -v jq").unwrap();
-        let mycelium_delegate_pos = REWRITE_HOOK.find("mycelium rewrite \"$CMD\"").unwrap();
+        let jq_pos = REWRITE_HOOK.find("if ! JQ_CMD").unwrap();
+        let mycelium_guard_pos = REWRITE_HOOK.find("if ! MYCELIUM_CMD").unwrap();
+        let mycelium_delegate_pos = REWRITE_HOOK.find("rewrite \"$CMD\"").unwrap();
         assert!(
-            jq_pos < mycelium_delegate_pos,
+            jq_pos < mycelium_delegate_pos && mycelium_guard_pos < mycelium_delegate_pos,
             "Guards must appear before mycelium rewrite delegation"
+        );
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_render_rewrite_hook_embeds_and_quotes_paths() {
+        let mycelium_bin = Path::new("/opt/mycelium/bin/mycelium build");
+        let jq_bin = Path::new("/usr/local/bin/jq");
+
+        let rendered = render_rewrite_hook(Some(mycelium_bin), Some(jq_bin));
+
+        assert!(!rendered.contains("__MYCELIUM_BIN__"));
+        assert!(!rendered.contains("__JQ_BIN__"));
+        assert!(rendered.contains("MYCELIUM_BIN='/opt/mycelium/bin/mycelium build'"));
+        assert!(rendered.contains("JQ_BIN='/usr/local/bin/jq'"));
+
+        assert_eq!(
+            extract_quoted_assignment(&rendered, "MYCELIUM_BIN").as_deref(),
+            Some("/opt/mycelium/bin/mycelium build")
+        );
+        assert_eq!(
+            extract_quoted_assignment(&rendered, "JQ_BIN").as_deref(),
+            Some("/usr/local/bin/jq")
         );
     }
 

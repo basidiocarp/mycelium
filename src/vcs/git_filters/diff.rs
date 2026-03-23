@@ -5,13 +5,14 @@
 /// Shows file names, hunk headers, and changed lines up to `max_hunk_lines`
 /// per hunk, capping the total output at `max_lines` result lines.
 pub(crate) fn compact_diff(diff: &str, max_lines: usize) -> String {
+    const MAX_HUNK_LINES: usize = 150;
+
     let mut result = Vec::new();
     let mut current_file = String::new();
     let mut added = 0;
     let mut removed = 0;
     let mut in_hunk = false;
     let mut hunk_lines = 0;
-    let max_hunk_lines = 100;
 
     for line in diff.lines() {
         if line.starts_with("diff --git") {
@@ -33,17 +34,17 @@ pub(crate) fn compact_diff(diff: &str, max_lines: usize) -> String {
         } else if in_hunk {
             if line.starts_with('+') && !line.starts_with("+++") {
                 added += 1;
-                if hunk_lines < max_hunk_lines {
+                if hunk_lines < MAX_HUNK_LINES {
                     result.push(format!("  {}", line));
                     hunk_lines += 1;
                 }
             } else if line.starts_with('-') && !line.starts_with("---") {
                 removed += 1;
-                if hunk_lines < max_hunk_lines {
+                if hunk_lines < MAX_HUNK_LINES {
                     result.push(format!("  {}", line));
                     hunk_lines += 1;
                 }
-            } else if hunk_lines < max_hunk_lines && !line.starts_with("\\") {
+            } else if hunk_lines < MAX_HUNK_LINES && !line.starts_with("\\") {
                 // Context line
                 if hunk_lines > 0 {
                     result.push(format!("  {}", line));
@@ -51,7 +52,7 @@ pub(crate) fn compact_diff(diff: &str, max_lines: usize) -> String {
                 }
             }
 
-            if hunk_lines == max_hunk_lines {
+            if hunk_lines == MAX_HUNK_LINES {
                 result.push("  ... (truncated)".to_string());
                 hunk_lines += 1;
             }
@@ -91,19 +92,35 @@ mod tests {
 
     #[test]
     fn test_compact_diff_increased_hunk_limit() {
-        // Build a hunk with 25 changed lines — should NOT be truncated with limit 30
+        // Build a hunk with 140 changed lines — should NOT be truncated with the
+        // current 150-line per-hunk budget.
         let mut diff =
-            "diff --git a/big.rs b/big.rs\n--- a/big.rs\n+++ b/big.rs\n@@ -1,25 +1,25 @@\n"
+            "diff --git a/big.rs b/big.rs\n--- a/big.rs\n+++ b/big.rs\n@@ -1,140 +1,140 @@\n"
                 .to_string();
-        for i in 1..=25 {
+        for i in 1..=140 {
             diff.push_str(&format!("+line{}\n", i));
         }
         let result = compact_diff(&diff, 500);
         assert!(
             !result.contains("... (truncated)"),
-            "25 lines should not be truncated with max_hunk_lines=30"
+            "140 lines should not be truncated with max_hunk_lines=150"
         );
-        assert!(result.contains("+line25"));
+        assert!(result.contains("+line140"));
+    }
+
+    #[test]
+    fn test_compact_diff_truncates_extreme_hunks() {
+        let mut diff =
+            "diff --git a/huge.rs b/huge.rs\n--- a/huge.rs\n+++ b/huge.rs\n@@ -1,220 +1,220 @@\n"
+                .to_string();
+        for i in 1..=220 {
+            diff.push_str(&format!("+line{}\n", i));
+        }
+        let result = compact_diff(&diff, 500);
+        assert!(
+            result.contains("... (truncated)"),
+            "220 lines should still be truncated to avoid blowing up output"
+        );
     }
 
     #[test]

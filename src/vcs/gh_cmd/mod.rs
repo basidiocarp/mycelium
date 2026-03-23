@@ -157,6 +157,7 @@ use anyhow::Result;
 
 #[cfg(test)]
 mod tests {
+    use super::issue::should_passthrough_issue_view;
     use super::*;
     use crate::utils::truncate;
 
@@ -253,5 +254,21 @@ mod tests {
         let (id, extra) = extract_identifier_and_extra_args(&args).unwrap();
         assert_eq!(id, "123");
         assert_eq!(extra, vec!["--web"]);
+    }
+
+    #[test]
+    fn test_should_passthrough_issue_view_comments() {
+        assert!(should_passthrough_issue_view(&["--comments".into()]));
+    }
+
+    #[test]
+    fn test_should_passthrough_issue_view_json_and_web() {
+        assert!(should_passthrough_issue_view(&["--json".into()]));
+        assert!(should_passthrough_issue_view(&["--web".into()]));
+    }
+
+    #[test]
+    fn test_should_passthrough_issue_view_default() {
+        assert!(!should_passthrough_issue_view(&[]));
     }
 }

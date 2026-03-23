@@ -20,6 +20,12 @@ pub(super) fn dispatch_issue(args: &[String], verbose: u8, ultra_compact: bool) 
     }
 }
 
+pub fn should_passthrough_issue_view(extra_args: &[String]) -> bool {
+    extra_args.iter().any(|a| {
+        a == "--comments" || a == "--json" || a == "--jq" || a == "--template" || a == "--web"
+    })
+}
+
 fn list_issues(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()> {
     let timer = tracking::TimedExecution::start();
 
@@ -91,6 +97,14 @@ fn view_issue(args: &[String], _verbose: u8) -> Result<()> {
         Some(result) => result,
         None => return Err(anyhow::anyhow!("Issue number required")),
     };
+
+    if should_passthrough_issue_view(&extra_args) {
+        return super::passthrough::run_passthrough_with_extra(
+            "gh",
+            &["issue", "view", &issue_number],
+            &extra_args,
+        );
+    }
 
     let mut cmd = Command::new("gh");
     cmd.args([

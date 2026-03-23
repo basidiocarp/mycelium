@@ -5,6 +5,11 @@ use crate::{tracking, utils::ok_confirmation, vcs::git_filters};
 use anyhow::{Context, Result};
 use std::process::Command;
 
+pub fn should_passthrough_pr_diff(args: &[String]) -> bool {
+    args.iter()
+        .any(|a| a == "--no-compact" || a == "--name-only" || a == "--web")
+}
+
 pub fn pr_create(args: &[String], _verbose: u8) -> Result<()> {
     let timer = tracking::TimedExecution::start();
 
@@ -85,15 +90,15 @@ pub fn pr_merge(args: &[String], _verbose: u8) -> Result<()> {
 }
 
 pub fn pr_diff(args: &[String], _verbose: u8) -> Result<()> {
-    // --no-compact: pass full diff through (gh CLI doesn't know this flag, strip it)
-    let no_compact = args.iter().any(|a| a == "--no-compact");
+    let passthrough = should_passthrough_pr_diff(args);
     let gh_args: Vec<String> = args
         .iter()
         .filter(|a| *a != "--no-compact")
         .cloned()
         .collect();
 
-    if no_compact {
+    // Some flags change the output shape enough that the diff compactor should not run.
+    if passthrough {
         return run_passthrough_with_extra("gh", &["pr", "diff"], &gh_args);
     }
 
@@ -183,6 +188,7 @@ pub fn pr_action(action: &str, args: &[String], _verbose: u8) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use super::should_passthrough_pr_diff;
     use crate::utils::ok_confirmation;
 
     #[test]
@@ -208,5 +214,21 @@ mod tests {
     fn test_ok_confirmation_pr_edit() {
         let result = ok_confirmation("edited", "#42");
         assert_eq!(result, "ok edited #42");
+    }
+
+    #[test]
+    fn test_should_passthrough_pr_diff_name_only() {
+        assert!(should_passthrough_pr_diff(&["--name-only".into()]));
+    }
+
+    #[test]
+    fn test_should_passthrough_pr_diff_web_and_no_compact() {
+        assert!(should_passthrough_pr_diff(&["--web".into()]));
+        assert!(should_passthrough_pr_diff(&["--no-compact".into()]));
+    }
+
+    #[test]
+    fn test_should_passthrough_pr_diff_default() {
+        assert!(!should_passthrough_pr_diff(&[]));
     }
 }

@@ -328,4 +328,31 @@ mod tests {
             .collect();
         assert_eq!(cmd_args, vec!["commit", "--amend", "-m", "new msg"]);
     }
+
+    #[test]
+    fn test_commit_signed_flag() {
+        let args = vec!["-S".to_string(), "-m".to_string(), "signed".to_string()];
+        let cmd = build_commit_command(&args, &[]);
+        let cmd_args: Vec<_> = cmd
+            .get_args()
+            .map(|a| a.to_string_lossy().to_string())
+            .collect();
+        assert_eq!(cmd_args, vec!["commit", "-S", "-m", "signed"]);
+    }
+
+    #[test]
+    fn test_commit_signed_amend_flag() {
+        let args = vec![
+            "--amend".to_string(),
+            "-S".to_string(),
+            "-m".to_string(),
+            "re-signed".to_string(),
+        ];
+        let cmd = build_commit_command(&args, &[]);
+        let cmd_args: Vec<_> = cmd
+            .get_args()
+            .map(|a| a.to_string_lossy().to_string())
+            .collect();
+        assert_eq!(cmd_args, vec!["commit", "--amend", "-S", "-m", "re-signed"]);
+    }
 }

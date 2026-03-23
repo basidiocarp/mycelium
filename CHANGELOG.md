@@ -2,6 +2,19 @@
 
 All notable changes to Mycelium are documented in this file.
 
+## v0.5.1 - 2026-03-23
+
+### Changed
+
+- **`gh` passthrough edge modes**: `mycelium gh issue view` now defers to the real GitHub CLI for `--comments`, `--json`, `--jq`, `--template`, and `--web`, and `mycelium gh pr diff` now passes through `--name-only`, `--web`, and `--no-compact` instead of forcing compacted output.
+- **Larger Git compaction budgets**: Increased the retained diff hunk budget and status file budget so routine repository state is less likely to be truncated.
+- **Rewrite hook installation**: Installed hooks now embed resolved `mycelium` and `jq` paths while still falling back to `PATH` when needed.
+
+### Fixed
+
+- **Signed commit coverage**: Added regression tests around `git commit -S` flows so signed commit and signed amend behavior stays intact.
+- **Hook PATH fragility**: Rewrite hooks now emit explicit skip diagnostics when `mycelium` or `jq` are unavailable, and `mycelium init --show-config` reports stale embedded paths and missing runtime dependencies instead of failing silently.
+
 ## v0.5.0 - 2026-03-22
 
 ### Added

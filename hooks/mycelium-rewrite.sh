@@ -20,18 +20,45 @@ _mycelium_audit_log() {
     >> "${dir}/hook-audit.log"
 }
 
+_resolve_command() {
+  local configured="$1" fallback="$2"
+  if [ -n "$configured" ] && [ -x "$configured" ]; then
+    printf '%s\n' "$configured"
+    return 0
+  fi
+  if command -v "$fallback" &>/dev/null; then
+    command -v "$fallback"
+    return 0
+  fi
+  return 1
+}
+
 # =========================================================
 #  Dependency guards
 # =========================================================
-if ! command -v mycelium &>/dev/null || ! command -v jq &>/dev/null; then
-  _mycelium_audit_log "skip:no_deps" "-"
+MYCELIUM_BIN=__MYCELIUM_BIN__
+JQ_BIN=__JQ_BIN__
+
+if ! MYCELIUM_CMD="$(_resolve_command "$MYCELIUM_BIN" mycelium)"; then
+  _mycelium_audit_log "skip:no_mycelium" "$PATH"
+  echo "[mycelium] hook skipped: mycelium binary not found" >&2
+  echo "[mycelium] embedded mycelium path: ${MYCELIUM_BIN:-unset}" >&2
+  echo "[mycelium] PATH=$PATH" >&2
+  exit 0
+fi
+
+if ! JQ_CMD="$(_resolve_command "$JQ_BIN" jq)"; then
+  _mycelium_audit_log "skip:no_jq" "$PATH"
+  echo "[mycelium] hook skipped: jq binary not found" >&2
+  echo "[mycelium] embedded jq path: ${JQ_BIN:-unset}" >&2
+  echo "[mycelium] PATH=$PATH" >&2
   exit 0
 fi
 
 # =========================================================
 #  Version guard
 # =========================================================
-MYCELIUM_VERSION=$(mycelium --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+MYCELIUM_VERSION=$("$MYCELIUM_CMD" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
 if [ -n "$MYCELIUM_VERSION" ]; then
   MAJOR=$(echo "$MYCELIUM_VERSION" | cut -d. -f1)
   MINOR=$(echo "$MYCELIUM_VERSION" | cut -d. -f2)
@@ -49,7 +76,7 @@ set -euo pipefail
 #  Parse input
 # =========================================================
 INPUT=$(cat)
-CMD=$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null) || {
+CMD=$(echo "$INPUT" | "$JQ_CMD" -r '.tool_input.command // empty' 2>/dev/null) || {
   _mycelium_audit_log "skip:jq_parse_error" "-"
   exit 0
 }
@@ -67,7 +94,7 @@ esac
 # =========================================================
 #  Delegate to mycelium rewrite
 # =========================================================
-REWRITTEN=$(mycelium rewrite "$CMD" 2>/dev/null) || {
+REWRITTEN=$("$MYCELIUM_CMD" rewrite "$CMD" 2>/dev/null) || {
   _mycelium_audit_log "skip:no_match" "$CMD"
   exit 0
 }
@@ -83,10 +110,10 @@ _mycelium_audit_log "rewrite" "$CMD" "$REWRITTEN"
 # =========================================================
 #  Output rewrite instruction
 # =========================================================
-ORIGINAL_INPUT=$(echo "$INPUT" | jq -c '.tool_input')
-UPDATED_INPUT=$(echo "$ORIGINAL_INPUT" | jq --arg cmd "$REWRITTEN" '.command = $cmd')
+ORIGINAL_INPUT=$(echo "$INPUT" | "$JQ_CMD" -c '.tool_input')
+UPDATED_INPUT=$(echo "$ORIGINAL_INPUT" | "$JQ_CMD" --arg cmd "$REWRITTEN" '.command = $cmd')
 
-jq -n \
+"$JQ_CMD" -n \
   --argjson updated "$UPDATED_INPUT" \
   '{
     "hookSpecificOutput": {

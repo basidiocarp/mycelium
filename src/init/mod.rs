@@ -17,6 +17,8 @@ use claude_md::{
 #[cfg(unix)]
 use claude_md::{MYCELIUM_SLIM, patch_claude_md};
 #[cfg(unix)]
+use hook::{command_on_path, extract_quoted_assignment};
+#[cfg(unix)]
 use hook::{prepare_hook_paths, write_if_changed};
 #[cfg(unix)]
 use json_patch::patch_settings_json;
@@ -139,8 +141,9 @@ pub fn show_config() -> Result<()> {
             let is_executable = perms.mode() & 0o111 != 0;
 
             let hook_content = fs::read_to_string(&hook_path)?;
-            let has_guards = hook_content.contains("command -v mycelium")
-                && hook_content.contains("command -v jq");
+            let has_guards = hook_content.contains("_resolve_command()")
+                && hook_content.contains("MYCELIUM_BIN=__MYCELIUM_BIN__")
+                && hook_content.contains("JQ_BIN=__JQ_BIN__");
             let is_thin_delegator = hook_content.contains("mycelium rewrite");
             let hook_version = crate::hook_check::parse_hook_version(&hook_content);
 
@@ -163,6 +166,64 @@ pub fn show_config() -> Result<()> {
                     hook_path.display(),
                     hook_version
                 );
+                let mycelium_embedded =
+                    extract_quoted_assignment(&hook_content, "MYCELIUM_BIN").unwrap_or_default();
+                let jq_embedded =
+                    extract_quoted_assignment(&hook_content, "JQ_BIN").unwrap_or_default();
+                let mycelium_on_path = command_on_path("mycelium");
+                let jq_on_path = command_on_path("jq");
+
+                if mycelium_embedded.is_empty() {
+                    println!(
+                        "[!] Hook dependency: mycelium was not embedded at install time; PATH fallback is required"
+                    );
+                } else {
+                    let path = PathBuf::from(&mycelium_embedded);
+                    if !path.exists() {
+                        println!(
+                            "[!] Hook dependency: embedded mycelium path missing: {}",
+                            path.display()
+                        );
+                    }
+                }
+
+                if jq_embedded.is_empty() {
+                    println!(
+                        "[!] Hook dependency: jq was not embedded at install time; PATH fallback is required"
+                    );
+                } else {
+                    let path = PathBuf::from(&jq_embedded);
+                    if !path.exists() {
+                        println!(
+                            "[!] Hook dependency: embedded jq path missing: {}",
+                            path.display()
+                        );
+                    }
+                }
+
+                let mut missing_path = Vec::new();
+                if !mycelium_on_path {
+                    missing_path.push("mycelium");
+                }
+                if !jq_on_path {
+                    missing_path.push("jq");
+                }
+                if !missing_path.is_empty() {
+                    println!(
+                        "[!] Hook PATH: current PATH does not expose {}",
+                        missing_path.join(" or ")
+                    );
+                    if !jq_on_path {
+                        println!(
+                            "    jq is missing from PATH; the hook will use an embedded path when available, otherwise it will skip rewrites."
+                        );
+                    }
+                    if !mycelium_on_path {
+                        println!(
+                            "    mycelium is missing from PATH; the hook will use an embedded path when available, otherwise it will skip rewrites."
+                        );
+                    }
+                }
             } else {
                 println!("[!] Hook: {} (no guards - outdated)", hook_path.display());
             }
