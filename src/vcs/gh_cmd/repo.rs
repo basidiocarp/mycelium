@@ -6,7 +6,12 @@ use anyhow::{Context, Result};
 use std::process::Command;
 
 use super::parsers::GhRepoViewParser;
-use super::passthrough::run_passthrough;
+use super::passthrough::{run_passthrough, run_passthrough_with_extra};
+
+fn should_passthrough_repo_view(args: &[String]) -> bool {
+    args.iter()
+        .any(|a| a == "--json" || a == "--jq" || a == "--template" || a == "--web")
+}
 
 pub(super) fn dispatch_repo(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()> {
     // Parse subcommand (default to "view")
@@ -18,6 +23,10 @@ pub(super) fn dispatch_repo(args: &[String], _verbose: u8, ultra_compact: bool) 
 
     if subcommand != "view" {
         return run_passthrough("gh", "repo", args);
+    }
+
+    if should_passthrough_repo_view(rest_args) {
+        return run_passthrough_with_extra("gh", &["repo", "view"], rest_args);
     }
 
     let timer = tracking::TimedExecution::start();
@@ -93,4 +102,28 @@ pub(super) fn dispatch_api(args: &[String], _verbose: u8) -> Result<()> {
     // Converting JSON to a schema destroys all values and forces Claude to re-fetch.
     // Passthrough preserves the full response and tracks metrics at 0% savings.
     run_passthrough("gh", "api", args)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::should_passthrough_repo_view;
+
+    #[test]
+    fn test_should_passthrough_repo_view_json_template_web() {
+        assert!(should_passthrough_repo_view(&["--json".into()]));
+        assert!(should_passthrough_repo_view(&[
+            "--jq".into(),
+            ".name".into()
+        ]));
+        assert!(should_passthrough_repo_view(&[
+            "--template".into(),
+            "{{.name}}".into()
+        ]));
+        assert!(should_passthrough_repo_view(&["--web".into()]));
+    }
+
+    #[test]
+    fn test_should_passthrough_repo_view_default() {
+        assert!(!should_passthrough_repo_view(&[]));
+    }
 }

@@ -2,6 +2,25 @@
 
 All notable changes to Mycelium are documented in this file.
 
+## v0.6.0 - 2026-03-23
+
+### Added
+
+- **Task-runner-aware rewrite support**: Explicit wrapper forms like `mise exec -- <command>`, `just -- <command>`, and `task -- <command>` now unwrap to the underlying command for rewrite/classification, while ambiguous task names still fail safe to raw execution.
+- **Tracking DB status view**: `mycelium gain --status` now reports the active tracking database path, where that path came from, and basic health details.
+- **Curated library API**: `src/lib.rs` now exposes rewrite, filter, compaction, and tracking helpers for downstream Basidiocarp tools.
+
+### Changed
+
+- **Broader `gh` edge-mode passthrough**: Issue, PR, run, and repo views now pass through more output-shaping modes like `--json`, `--jq`, `--template`, `--web`, `--comments`, and related browser/watch variants instead of trying to filter the wrong output shape.
+- **Named compaction profiles**: Added `debug`, `balanced`, and `aggressive` compaction profiles and wired them into adaptive classification plus git diff/status compression budgets.
+- **Hook install diagnostics**: Installed rewrite hooks now carry a stamped Mycelium version, and `mycelium init --show-config` can distinguish current hooks from stale or unknown ones with direct repair guidance.
+
+### Fixed
+
+- **Hook repair visibility**: Rewrite hooks now explain skipped rewrites more clearly when `mycelium`, `jq`, or embedded paths are stale or missing.
+- **Tracking path drift diagnosis**: Config, doctor output, and tracking utilities now surface whether the active DB path came from an override, env var, config file, or platform default.
+
 ## v0.5.1 - 2026-03-23
 
 ### Changed

@@ -172,6 +172,28 @@ fn test_default_db_path() {
     assert!(db_path.ends_with("mycelium/history.db"));
 }
 
+#[test]
+fn test_resolve_db_path_info_override() {
+    let info = resolve_db_path_info(Some("/tmp/mycelium_override.db"))
+        .expect("Failed to resolve db path info");
+    assert_eq!(info.source, DbPathSource::Override);
+    assert_eq!(info.path, PathBuf::from("/tmp/mycelium_override.db"));
+    assert!(info.config_path.ends_with("mycelium/config.toml"));
+}
+
+#[test]
+fn test_resolve_db_path_info_env() {
+    with_test_db("test_resolve_db_path_info_env", |db_path| {
+        // SAFETY: serialized by global test lock in with_test_db.
+        unsafe { std::env::set_var("MYCELIUM_DB_PATH", db_path) };
+        let info = resolve_db_path_info(None).expect("Failed to resolve db path info");
+        // SAFETY: paired with set_var above.
+        unsafe { std::env::remove_var("MYCELIUM_DB_PATH") };
+        assert_eq!(info.source, DbPathSource::Environment);
+        assert_eq!(info.path, PathBuf::from(db_path));
+    });
+}
+
 // 9. project_filter_params uses GLOB pattern with * wildcard
 #[test]
 fn test_project_filter_params_glob_pattern() {

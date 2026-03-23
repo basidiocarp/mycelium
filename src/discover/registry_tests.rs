@@ -1393,6 +1393,53 @@ fn test_rewrite_gh_without_json_still_works() {
 }
 
 #[test]
+fn test_classify_task_runner_direct_exec_commands() {
+    assert_eq!(
+        classify_command("mise exec -- cargo test"),
+        Classification::Supported {
+            mycelium_equivalent: "mycelium cargo",
+            category: "Cargo",
+            estimated_savings_pct: 90.0,
+            status: MyceliumStatus::Existing,
+        }
+    );
+}
+
+#[test]
+fn test_rewrite_task_runner_direct_exec_commands() {
+    assert_eq!(
+        rewrite_command("mise exec -- cargo test", &[]),
+        Some("mycelium cargo test".into())
+    );
+    assert_eq!(
+        rewrite_command("just -- git status", &[]),
+        Some("mycelium git status".into())
+    );
+    assert_eq!(
+        rewrite_command("task -- cargo test", &[]),
+        Some("mycelium cargo test".into())
+    );
+}
+
+#[test]
+fn test_rewrite_task_runner_ambiguous_commands_stay_raw() {
+    assert_eq!(rewrite_command("just test", &[]), None);
+    assert_eq!(rewrite_command("task build", &[]), None);
+}
+
+#[test]
+fn test_display_command_for_discover_uses_wrapped_command() {
+    assert_eq!(
+        display_command_for_discover("FOO=1 mise exec -- cargo test"),
+        "cargo test"
+    );
+    assert_eq!(
+        display_command_for_discover("just -- git status"),
+        "git status"
+    );
+}
+
+#[test]
 fn test_classify_js_runner_prefixes() {
     let r = classify_command("bunx vitest run");
     assert!(

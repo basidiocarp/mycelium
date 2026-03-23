@@ -2,37 +2,37 @@
 
 use crate::tracking;
 use crate::vcs::gh_cmd::{
-    extract_identifier_and_extra_args, filter_markdown_body, run_passthrough_with_extra,
+    extract_optional_identifier_and_extra_args, filter_markdown_body, run_passthrough_with_extra,
 };
 use anyhow::{Context, Result};
 use serde_json::Value;
 use std::process::Command;
 
 pub fn should_passthrough_pr_view(extra_args: &[String]) -> bool {
-    extra_args
-        .iter()
-        .any(|a| a == "--json" || a == "--jq" || a == "--web")
+    extra_args.iter().any(|a| {
+        a == "--comments" || a == "--json" || a == "--jq" || a == "--template" || a == "--web"
+    })
 }
 
 pub fn view_pr(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()> {
     let timer = tracking::TimedExecution::start();
 
-    let (pr_number, extra_args) = match extract_identifier_and_extra_args(args) {
-        Some(result) => result,
-        None => return Err(anyhow::anyhow!("PR number required")),
+    let (pr_number, extra_args) = extract_optional_identifier_and_extra_args(args);
+    let base_args = if let Some(ref pr_number) = pr_number {
+        vec!["pr", "view", pr_number.as_str()]
+    } else {
+        vec!["pr", "view"]
     };
 
-    // If the user provides --jq or --web, pass through directly.
+    // If the user provides output-shaping flags, pass through directly.
     // Note: --json is already handled globally by run() via has_json_flag.
     if should_passthrough_pr_view(&extra_args) {
-        return run_passthrough_with_extra("gh", &["pr", "view", &pr_number], &extra_args);
+        return run_passthrough_with_extra("gh", &base_args, &extra_args);
     }
 
     let mut cmd = Command::new("gh");
+    cmd.args(&base_args);
     cmd.args([
-        "pr",
-        "view",
-        &pr_number,
         "--json",
         "number,title,state,author,body,url,mergeable,reviews,statusCheckRollup",
     ]);
@@ -45,12 +45,15 @@ pub fn view_pr(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()>
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-        timer.track(
-            &format!("gh pr view {}", pr_number),
-            &format!("mycelium gh pr view {}", pr_number),
-            &stderr,
-            &stderr,
-        );
+        let pr_label = pr_number
+            .as_deref()
+            .map(|n| format!("gh pr view {}", n))
+            .unwrap_or_else(|| "gh pr view".to_string());
+        let mycelium_label = pr_number
+            .as_deref()
+            .map(|n| format!("mycelium gh pr view {}", n))
+            .unwrap_or_else(|| "mycelium gh pr view".to_string());
+        timer.track(&pr_label, &mycelium_label, &stderr, &stderr);
         eprintln!("{}", stderr.trim());
         std::process::exit(output.status.code().unwrap_or(1));
     }
@@ -178,12 +181,15 @@ pub fn view_pr(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()>
         }
     }
 
-    timer.track(
-        &format!("gh pr view {}", pr_number),
-        &format!("mycelium gh pr view {}", pr_number),
-        &raw,
-        &filtered,
-    );
+    let pr_label = pr_number
+        .as_deref()
+        .map(|n| format!("gh pr view {}", n))
+        .unwrap_or_else(|| "gh pr view".to_string());
+    let mycelium_label = pr_number
+        .as_deref()
+        .map(|n| format!("mycelium gh pr view {}", n))
+        .unwrap_or_else(|| "mycelium gh pr view".to_string());
+    timer.track(&pr_label, &mycelium_label, &raw, &filtered);
     Ok(())
 }
 
@@ -211,13 +217,22 @@ mod tests {
     }
 
     #[test]
+    fn test_should_passthrough_pr_view_comments_and_template() {
+        assert!(should_passthrough_pr_view(&["--comments".into()]));
+        assert!(should_passthrough_pr_view(&[
+            "--template".into(),
+            "{{.body}}".into()
+        ]));
+    }
+
+    #[test]
     fn test_should_passthrough_pr_view_default() {
         assert!(!should_passthrough_pr_view(&[]));
     }
 
     #[test]
     fn test_should_passthrough_pr_view_other_flags() {
-        assert!(!should_passthrough_pr_view(&["--comments".into()]));
+        assert!(!should_passthrough_pr_view(&[]));
     }
 
     #[test]

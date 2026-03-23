@@ -63,6 +63,69 @@ fn env_prefix() -> &'static Regex {
     })
 }
 
+/// If a task runner is being used as a clear direct-execution wrapper, return the underlying command.
+///
+/// This intentionally only recognizes explicit raw-command forms rather than opaque recipe names.
+pub(crate) fn unwrap_task_runner_command(cmd: &str) -> Option<&str> {
+    let trimmed = cmd.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    if let Some(rest) = trimmed.strip_prefix("mise ") {
+        let rest = rest.trim_start();
+        if let Some(payload) = rest.strip_prefix("exec -- ") {
+            return Some(payload.trim_start());
+        }
+        if let Some(payload) = rest.strip_prefix("x -- ") {
+            return Some(payload.trim_start());
+        }
+        if let Some(payload) = rest.strip_prefix("exec ") {
+            return Some(payload.trim_start());
+        }
+        if let Some(payload) = rest.strip_prefix("x ") {
+            return Some(payload.trim_start());
+        }
+    }
+
+    if let Some(rest) = trimmed.strip_prefix("just ") {
+        let rest = rest.trim_start();
+        if let Some(payload) = rest.strip_prefix("-- ") {
+            return Some(payload.trim_start());
+        }
+    }
+
+    if let Some(rest) = trimmed.strip_prefix("task ") {
+        let rest = rest.trim_start();
+        if let Some(payload) = rest.strip_prefix("-- ") {
+            return Some(payload.trim_start());
+        }
+    }
+
+    None
+}
+
+/// Normalize a command string for discover reports.
+///
+/// This trims wrappers like `mise exec --` and `just --`, then keeps the first
+/// two words for display so reports surface the underlying command shape.
+pub(crate) fn display_command_for_discover(cmd: &str) -> String {
+    let trimmed = cmd.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+
+    let stripped = env_prefix().replace(trimmed, "");
+    let cmd_clean = stripped.trim();
+    let display_source = unwrap_task_runner_command(cmd_clean).unwrap_or(cmd_clean);
+    let parts: Vec<&str> = display_source.splitn(3, char::is_whitespace).collect();
+    match parts.len() {
+        0 => String::new(),
+        1 => parts[0].to_string(),
+        _ => format!("{} {}", parts[0], parts[1]),
+    }
+}
+
 /// Classify a single (already-split) command.
 pub fn classify_command(cmd: &str) -> Classification {
     let trimmed = cmd.trim();
@@ -87,6 +150,10 @@ pub fn classify_command(cmd: &str) -> Classification {
     let cmd_clean = stripped.trim();
     if cmd_clean.is_empty() {
         return Classification::Ignored;
+    }
+
+    if let Some(inner) = unwrap_task_runner_command(cmd_clean) {
+        return classify_command(inner);
     }
 
     // Fast check with RegexSet — take the last (most specific) match
@@ -457,16 +524,26 @@ fn rewrite_segment(seg: &str, excluded: &[String]) -> Option<String> {
         return Some(trimmed.to_string());
     }
 
+    let stripped_cow = env_prefix().replace(trimmed, "");
+    let env_prefix_len = trimmed.len() - stripped_cow.len();
+    let env_prefix = &trimmed[..env_prefix_len];
+    let cmd_clean = stripped_cow.trim();
+
+    if let Some(inner) = unwrap_task_runner_command(cmd_clean) {
+        let rewritten = rewrite_segment(inner, excluded)?;
+        return Some(format!("{}{}", env_prefix, rewritten));
+    }
+
     // Special case: `head -N file` / `head --lines=N file` → `mycelium read file --max-lines N`
     // Must intercept before generic prefix replacement, which would produce `mycelium read -20 file`.
     // Only intercept when head has a flag (-N, --lines=N, -c, etc.); plain `head file` falls
     // through to the generic rewrite below and produces `mycelium read file` as expected.
-    if trimmed.starts_with("head -") {
-        return rewrite_head_numeric(trimmed);
+    if cmd_clean.starts_with("head -") {
+        return rewrite_head_numeric(cmd_clean);
     }
 
     // Use classify_command for correct ignore/prefix handling
-    let mycelium_equivalent = match classify_command(trimmed) {
+    let mycelium_equivalent = match classify_command(cmd_clean) {
         Classification::Supported {
             mycelium_equivalent,
             ..
@@ -480,12 +557,6 @@ fn rewrite_segment(seg: &str, excluded: &[String]) -> Option<String> {
         }
         _ => return None,
     };
-
-    // Extract env prefix (sudo, env VAR=val, etc.)
-    let stripped_cow = env_prefix().replace(trimmed, "");
-    let env_prefix_len = trimmed.len() - stripped_cow.len();
-    let env_prefix = &trimmed[..env_prefix_len];
-    let cmd_clean = stripped_cow.trim();
 
     // #345: MYCELIUM_DISABLED=1 in env prefix → skip rewrite entirely
     if env_prefix.contains("MYCELIUM_DISABLED=") {

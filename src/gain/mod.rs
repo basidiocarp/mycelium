@@ -22,6 +22,7 @@ pub fn run(
     all: bool,
     format: &str,
     failures: bool,
+    status: bool,
     compare: Option<&str>,
     _verbose: u8,
 ) -> Result<()> {
@@ -31,6 +32,10 @@ pub fn run(
     }
 
     let tracker = Tracker::new().context("Failed to initialize tracking database")?;
+
+    if status {
+        return display::show_status(&tracker);
+    }
 
     // --projects: per-project breakdown table
     if projects {

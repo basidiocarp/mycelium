@@ -17,7 +17,7 @@ use claude_md::{
 #[cfg(unix)]
 use claude_md::{MYCELIUM_SLIM, patch_claude_md};
 #[cfg(unix)]
-use hook::{command_on_path, extract_quoted_assignment};
+use hook::{command_on_path, extract_hook_version, extract_quoted_assignment};
 #[cfg(unix)]
 use hook::{prepare_hook_paths, write_if_changed};
 #[cfg(unix)]
@@ -142,10 +142,15 @@ pub fn show_config() -> Result<()> {
 
             let hook_content = fs::read_to_string(&hook_path)?;
             let has_guards = hook_content.contains("_resolve_command()")
-                && hook_content.contains("MYCELIUM_BIN=__MYCELIUM_BIN__")
-                && hook_content.contains("JQ_BIN=__JQ_BIN__");
+                && hook_content.contains("MYCELIUM_BIN=")
+                && hook_content.contains("JQ_BIN=")
+                && !hook_content.contains("__MYCELIUM_VERSION__")
+                && !hook_content.contains("__MYCELIUM_BIN__")
+                && !hook_content.contains("__JQ_BIN__");
             let is_thin_delegator = hook_content.contains("mycelium rewrite");
             let hook_version = crate::hook_check::parse_hook_version(&hook_content);
+            let installed_version = extract_hook_version(&hook_content);
+            let current_version = hook::current_install_version();
 
             if !is_executable {
                 println!(
@@ -158,7 +163,7 @@ pub fn show_config() -> Result<()> {
                     hook_path.display()
                 );
                 println!(
-                    "   → Run `mycelium init --global` to upgrade to the single source of truth hook"
+                    "   → Run `mycelium init -g` to upgrade to the current thin delegator hook"
                 );
             } else if is_executable && has_guards {
                 println!(
@@ -166,6 +171,28 @@ pub fn show_config() -> Result<()> {
                     hook_path.display(),
                     hook_version
                 );
+                match installed_version.as_deref() {
+                    Some(version) if version == current_version => {
+                        println!("ok Hook version: {} (current)", version);
+                    }
+                    Some(version) if hook::version_is_stale(version, current_version) => {
+                        println!(
+                            "[!] Hook version: {} (stale vs current {}; run `mycelium init -g`)",
+                            version, current_version
+                        );
+                    }
+                    Some(version) => {
+                        println!(
+                            "[!] Hook version: {} (mismatch with current {}; run `mycelium init -g`)",
+                            version, current_version
+                        );
+                    }
+                    None => {
+                        println!(
+                            "[!] Hook version: unknown (run `mycelium init -g` to stamp the current version)"
+                        );
+                    }
+                }
                 let mycelium_embedded =
                     extract_quoted_assignment(&hook_content, "MYCELIUM_BIN").unwrap_or_default();
                 let jq_embedded =
@@ -177,6 +204,7 @@ pub fn show_config() -> Result<()> {
                     println!(
                         "[!] Hook dependency: mycelium was not embedded at install time; PATH fallback is required"
                     );
+                    println!("    Repair: mycelium init -g");
                 } else {
                     let path = PathBuf::from(&mycelium_embedded);
                     if !path.exists() {
@@ -184,6 +212,7 @@ pub fn show_config() -> Result<()> {
                             "[!] Hook dependency: embedded mycelium path missing: {}",
                             path.display()
                         );
+                        println!("    Repair: mycelium init -g");
                     }
                 }
 
@@ -191,6 +220,7 @@ pub fn show_config() -> Result<()> {
                     println!(
                         "[!] Hook dependency: jq was not embedded at install time; PATH fallback is required"
                     );
+                    println!("    Repair: install jq, then run `mycelium init -g`");
                 } else {
                     let path = PathBuf::from(&jq_embedded);
                     if !path.exists() {
@@ -198,6 +228,7 @@ pub fn show_config() -> Result<()> {
                             "[!] Hook dependency: embedded jq path missing: {}",
                             path.display()
                         );
+                        println!("    Repair: install jq, then run `mycelium init -g`");
                     }
                 }
 
@@ -226,6 +257,7 @@ pub fn show_config() -> Result<()> {
                 }
             } else {
                 println!("[!] Hook: {} (no guards - outdated)", hook_path.display());
+                println!("   → Run `mycelium init -g` to refresh the guarded hook");
             }
         }
 

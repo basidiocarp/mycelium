@@ -14,13 +14,25 @@ pub(super) fn run_workflow(args: &[String], verbose: u8, ultra_compact: bool) ->
     }
 
     match args[0].as_str() {
+        "list" if should_passthrough_run_list(&args[1..]) => {
+            run_passthrough_with_extra("gh", &["run", "list"], &args[1..])
+        }
         "list" => list_runs(&args[1..], verbose, ultra_compact),
         "view" => view_run(&args[1..], verbose),
         _ => run_passthrough("gh", "run", args),
     }
 }
 
+fn should_passthrough_run_list(args: &[String]) -> bool {
+    args.iter()
+        .any(|a| a == "--json" || a == "--jq" || a == "--template")
+}
+
 fn list_runs(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()> {
+    if should_passthrough_run_list(args) {
+        return run_passthrough_with_extra("gh", &["run", "list"], args);
+    }
+
     let timer = tracking::TimedExecution::start();
 
     let mut cmd = Command::new("gh");
@@ -94,26 +106,33 @@ fn list_runs(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()> {
 /// Flags like --log-failed, --log, and --json produce output that the filter
 /// would incorrectly strip.
 fn should_passthrough_run_view(extra_args: &[String]) -> bool {
-    extra_args
-        .iter()
-        .any(|a| a == "--log-failed" || a == "--log" || a == "--json")
+    extra_args.iter().any(|a| {
+        a == "--log-failed"
+            || a == "--log"
+            || a == "--json"
+            || a == "--jq"
+            || a == "--template"
+            || a == "--web"
+    })
 }
 
 fn view_run(args: &[String], _verbose: u8) -> Result<()> {
-    let (run_id, extra_args) = match super::extract_identifier_and_extra_args(args) {
-        Some(result) => result,
-        None => return Err(anyhow::anyhow!("Run ID required")),
+    let (run_id, extra_args) = super::extract_optional_identifier_and_extra_args(args);
+    let base_args = if let Some(ref run_id) = run_id {
+        vec!["run", "view", run_id.as_str()]
+    } else {
+        vec!["run", "view"]
     };
 
     // Pass through when user requests logs or JSON — the filter would strip them
     if should_passthrough_run_view(&extra_args) {
-        return run_passthrough_with_extra("gh", &["run", "view", &run_id], &extra_args);
+        return run_passthrough_with_extra("gh", &base_args, &extra_args);
     }
 
     let timer = tracking::TimedExecution::start();
 
     let mut cmd = Command::new("gh");
-    cmd.args(["run", "view", &run_id]);
+    cmd.args(&base_args);
     for arg in &extra_args {
         cmd.arg(arg);
     }
@@ -123,14 +142,15 @@ fn view_run(args: &[String], _verbose: u8) -> Result<()> {
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-        timer.track_with_parse_info(
-            &format!("gh run view {}", run_id),
-            &format!("mycelium gh run view {}", run_id),
-            &stderr,
-            &stderr,
-            3,
-            "compact",
-        );
+        let run_label = run_id
+            .as_deref()
+            .map(|id| format!("gh run view {}", id))
+            .unwrap_or_else(|| "gh run view".to_string());
+        let mycelium_label = run_id
+            .as_deref()
+            .map(|id| format!("mycelium gh run view {}", id))
+            .unwrap_or_else(|| "mycelium gh run view".to_string());
+        timer.track_with_parse_info(&run_label, &mycelium_label, &stderr, &stderr, 3, "compact");
         eprintln!("{}", stderr.trim());
         std::process::exit(output.status.code().unwrap_or(1));
     }
@@ -141,7 +161,22 @@ fn view_run(args: &[String], _verbose: u8) -> Result<()> {
 
     let mut filtered = String::new();
 
-    let line = format!("Workflow Run #{}\n", run_id);
+    let run_label = run_id
+        .as_deref()
+        .map(|id| format!("gh run view {}", id))
+        .unwrap_or_else(|| "gh run view".to_string());
+    let mycelium_label = run_id
+        .as_deref()
+        .map(|id| format!("mycelium gh run view {}", id))
+        .unwrap_or_else(|| "mycelium gh run view".to_string());
+
+    let line = format!(
+        "Workflow Run{}\n",
+        run_id
+            .as_deref()
+            .map(|id| format!(" #{}", id))
+            .unwrap_or_default()
+    );
     filtered.push_str(&line);
     print!("{}", line);
 
@@ -167,14 +202,7 @@ fn view_run(args: &[String], _verbose: u8) -> Result<()> {
         }
     }
 
-    timer.track_with_parse_info(
-        &format!("gh run view {}", run_id),
-        &format!("mycelium gh run view {}", run_id),
-        &raw,
-        &filtered,
-        1,
-        "compact",
-    );
+    timer.track_with_parse_info(&run_label, &mycelium_label, &raw, &filtered, 1, "compact");
     Ok(())
 }
 
@@ -201,12 +229,42 @@ mod tests {
     }
 
     #[test]
+    fn test_run_view_passthrough_template_and_web() {
+        assert!(should_passthrough_run_view(&[
+            "--jq".into(),
+            ".jobs".into()
+        ]));
+        assert!(should_passthrough_run_view(&[
+            "--template".into(),
+            "{{.jobs}}".into()
+        ]));
+        assert!(should_passthrough_run_view(&["--web".into()]));
+    }
+
+    #[test]
     fn test_run_view_no_passthrough_empty() {
         assert!(!should_passthrough_run_view(&[]));
     }
 
     #[test]
     fn test_run_view_no_passthrough_other_flags() {
-        assert!(!should_passthrough_run_view(&["--web".into()]));
+        assert!(!should_passthrough_run_view(&["--exit-status".into()]));
+    }
+
+    #[test]
+    fn test_run_list_passthrough_json_template() {
+        assert!(should_passthrough_run_list(&["--json".into()]));
+        assert!(should_passthrough_run_list(&[
+            "--jq".into(),
+            ".workflowName".into()
+        ]));
+        assert!(should_passthrough_run_list(&[
+            "--template".into(),
+            "{{.workflowName}}".into()
+        ]));
+        assert!(!should_passthrough_run_list(&[
+            "--limit".into(),
+            "5".into()
+        ]));
     }
 }

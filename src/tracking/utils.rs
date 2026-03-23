@@ -4,9 +4,36 @@
 //! and by the rest of the crate.
 
 use std::ffi::OsString;
+use std::fmt;
 use std::path::PathBuf;
 
 use anyhow::Result;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DbPathSource {
+    Override,
+    Environment,
+    Config,
+    Default,
+}
+
+impl fmt::Display for DbPathSource {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Override => write!(f, "override"),
+            Self::Environment => write!(f, "MYCELIUM_DB_PATH"),
+            Self::Config => write!(f, "config"),
+            Self::Default => write!(f, "default"),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct DbPathInfo {
+    pub path: PathBuf,
+    pub source: DbPathSource,
+    pub config_path: PathBuf,
+}
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
@@ -26,23 +53,47 @@ pub(super) fn current_project_path_string() -> String {
 /// 2. `MYCELIUM_DB_PATH` environment variable
 /// 3. `tracking.database_path` from `~/.config/mycelium/config.toml`
 /// 4. Platform-specific default (`~/.local/share/mycelium/history.db` on Linux)
-pub(super) fn get_db_path(override_path: Option<&str>) -> Result<PathBuf> {
+pub fn resolve_db_path_info(override_path: Option<&str>) -> Result<DbPathInfo> {
+    let config_path = crate::config::config_path()?;
+
     if let Some(path) = override_path {
-        return Ok(PathBuf::from(path));
+        return Ok(DbPathInfo {
+            path: PathBuf::from(path),
+            source: DbPathSource::Override,
+            config_path,
+        });
     }
 
-    if let Ok(custom_path) = std::env::var("MYCELIUM_DB_PATH") {
-        return Ok(PathBuf::from(custom_path));
+    if let Ok(custom_path) = std::env::var("MYCELIUM_DB_PATH")
+        && !custom_path.trim().is_empty()
+    {
+        return Ok(DbPathInfo {
+            path: PathBuf::from(custom_path),
+            source: DbPathSource::Environment,
+            config_path,
+        });
     }
 
     if let Ok(config) = crate::config::Config::load()
         && let Some(db_path) = config.tracking.database_path
     {
-        return Ok(db_path);
+        return Ok(DbPathInfo {
+            path: db_path,
+            source: DbPathSource::Config,
+            config_path,
+        });
     }
 
     let data_dir = dirs::data_local_dir().unwrap_or_else(|| PathBuf::from("."));
-    Ok(data_dir.join("mycelium").join("history.db"))
+    Ok(DbPathInfo {
+        path: data_dir.join("mycelium").join("history.db"),
+        source: DbPathSource::Default,
+        config_path,
+    })
+}
+
+pub(super) fn get_db_path(override_path: Option<&str>) -> Result<PathBuf> {
+    Ok(resolve_db_path_info(override_path)?.path)
 }
 
 // ── Crate-visible helpers ─────────────────────────────────────────────────────

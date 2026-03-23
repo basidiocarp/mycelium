@@ -165,6 +165,8 @@ pub struct FilterConfig {
     #[serde(default = "default_ignore_files")]
     pub ignore_files: Vec<String>,
     #[serde(default)]
+    pub compaction_profile: CompactionProfile,
+    #[serde(default)]
     pub git: Option<GitFilterConfig>,
     #[serde(default)]
     pub cargo: Option<CargoFilterConfig>,
@@ -174,6 +176,52 @@ pub struct FilterConfig {
     pub hyphae: Option<HyphaeConfig>,
     #[serde(default)]
     pub rhizome: Option<RhizomeConfig>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum CompactionProfile {
+    Debug,
+    #[default]
+    Balanced,
+    Aggressive,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CompactionTuning {
+    pub diff_max_hunk_lines: usize,
+    pub status_max_files: usize,
+    pub adaptive_small_lines: usize,
+    pub adaptive_small_bytes: usize,
+    pub adaptive_large_lines: usize,
+}
+
+impl CompactionProfile {
+    pub fn tuning(self) -> CompactionTuning {
+        match self {
+            Self::Debug => CompactionTuning {
+                diff_max_hunk_lines: 240,
+                status_max_files: 150,
+                adaptive_small_lines: 80,
+                adaptive_small_bytes: 4096,
+                adaptive_large_lines: 800,
+            },
+            Self::Balanced => CompactionTuning {
+                diff_max_hunk_lines: 150,
+                status_max_files: 75,
+                adaptive_small_lines: 50,
+                adaptive_small_bytes: 2048,
+                adaptive_large_lines: 500,
+            },
+            Self::Aggressive => CompactionTuning {
+                diff_max_hunk_lines: 80,
+                status_max_files: 40,
+                adaptive_small_lines: 25,
+                adaptive_small_bytes: 1024,
+                adaptive_large_lines: 250,
+            },
+        }
+    }
 }
 
 fn default_ignore_dirs() -> Vec<String> {
@@ -196,6 +244,7 @@ impl Default for FilterConfig {
         Self {
             ignore_dirs: default_ignore_dirs(),
             ignore_files: default_ignore_files(),
+            compaction_profile: CompactionProfile::default(),
             git: None,
             cargo: None,
             adaptive: None,
@@ -207,7 +256,7 @@ impl Default for FilterConfig {
 
 impl Config {
     pub fn load() -> Result<Self> {
-        let path = get_config_path()?;
+        let path = config_path()?;
 
         if path.exists() {
             let content = std::fs::read_to_string(&path)?;
@@ -219,7 +268,7 @@ impl Config {
     }
 
     pub fn save(&self) -> Result<()> {
-        let path = get_config_path()?;
+        let path = config_path()?;
 
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
@@ -233,28 +282,64 @@ impl Config {
     pub fn create_default() -> Result<PathBuf> {
         let config = Config::default();
         config.save()?;
-        get_config_path()
+        config_path()
+    }
+
+    pub fn compaction_tuning(&self) -> CompactionTuning {
+        let mut tuning = self.filters.compaction_profile.tuning();
+        if let Some(adaptive) = &self.filters.adaptive {
+            tuning.adaptive_small_lines = adaptive.small_lines;
+            tuning.adaptive_small_bytes = adaptive.small_bytes;
+            tuning.adaptive_large_lines = adaptive.large_lines;
+        }
+        tuning
     }
 }
 
-fn get_config_path() -> Result<PathBuf> {
+pub fn config_path() -> Result<PathBuf> {
     let config_dir = dirs::config_dir().unwrap_or_else(|| PathBuf::from("."));
     Ok(config_dir.join("mycelium").join("config.toml"))
 }
 
+#[allow(dead_code)]
+pub fn current_compaction_profile() -> CompactionProfile {
+    Config::load()
+        .map(|config| config.filters.compaction_profile)
+        .unwrap_or_default()
+}
+
+pub fn current_compaction_tuning() -> CompactionTuning {
+    Config::load()
+        .map(|config| config.compaction_tuning())
+        .unwrap_or_else(|_| CompactionProfile::default().tuning())
+}
+
 pub fn show_config() -> Result<()> {
-    let path = get_config_path()?;
+    let path = config_path()?;
+    let tracking_info = crate::tracking::resolve_db_path_info(None).ok();
     println!("Config: {}", path.display());
     println!();
 
     if path.exists() {
         let config = Config::load()?;
         println!("{}", toml::to_string_pretty(&config)?);
+        println!(
+            "# Effective compaction profile: {:?}",
+            config.filters.compaction_profile
+        );
     } else {
         println!("(default config, file not created)");
         println!();
         let config = Config::default();
         println!("{}", toml::to_string_pretty(&config)?);
+        println!(
+            "# Effective compaction profile: {:?}",
+            config.filters.compaction_profile
+        );
+    }
+
+    if let Some(info) = tracking_info {
+        println!("# Tracking DB: {} ({})", info.path.display(), info.source);
     }
 
     Ok(())
@@ -355,6 +440,48 @@ test_show_passing = true
         let config = Config::default();
         assert!(config.filters.git.is_none());
         assert!(config.filters.cargo.is_none());
+    }
+
+    #[test]
+    fn test_filter_config_default_profile() {
+        let config = Config::default();
+        assert_eq!(
+            config.filters.compaction_profile,
+            CompactionProfile::Balanced
+        );
+    }
+
+    #[test]
+    fn test_filter_config_profile_deserialize() {
+        let toml = r#"
+[filters]
+compaction_profile = "debug"
+"#;
+        let config: Config = toml::from_str(toml).expect("valid toml");
+        assert_eq!(config.filters.compaction_profile, CompactionProfile::Debug);
+        let tuning = config.compaction_tuning();
+        assert_eq!(tuning.diff_max_hunk_lines, 240);
+        assert_eq!(tuning.status_max_files, 150);
+    }
+
+    #[test]
+    fn test_adaptive_config_overrides_profile_thresholds() {
+        let toml = r#"
+[filters]
+compaction_profile = "aggressive"
+
+[filters.adaptive]
+small_lines = 12
+small_bytes = 900
+large_lines = 120
+"#;
+        let config: Config = toml::from_str(toml).expect("valid toml");
+        let tuning = config.compaction_tuning();
+        assert_eq!(tuning.diff_max_hunk_lines, 80);
+        assert_eq!(tuning.status_max_files, 40);
+        assert_eq!(tuning.adaptive_small_lines, 12);
+        assert_eq!(tuning.adaptive_small_bytes, 900);
+        assert_eq!(tuning.adaptive_large_lines, 120);
     }
 
     #[test]

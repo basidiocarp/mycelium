@@ -446,6 +446,7 @@ pub fn dispatch(cli: Cli) -> Result<()> {
             all,
             format,
             failures,
+            status,
             compare,
         } => {
             gain::run(
@@ -462,6 +463,7 @@ pub fn dispatch(cli: Cli) -> Result<()> {
                 all,
                 &format,
                 failures,
+                status,
                 compare.as_deref(),
                 cli.verbose,
             )?;

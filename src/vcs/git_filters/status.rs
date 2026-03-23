@@ -1,9 +1,8 @@
 //! Git status, branch, and related output filters.
 
-/// Format porcelain output into compact Mycelium status display
-pub(crate) fn format_status_output(porcelain: &str) -> String {
-    const MAX_STATUS_FILES: usize = 75;
+use crate::config::{CompactionProfile, current_compaction_tuning};
 
+fn format_status_output_with_limit(porcelain: &str, max_status_files: usize) -> String {
     let lines: Vec<&str> = porcelain.lines().collect();
 
     if lines.is_empty() {
@@ -62,7 +61,7 @@ pub(crate) fn format_status_output(porcelain: &str) -> String {
 
     // Build summary with a modest total cap so large worktrees still fit in context.
     let total = staged_files.len() + modified_files.len() + untracked_files.len();
-    let mut remaining_budget = MAX_STATUS_FILES;
+    let mut remaining_budget = max_status_files;
 
     if staged > 0 {
         output.push_str(&format!("Staged: {} files\n", staged));
@@ -89,10 +88,10 @@ pub(crate) fn format_status_output(porcelain: &str) -> String {
         }
     }
 
-    if total > MAX_STATUS_FILES {
+    if total > max_status_files {
         output.push_str(&format!(
             "   ... +{} more files\n",
-            total - MAX_STATUS_FILES
+            total - max_status_files
         ));
     }
 
@@ -103,8 +102,19 @@ pub(crate) fn format_status_output(porcelain: &str) -> String {
     output.trim_end().to_string()
 }
 
+/// Format porcelain output into compact Mycelium status display using a named profile.
+#[allow(dead_code)]
+pub fn format_status_output_with_profile(porcelain: &str, profile: CompactionProfile) -> String {
+    format_status_output_with_limit(porcelain, profile.tuning().status_max_files)
+}
+
+/// Format porcelain output into compact Mycelium status display.
+pub fn format_status_output(porcelain: &str) -> String {
+    format_status_output_with_limit(porcelain, current_compaction_tuning().status_max_files)
+}
+
 /// Minimal filtering for git status with user-provided args
-pub(crate) fn filter_status_with_args(output: &str) -> String {
+pub fn filter_status_with_args(output: &str) -> String {
     let mut result = Vec::new();
 
     for line in output.lines() {
@@ -141,7 +151,7 @@ pub(crate) fn filter_status_with_args(output: &str) -> String {
 }
 
 /// Filter branch listing into compact format with current, local, and remote-only sections
-pub(crate) fn filter_branch_output(output: &str) -> String {
+pub fn filter_branch_output(output: &str) -> String {
     let mut current = String::new();
     let mut local: Vec<String> = Vec::new();
     let mut remote: Vec<String> = Vec::new();
@@ -376,5 +386,26 @@ no changes added to commit (use "git add" and/or "git commit -a")
         let porcelain = "## main\nA  🎉-party.txt\n M 日本語ファイル.rs\n";
         let result = format_status_output(porcelain);
         assert!(result.contains("Branch: main"));
+    }
+
+    #[test]
+    fn test_format_status_output_debug_profile_preserves_more_files() {
+        let mut porcelain = String::from("## debug\n");
+        for i in 1..=100 {
+            porcelain.push_str(&format!("?? file_{i}.txt\n"));
+        }
+        let result = format_status_output_with_profile(&porcelain, CompactionProfile::Debug);
+        assert!(result.contains("file_100.txt"));
+        assert!(!result.contains("more files"));
+    }
+
+    #[test]
+    fn test_format_status_output_aggressive_profile_truncates_earlier() {
+        let mut porcelain = String::from("## aggressive\n");
+        for i in 1..=60 {
+            porcelain.push_str(&format!("?? file_{i}.txt\n"));
+        }
+        let result = format_status_output_with_profile(&porcelain, CompactionProfile::Aggressive);
+        assert!(result.contains("... +20 more files"));
     }
 }

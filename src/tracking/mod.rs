@@ -44,7 +44,11 @@ use utils::{current_project_path_string, get_db_path};
 pub use queries::ParseHealthRow;
 pub use timer::TimedExecution;
 pub(crate) use utils::project_filter_params;
-pub use utils::{args_display, estimate_tokens, record_parse_failure_silent};
+#[allow(unused_imports)]
+pub use utils::{
+    DbPathInfo, DbPathSource, args_display, estimate_tokens, record_parse_failure_silent,
+    resolve_db_path_info,
+};
 
 /// Number of days to retain tracking history before automatic cleanup.
 const HISTORY_DAYS: i64 = 90;
@@ -284,7 +288,7 @@ impl Tracker {
         Self::new_with_override(None)
     }
 
-    fn new_with_override(override_path: Option<&str>) -> Result<Self> {
+    pub fn new_with_override(override_path: Option<&str>) -> Result<Self> {
         let db_path = get_db_path(override_path)?;
         if let Some(parent) = db_path.parent() {
             std::fs::create_dir_all(parent)?;

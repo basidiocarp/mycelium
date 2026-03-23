@@ -6,6 +6,7 @@
 # This is a thin delegating hook: all rewrite logic lives in `mycelium rewrite`,
 # which is the single source of truth (src/discover/registry.rs).
 # To add or change rewrite rules, edit the Rust registry — not this file.
+# mycelium-install-version: __MYCELIUM_VERSION__
 
 # =========================================================
 #  Audit logging (opt-in via MYCELIUM_HOOK_AUDIT=1)
@@ -44,6 +45,7 @@ if ! MYCELIUM_CMD="$(_resolve_command "$MYCELIUM_BIN" mycelium)"; then
   echo "[mycelium] hook skipped: mycelium binary not found" >&2
   echo "[mycelium] embedded mycelium path: ${MYCELIUM_BIN:-unset}" >&2
   echo "[mycelium] PATH=$PATH" >&2
+  echo "[mycelium] repair: run 'mycelium init -g' after reinstalling mycelium" >&2
   exit 0
 fi
 
@@ -52,6 +54,7 @@ if ! JQ_CMD="$(_resolve_command "$JQ_BIN" jq)"; then
   echo "[mycelium] hook skipped: jq binary not found" >&2
   echo "[mycelium] embedded jq path: ${JQ_BIN:-unset}" >&2
   echo "[mycelium] PATH=$PATH" >&2
+  echo "[mycelium] repair: install jq or rerun 'mycelium init -g' to refresh the hook" >&2
   exit 0
 fi
 
@@ -64,7 +67,8 @@ if [ -n "$MYCELIUM_VERSION" ]; then
   MINOR=$(echo "$MYCELIUM_VERSION" | cut -d. -f2)
   # Require >= 0.1.0
   if [ "$MAJOR" -eq 0 ] && [ "$MINOR" -lt 1 ]; then
-    echo "[mycelium] WARNING: mycelium $MYCELIUM_VERSION is too old (need >= 0.1.0). Upgrade: cargo install --path ." >&2
+    echo "[mycelium] WARNING: mycelium $MYCELIUM_VERSION is too old (need >= 0.1.0)." >&2
+    echo "[mycelium] repair: upgrade mycelium, then rerun 'mycelium init -g' to refresh the hook" >&2
     _mycelium_audit_log "skip:old_version" "$MYCELIUM_VERSION"
     exit 0
   fi

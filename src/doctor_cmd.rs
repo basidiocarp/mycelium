@@ -109,6 +109,7 @@ fn check_config() {
 }
 
 fn check_tracking_db() {
+    let path_info = tracking::resolve_db_path_info(None).ok();
     match tracking::Tracker::new() {
         Ok(tracker) => {
             let count: Result<i64, _> =
@@ -117,7 +118,14 @@ fn check_tracking_db() {
                     .query_row("SELECT COUNT(*) FROM commands", [], |row| row.get(0));
 
             match count {
-                Ok(n) => pass("tracking db", &format!("{n} records")),
+                Ok(n) => {
+                    let detail = if let Some(info) = path_info {
+                        format!("{n} records ({}, {})", info.path.display(), info.source)
+                    } else {
+                        format!("{n} records")
+                    };
+                    pass("tracking db", &detail);
+                }
                 Err(e) => fail("tracking db", &format!("opened but query failed: {e}")),
             }
         }

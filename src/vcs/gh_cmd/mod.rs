@@ -34,9 +34,9 @@ fn has_json_flag_str(args: &[&str]) -> bool {
 /// Extract a positional identifier (PR/issue number) from args, returning it
 /// separately from the remaining extra flags (like -R, --repo, etc.).
 /// Handles both `view 123 -R owner/repo` and `view -R owner/repo 123`.
-pub(crate) fn extract_identifier_and_extra_args(args: &[String]) -> Option<(String, Vec<String>)> {
+fn extract_identifier_and_extra_args_impl(args: &[String]) -> (Option<String>, Vec<String>) {
     if args.is_empty() {
-        return None;
+        return (None, Vec::new());
     }
 
     // Known gh flags that take a value — skip these and their values
@@ -68,7 +68,18 @@ pub(crate) fn extract_identifier_and_extra_args(args: &[String]) -> Option<(Stri
         }
     }
 
+    (identifier, extra)
+}
+
+pub(crate) fn extract_identifier_and_extra_args(args: &[String]) -> Option<(String, Vec<String>)> {
+    let (identifier, extra) = extract_identifier_and_extra_args_impl(args);
     identifier.map(|id| (id, extra))
+}
+
+pub(crate) fn extract_optional_identifier_and_extra_args(
+    args: &[String],
+) -> (Option<String>, Vec<String>) {
+    extract_identifier_and_extra_args_impl(args)
 }
 
 fn str_slice_to_strings(args: &[&str]) -> Vec<String> {
@@ -239,6 +250,14 @@ mod tests {
     fn test_extract_identifier_empty() {
         let args: Vec<String> = vec![];
         assert!(extract_identifier_and_extra_args(&args).is_none());
+    }
+
+    #[test]
+    fn test_extract_optional_identifier_with_web_flag() {
+        let args: Vec<String> = vec!["--web".into()];
+        let (identifier, extra) = extract_optional_identifier_and_extra_args(&args);
+        assert!(identifier.is_none());
+        assert_eq!(extra, vec!["--web"]);
     }
 
     #[test]

@@ -506,6 +506,9 @@ pub enum Commands {
         /// Show parse failure log (commands that fell back to raw execution)
         #[arg(short = 'F', long)]
         failures: bool,
+        /// Show tracking database path, source, and health details
+        #[arg(long)]
+        status: bool,
         /// Run side-by-side token comparison for a command
         #[arg(long)]
         compare: Option<String>,

@@ -5,7 +5,18 @@ use anyhow::{Context, Result};
 use serde_json::Value;
 use std::process::Command;
 
+use crate::vcs::gh_cmd::run_passthrough_with_extra;
+
+pub fn should_passthrough_pr_list(args: &[String]) -> bool {
+    args.iter()
+        .any(|a| a == "--json" || a == "--jq" || a == "--template" || a == "--web")
+}
+
 pub fn list_prs(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()> {
+    if should_passthrough_pr_list(args) {
+        return run_passthrough_with_extra("gh", &["pr", "list"], args);
+    }
+
     let timer = tracking::TimedExecution::start();
 
     let mut cmd = Command::new("gh");
@@ -86,4 +97,28 @@ pub fn list_prs(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()
 
     timer.track("gh pr list", "mycelium gh pr list", &raw, &filtered);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::should_passthrough_pr_list;
+
+    #[test]
+    fn test_should_passthrough_pr_list_json_template_web() {
+        assert!(should_passthrough_pr_list(&["--json".into()]));
+        assert!(should_passthrough_pr_list(&[
+            "--jq".into(),
+            ".title".into()
+        ]));
+        assert!(should_passthrough_pr_list(&[
+            "--template".into(),
+            "{{.title}}".into()
+        ]));
+        assert!(should_passthrough_pr_list(&["--web".into()]));
+    }
+
+    #[test]
+    fn test_should_passthrough_pr_list_default() {
+        assert!(!should_passthrough_pr_list(&[]));
+    }
 }

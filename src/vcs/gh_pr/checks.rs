@@ -4,17 +4,35 @@ use crate::{tracking, utils::truncate};
 use anyhow::{Context, Result};
 use std::process::Command;
 
+use crate::vcs::gh_cmd::{extract_optional_identifier_and_extra_args, run_passthrough_with_extra};
+
+pub fn should_passthrough_pr_checks(extra_args: &[String]) -> bool {
+    extra_args.iter().any(|a| {
+        a == "--json"
+            || a == "--jq"
+            || a == "--template"
+            || a == "--web"
+            || a == "--watch"
+            || a == "--fail-fast"
+    })
+}
+
 pub fn pr_checks(args: &[String], _verbose: u8, _ultra_compact: bool) -> Result<()> {
     let timer = tracking::TimedExecution::start();
 
-    let (pr_number, extra_args) = match crate::vcs::gh_cmd::extract_identifier_and_extra_args(args)
-    {
-        Some(result) => result,
-        None => return Err(anyhow::anyhow!("PR number required")),
+    let (pr_number, extra_args) = extract_optional_identifier_and_extra_args(args);
+    let base_args = if let Some(ref pr_number) = pr_number {
+        vec!["pr", "checks", pr_number.as_str()]
+    } else {
+        vec!["pr", "checks"]
     };
 
+    if should_passthrough_pr_checks(&extra_args) {
+        return run_passthrough_with_extra("gh", &base_args, &extra_args);
+    }
+
     let mut cmd = Command::new("gh");
-    cmd.args(["pr", "checks", &pr_number]);
+    cmd.args(&base_args);
     for arg in &extra_args {
         cmd.arg(arg);
     }
@@ -24,12 +42,15 @@ pub fn pr_checks(args: &[String], _verbose: u8, _ultra_compact: bool) -> Result<
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-        timer.track(
-            &format!("gh pr checks {}", pr_number),
-            &format!("mycelium gh pr checks {}", pr_number),
-            &stderr,
-            &stderr,
-        );
+        let pr_label = pr_number
+            .as_deref()
+            .map(|n| format!("gh pr checks {}", n))
+            .unwrap_or_else(|| "gh pr checks".to_string());
+        let mycelium_label = pr_number
+            .as_deref()
+            .map(|n| format!("mycelium gh pr checks {}", n))
+            .unwrap_or_else(|| "mycelium gh pr checks".to_string());
+        timer.track(&pr_label, &mycelium_label, &stderr, &stderr);
         eprintln!("{}", stderr.trim());
         std::process::exit(output.status.code().unwrap_or(1));
     }
@@ -83,17 +104,24 @@ pub fn pr_checks(args: &[String], _verbose: u8, _ultra_compact: bool) -> Result<
         }
     }
 
-    timer.track(
-        &format!("gh pr checks {}", pr_number),
-        &format!("mycelium gh pr checks {}", pr_number),
-        &raw,
-        &filtered,
-    );
+    let pr_label = pr_number
+        .as_deref()
+        .map(|n| format!("gh pr checks {}", n))
+        .unwrap_or_else(|| "gh pr checks".to_string());
+    let mycelium_label = pr_number
+        .as_deref()
+        .map(|n| format!("mycelium gh pr checks {}", n))
+        .unwrap_or_else(|| "mycelium gh pr checks".to_string());
+    timer.track(&pr_label, &mycelium_label, &raw, &filtered);
     Ok(())
 }
 
-pub fn pr_status(_verbose: u8, _ultra_compact: bool) -> Result<()> {
+pub fn pr_status(args: &[String], _verbose: u8, _ultra_compact: bool) -> Result<()> {
     let timer = tracking::TimedExecution::start();
+
+    if should_passthrough_pr_status(args) {
+        return run_passthrough_with_extra("gh", &["pr", "status"], args);
+    }
 
     let mut cmd = Command::new("gh");
     cmd.args([
@@ -102,6 +130,9 @@ pub fn pr_status(_verbose: u8, _ultra_compact: bool) -> Result<()> {
         "--json",
         "currentBranch,createdBy,reviewDecision,statusCheckRollup",
     ]);
+    for arg in args {
+        cmd.arg(arg);
+    }
 
     let output = cmd.output().context("Failed to run gh pr status")?;
     let raw = String::from_utf8_lossy(&output.stdout).to_string();
@@ -134,4 +165,53 @@ pub fn pr_status(_verbose: u8, _ultra_compact: bool) -> Result<()> {
 
     timer.track("gh pr status", "mycelium gh pr status", &raw, &filtered);
     Ok(())
+}
+
+fn should_passthrough_pr_status(args: &[String]) -> bool {
+    args.iter()
+        .any(|a| a == "--jq" || a == "--template" || a == "--json")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{should_passthrough_pr_checks, should_passthrough_pr_status};
+
+    #[test]
+    fn test_should_passthrough_pr_checks_json_template_watch_web() {
+        assert!(should_passthrough_pr_checks(&["--json".into()]));
+        assert!(should_passthrough_pr_checks(&[
+            "--jq".into(),
+            ".state".into()
+        ]));
+        assert!(should_passthrough_pr_checks(&[
+            "--template".into(),
+            "{{.state}}".into()
+        ]));
+        assert!(should_passthrough_pr_checks(&["--web".into()]));
+        assert!(should_passthrough_pr_checks(&["--watch".into()]));
+        assert!(should_passthrough_pr_checks(&["--fail-fast".into()]));
+    }
+
+    #[test]
+    fn test_should_passthrough_pr_checks_default() {
+        assert!(!should_passthrough_pr_checks(&[]));
+    }
+
+    #[test]
+    fn test_should_passthrough_pr_status_json_template() {
+        assert!(should_passthrough_pr_status(&["--json".into()]));
+        assert!(should_passthrough_pr_status(&[
+            "--jq".into(),
+            ".createdBy".into()
+        ]));
+        assert!(should_passthrough_pr_status(&[
+            "--template".into(),
+            "{{.createdBy}}".into()
+        ]));
+    }
+
+    #[test]
+    fn test_should_passthrough_pr_status_default() {
+        assert!(!should_passthrough_pr_status(&[]));
+    }
 }

@@ -6,7 +6,7 @@ use anyhow::{Context, Result};
 use std::process::Command;
 
 use super::parsers::{GhIssueListParser, GhIssueViewParser};
-use super::passthrough::run_passthrough;
+use super::passthrough::{run_passthrough, run_passthrough_with_extra};
 
 pub(super) fn dispatch_issue(args: &[String], verbose: u8, ultra_compact: bool) -> Result<()> {
     if args.is_empty() {
@@ -14,10 +14,18 @@ pub(super) fn dispatch_issue(args: &[String], verbose: u8, ultra_compact: bool) 
     }
 
     match args[0].as_str() {
+        "list" if should_passthrough_issue_list(&args[1..]) => {
+            run_passthrough_with_extra("gh", &["issue", "list"], &args[1..])
+        }
         "list" => list_issues(&args[1..], verbose, ultra_compact),
         "view" => view_issue(&args[1..], verbose),
         _ => run_passthrough("gh", "issue", args),
     }
+}
+
+pub fn should_passthrough_issue_list(args: &[String]) -> bool {
+    args.iter()
+        .any(|a| a == "--json" || a == "--jq" || a == "--template" || a == "--web")
 }
 
 pub fn should_passthrough_issue_view(extra_args: &[String]) -> bool {
@@ -163,4 +171,38 @@ fn view_issue(args: &[String], _verbose: u8) -> Result<()> {
         "compact",
     );
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{should_passthrough_issue_list, should_passthrough_issue_view};
+
+    #[test]
+    fn test_should_passthrough_issue_list_json_template_web() {
+        assert!(should_passthrough_issue_list(&["--json".into()]));
+        assert!(should_passthrough_issue_list(&[
+            "--jq".into(),
+            ".title".into()
+        ]));
+        assert!(should_passthrough_issue_list(&[
+            "--template".into(),
+            "{{.title}}".into()
+        ]));
+        assert!(should_passthrough_issue_list(&["--web".into()]));
+    }
+
+    #[test]
+    fn test_should_passthrough_issue_view_comments_and_formatting() {
+        assert!(should_passthrough_issue_view(&["--comments".into()]));
+        assert!(should_passthrough_issue_view(&["--json".into()]));
+        assert!(should_passthrough_issue_view(&[
+            "--jq".into(),
+            ".body".into()
+        ]));
+        assert!(should_passthrough_issue_view(&[
+            "--template".into(),
+            "{{.body}}".into()
+        ]));
+        assert!(should_passthrough_issue_view(&["--web".into()]));
+    }
 }

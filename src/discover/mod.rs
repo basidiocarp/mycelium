@@ -8,7 +8,10 @@ use anyhow::Result;
 use std::collections::HashMap;
 
 use provider::{ClaudeProvider, SessionProvider};
-use registry::{Classification, category_avg_tokens, classify_command, split_command_chain};
+use registry::{
+    Classification, category_avg_tokens, classify_command, display_command_for_discover,
+    split_command_chain,
+};
 use report::{DiscoverReport, SupportedEntry, UnsupportedEntry};
 
 /// Aggregation bucket for supported commands.
@@ -120,7 +123,7 @@ pub fn run(
                         bucket.total_output_tokens += savings;
 
                         // Track the display name with status
-                        let display_name = truncate_command(part);
+                        let display_name = display_command_for_discover(part);
                         let entry = bucket
                             .command_counts
                             .entry(format!("{}:{:?}", display_name, status))
@@ -131,7 +134,7 @@ pub fn run(
                         let bucket = unsupported_map.entry(base_command).or_insert_with(|| {
                             UnsupportedBucket {
                                 count: 0,
-                                example: part.to_string(),
+                                example: display_command_for_discover(part),
                             }
                         });
                         bucket.count += 1;
@@ -223,16 +226,4 @@ pub fn run(
 fn extract_subcmd(cmd: &str) -> &str {
     let parts: Vec<&str> = cmd.trim().splitn(3, char::is_whitespace).collect();
     if parts.len() >= 2 { parts[1] } else { "" }
-}
-
-/// Truncate a command for display (keep first meaningful portion).
-fn truncate_command(cmd: &str) -> String {
-    let trimmed = cmd.trim();
-    // Keep first two words for display
-    let parts: Vec<&str> = trimmed.splitn(3, char::is_whitespace).collect();
-    match parts.len() {
-        0 => String::new(),
-        1 => parts[0].to_string(),
-        _ => format!("{} {}", parts[0], parts[1]),
-    }
 }

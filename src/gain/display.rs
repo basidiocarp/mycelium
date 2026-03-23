@@ -4,7 +4,7 @@ use super::helpers::{
     style_command_cell, styled, truncate_for_column,
 };
 use crate::display_helpers::{format_duration, print_period_table};
-use crate::tracking::Tracker;
+use crate::tracking::{Tracker, resolve_db_path_info};
 use crate::utils::format_tokens;
 use anyhow::{Context, Result};
 
@@ -215,6 +215,29 @@ pub(crate) fn show_summary(
         println!();
         println!("Note: Heuristic estimate based on ~44K tokens/5h (Pro baseline)");
         println!("      Actual limits use rolling 5-hour windows, not monthly caps.");
+    }
+
+    Ok(())
+}
+
+pub(crate) fn show_status(tracker: &Tracker) -> Result<()> {
+    let info = resolve_db_path_info(None).context("Failed to resolve tracking database path")?;
+    let count: i64 = tracker
+        .conn
+        .query_row("SELECT COUNT(*) FROM commands", [], |row| row.get(0))
+        .context("Failed to count tracking records")?;
+
+    let file_size = std::fs::metadata(&info.path).map(|m| m.len()).unwrap_or(0);
+
+    println!("{}", styled("Tracking Database Status", true));
+    println!("{}", "═".repeat(60));
+    print_kpi("Path", info.path.display().to_string());
+    print_kpi("Source", info.source.to_string());
+    print_kpi("Config path", info.config_path.display().to_string());
+    print_kpi("Exists", info.path.exists().to_string());
+    print_kpi("Records", count.to_string());
+    if info.path.exists() {
+        print_kpi("File size", format!("{} bytes", file_size));
     }
 
     Ok(())

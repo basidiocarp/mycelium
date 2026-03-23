@@ -1,19 +1,24 @@
 //! Pure text filters for git output (status, log, diff, branch, stash, worktree).
 
-pub(crate) mod diff;
-pub(crate) mod status;
+pub mod diff;
+pub mod status;
 
-pub(crate) use diff::compact_diff;
-pub(crate) use status::{filter_branch_output, filter_status_with_args, format_status_output};
+#[allow(unused_imports)]
+pub use diff::{compact_diff, compact_diff_with_profile};
+#[allow(unused_imports)]
+pub use status::{
+    filter_branch_output, filter_status_with_args, format_status_output,
+    format_status_output_with_profile,
+};
 
 /// Detect `rev:path` style arguments (blob show) while ignoring flags like
 /// `--pretty=format:...`.
-pub(crate) fn is_blob_show_arg(arg: &str) -> bool {
+pub fn is_blob_show_arg(arg: &str) -> bool {
     !arg.starts_with('-') && arg.contains(':')
 }
 
 /// Filter git log output: truncate long messages, cap lines
-pub(crate) fn filter_log_output(output: &str, limit: usize) -> String {
+pub fn filter_log_output(output: &str, limit: usize) -> String {
     let lines: Vec<&str> = output.lines().collect();
     let capped: Vec<String> = lines
         .iter()
@@ -32,7 +37,7 @@ pub(crate) fn filter_log_output(output: &str, limit: usize) -> String {
 }
 
 /// Compact stash list: strip "WIP on branch:" prefix
-pub(crate) fn filter_stash_list(output: &str) -> String {
+pub fn filter_stash_list(output: &str) -> String {
     // Format: "stash@{0}: WIP on main: abc1234 commit message"
     let mut result = Vec::new();
     for line in output.lines() {
@@ -54,7 +59,7 @@ pub(crate) fn filter_stash_list(output: &str) -> String {
 }
 
 /// Compact worktree list: shorten home directory paths
-pub(crate) fn filter_worktree_list(output: &str) -> String {
+pub fn filter_worktree_list(output: &str) -> String {
     let home = dirs::home_dir()
         .map(|h| h.to_string_lossy().to_string())
         .unwrap_or_default();

@@ -1,12 +1,8 @@
 //! Compact unified diff filter.
 
-/// Compact a unified diff into a token-efficient summary.
-///
-/// Shows file names, hunk headers, and changed lines up to `max_hunk_lines`
-/// per hunk, capping the total output at `max_lines` result lines.
-pub(crate) fn compact_diff(diff: &str, max_lines: usize) -> String {
-    const MAX_HUNK_LINES: usize = 150;
+use crate::config::{CompactionProfile, current_compaction_tuning};
 
+fn compact_diff_with_hunk_limit(diff: &str, max_lines: usize, max_hunk_lines: usize) -> String {
     let mut result = Vec::new();
     let mut current_file = String::new();
     let mut added = 0;
@@ -34,17 +30,17 @@ pub(crate) fn compact_diff(diff: &str, max_lines: usize) -> String {
         } else if in_hunk {
             if line.starts_with('+') && !line.starts_with("+++") {
                 added += 1;
-                if hunk_lines < MAX_HUNK_LINES {
+                if hunk_lines < max_hunk_lines {
                     result.push(format!("  {}", line));
                     hunk_lines += 1;
                 }
             } else if line.starts_with('-') && !line.starts_with("---") {
                 removed += 1;
-                if hunk_lines < MAX_HUNK_LINES {
+                if hunk_lines < max_hunk_lines {
                     result.push(format!("  {}", line));
                     hunk_lines += 1;
                 }
-            } else if hunk_lines < MAX_HUNK_LINES && !line.starts_with("\\") {
+            } else if hunk_lines < max_hunk_lines && !line.starts_with("\\") {
                 // Context line
                 if hunk_lines > 0 {
                     result.push(format!("  {}", line));
@@ -52,7 +48,7 @@ pub(crate) fn compact_diff(diff: &str, max_lines: usize) -> String {
                 }
             }
 
-            if hunk_lines == MAX_HUNK_LINES {
+            if hunk_lines == max_hunk_lines {
                 result.push("  ... (truncated)".to_string());
                 hunk_lines += 1;
             }
@@ -69,6 +65,28 @@ pub(crate) fn compact_diff(diff: &str, max_lines: usize) -> String {
     }
 
     result.join("\n")
+}
+
+/// Compact a unified diff using a specific named profile.
+#[allow(dead_code)]
+pub fn compact_diff_with_profile(
+    diff: &str,
+    max_lines: usize,
+    profile: CompactionProfile,
+) -> String {
+    compact_diff_with_hunk_limit(diff, max_lines, profile.tuning().diff_max_hunk_lines)
+}
+
+/// Compact a unified diff into a token-efficient summary.
+///
+/// Shows file names, hunk headers, and changed lines up to `max_hunk_lines`
+/// per hunk, capping the total output at `max_lines` result lines.
+pub fn compact_diff(diff: &str, max_lines: usize) -> String {
+    compact_diff_with_hunk_limit(
+        diff,
+        max_lines,
+        current_compaction_tuning().diff_max_hunk_lines,
+    )
 }
 
 #[cfg(test)]
@@ -176,5 +194,28 @@ mod tests {
             "Git diff filter: expected >= 60% token savings, got {}%",
             savings
         );
+    }
+
+    #[test]
+    fn test_compact_diff_debug_profile_preserves_more_lines() {
+        let mut diff =
+            "diff --git a/debug.rs b/debug.rs\n--- a/debug.rs\n+++ b/debug.rs\n@@ -1,160 +1,160 @@\n"
+                .to_string();
+        for i in 1..=160 {
+            diff.push_str(&format!("+line{}\n", i));
+        }
+        let result = compact_diff_with_profile(&diff, 500, CompactionProfile::Debug);
+        assert!(result.contains("+line160"));
+        assert!(!result.contains("... (truncated)"));
+    }
+
+    #[test]
+    fn test_compact_diff_aggressive_profile_truncates_sooner() {
+        let mut diff = "diff --git a/aggressive.rs b/aggressive.rs\n--- a/aggressive.rs\n+++ b/aggressive.rs\n@@ -1,90 +1,90 @@\n".to_string();
+        for i in 1..=90 {
+            diff.push_str(&format!("+line{}\n", i));
+        }
+        let result = compact_diff_with_profile(&diff, 500, CompactionProfile::Aggressive);
+        assert!(result.contains("... (truncated)"));
     }
 }

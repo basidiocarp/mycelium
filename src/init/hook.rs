@@ -16,6 +16,8 @@ use super::claude_md::resolve_claude_dir;
 pub(crate) const REWRITE_HOOK: &str = include_str!("../../hooks/mycelium-rewrite.sh");
 
 #[cfg(unix)]
+const MYCELIUM_VERSION_PLACEHOLDER: &str = "__MYCELIUM_VERSION__";
+#[cfg(unix)]
 const MYCELIUM_BIN_PLACEHOLDER: &str = "__MYCELIUM_BIN__";
 #[cfg(unix)]
 const JQ_BIN_PLACEHOLDER: &str = "__JQ_BIN__";
@@ -79,6 +81,35 @@ pub(crate) fn extract_quoted_assignment(content: &str, name: &str) -> Option<Str
 }
 
 #[cfg(unix)]
+pub(crate) fn extract_hook_version(content: &str) -> Option<String> {
+    content
+        .lines()
+        .find_map(|line| line.strip_prefix("# mycelium-install-version: "))
+        .map(|version| version.trim().to_string())
+}
+
+#[cfg(unix)]
+pub(crate) fn current_install_version() -> &'static str {
+    env!("CARGO_PKG_VERSION")
+}
+
+#[cfg(unix)]
+pub(crate) fn version_is_stale(installed: &str, current: &str) -> bool {
+    fn parse_triplet(version: &str) -> Option<(u64, u64, u64)> {
+        let mut parts = version.split('.');
+        let major = parts.next()?.parse().ok()?;
+        let minor = parts.next()?.parse().ok()?;
+        let patch = parts.next()?.parse().ok()?;
+        Some((major, minor, patch))
+    }
+
+    match (parse_triplet(installed), parse_triplet(current)) {
+        (Some(installed), Some(current)) => installed < current,
+        _ => false,
+    }
+}
+
+#[cfg(unix)]
 pub(crate) fn render_rewrite_hook(mycelium_bin: Option<&Path>, jq_bin: Option<&Path>) -> String {
     let mycelium_bin = mycelium_bin
         .map(|path| shell_single_quote(&path.display().to_string()))
@@ -88,6 +119,7 @@ pub(crate) fn render_rewrite_hook(mycelium_bin: Option<&Path>, jq_bin: Option<&P
         .unwrap_or_else(|| "''".to_string());
 
     REWRITE_HOOK
+        .replace(MYCELIUM_VERSION_PLACEHOLDER, current_install_version())
         .replace(MYCELIUM_BIN_PLACEHOLDER, &mycelium_bin)
         .replace(JQ_BIN_PLACEHOLDER, &jq_bin)
 }
@@ -233,6 +265,7 @@ mod tests {
     #[test]
     #[cfg(unix)]
     fn test_hook_has_guards() {
+        assert!(REWRITE_HOOK.contains("__MYCELIUM_VERSION__"));
         assert!(REWRITE_HOOK.contains("__MYCELIUM_BIN__"));
         assert!(REWRITE_HOOK.contains("__JQ_BIN__"));
         assert!(REWRITE_HOOK.contains("_resolve_command()"));
@@ -256,8 +289,10 @@ mod tests {
 
         let rendered = render_rewrite_hook(Some(mycelium_bin), Some(jq_bin));
 
+        assert!(rendered.contains(current_install_version()));
         assert!(!rendered.contains("__MYCELIUM_BIN__"));
         assert!(!rendered.contains("__JQ_BIN__"));
+        assert!(!rendered.contains("__MYCELIUM_VERSION__"));
         assert!(rendered.contains("MYCELIUM_BIN='/opt/mycelium/bin/mycelium build'"));
         assert!(rendered.contains("JQ_BIN='/usr/local/bin/jq'"));
 
@@ -269,6 +304,20 @@ mod tests {
             extract_quoted_assignment(&rendered, "JQ_BIN").as_deref(),
             Some("/usr/local/bin/jq")
         );
+        assert_eq!(
+            extract_hook_version(&rendered).as_deref(),
+            Some(current_install_version())
+        );
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_version_is_stale_detects_older_version() {
+        assert!(version_is_stale("0.0.1", current_install_version()));
+        assert!(!version_is_stale(
+            current_install_version(),
+            current_install_version()
+        ));
     }
 
     #[test]
