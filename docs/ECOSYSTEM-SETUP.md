@@ -1,10 +1,10 @@
 # Ecosystem Setup
 
-This document describes what `mycelium init --ecosystem` does and how to verify it works correctly.
+`stipe init` owns onboarding and repair for the ecosystem. This document describes the lower-level integration work that `mycelium init --ecosystem` performs once the tools are already installed.
 
 ## Overview
 
-`mycelium init --ecosystem` detects which Basidiocarp tools you have installed and automatically configures them across your AI coding clients (Claude Code, Cursor, Windsurf, Cline, Continue, Claude Desktop).
+`mycelium init --ecosystem` detects which Basidiocarp tools you have installed and configures the integration pieces they need across your AI coding clients (Claude Code, Cursor, Windsurf, Cline, Continue, Claude Desktop).
 
 It's idempotent — you can run it multiple times without problems, and it's safe to re-run after installing new tools.
 
@@ -113,31 +113,21 @@ Or install all: curl -sSfL https://raw.githubusercontent.com/basidiocarp/.github
 
 ## Running the Setup
 
-### Interactive Wizard (Recommended for First-Time Setup)
+### Primary Onboarding
 
 ```bash
-mycelium init --onboard
+stipe init
 ```
 
-This walks you through 5 steps:
+Use this for first-time setup and repair. It owns the operator-facing flow.
 
-1. **Detect tools** — Shows what's installed
-2. **Configure Claude Code** — Asks if you want to register MCP servers and install hooks
-3. **Store first memory** — Asks if you want to create a welcome memory in Hyphae
-4. **Scan project** — Asks if you want to scan your current directory with Rhizome
-5. **Export code graph** — Asks if you want to export code symbols to Hyphae
-
-Each step prompts for confirmation (default is yes, just press Enter).
-
-If stdin is not a TTY (e.g., running in CI or a non-interactive shell), `--onboard` automatically falls back to `--ecosystem`.
-
-### Non-Interactive Setup
+### Lower-Level Integration
 
 ```bash
 mycelium init --ecosystem
 ```
 
-This runs all configuration steps without prompts. Good for:
+This applies the Mycelium-side integration without the onboarding wrapper. Good for:
 
 - CI/CD pipelines
 - Scripted setup
@@ -201,7 +191,7 @@ rhizome doctor       # Rhizome LSP servers + code intelligence
 
 ### Test the Setup
 
-After running `mycelium init --ecosystem`, test it in Claude Code:
+After running `stipe init` and any required `mycelium init --ecosystem` integration, test it in Claude Code:
 
 1. Open Claude Code
 2. Try a simple command: `git status`
@@ -254,6 +244,8 @@ hyphae recall "session"      # Find session summaries
 ```
 
 ## Re-Running Setup
+
+If the problem is onboarding or repair, rerun `stipe init`.
 
 You can safely re-run `mycelium init --ecosystem` at any time:
 

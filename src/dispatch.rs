@@ -539,8 +539,8 @@ pub fn dispatch(cli: Cli) -> Result<()> {
             hook_audit_cmd::run(since, cli.verbose)?;
         }
 
-        Commands::Rewrite { cmd } => {
-            rewrite_cmd::run(&cmd)?;
+        Commands::Rewrite { cmd, explain } => {
+            rewrite_cmd::run(&cmd, explain)?;
         }
 
         Commands::Proxy { ref args } => {

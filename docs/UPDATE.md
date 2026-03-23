@@ -101,17 +101,18 @@ npm run dev:all
 
 ## After Updating
 
-After updating any tool, re-run the ecosystem setup to re-register MCP servers with new versions:
+After updating any tool, re-run `stipe init` to refresh onboarding and repair flows. If you changed hooks or client wiring, follow it with `mycelium init --ecosystem` to re-apply the lower-level integration:
 
 ```bash
+stipe init
 mycelium init --ecosystem
 ```
 
 This will:
 
 1. Detect the new versions
-2. Check if MCP servers are already registered
-3. Re-register if needed (usually not, but safe to run)
+2. Repair onboarding state if needed
+3. Re-register MCP servers if the lower-level integration changed
 4. Update hook scripts if they're outdated
 5. Initialize any new databases or features
 
@@ -224,10 +225,10 @@ If Claude Code stops filtering commands after an update:
 ls -la ~/.claude/hooks/mycelium-rewrite.sh
 ```
 
-2. Re-run init to update hooks:
+2. Re-run `stipe init` to repair onboarding state:
 
 ```bash
-mycelium init -g
+stipe init
 ```
 
 3. Check hook is executable:

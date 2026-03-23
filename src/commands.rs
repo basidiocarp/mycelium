@@ -723,6 +723,9 @@ pub enum Commands {
     Rewrite {
         /// Raw command to rewrite (e.g. "git status", "cargo test && git push")
         cmd: String,
+        /// Explain why the command rewrites or not
+        #[arg(long)]
+        explain: bool,
     },
 }
 
@@ -1322,3 +1325,21 @@ pub const MYCELIUM_META_COMMANDS: &[&str] = &[
     "self-update",
     "parse-health",
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::Parser;
+
+    #[test]
+    fn test_rewrite_explain_flag_parses() {
+        let cli = Cli::try_parse_from(["mycelium", "rewrite", "--explain", "git status"]).unwrap();
+        match cli.command {
+            Commands::Rewrite { cmd, explain } => {
+                assert!(explain);
+                assert_eq!(cmd, "git status");
+            }
+            _ => panic!("Expected Rewrite command"),
+        }
+    }
+}

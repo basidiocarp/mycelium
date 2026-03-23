@@ -4,6 +4,8 @@ Token-optimized CLI proxy. Filters and compresses command output before it reach
 
 Part of the [Basidiocarp ecosystem](https://github.com/basidiocarp) — see the [Technical Overview](https://github.com/basidiocarp/.github/blob/main/profile/README.md#technical-overview) for how Mycelium fits with Hyphae, Rhizome, Cap, and Lamella.
 
+`stipe` owns onboarding and repair for the ecosystem. Mycelium handles the lower-level filtering and integration work that those flows depend on.
+
 ## The Ecosystem
 
 - **mycelium** — Filters and compresses command output (this project). See [Token Optimization](https://github.com/basidiocarp/.github/blob/main/profile/README.md#token-optimization--mycelium).
@@ -36,10 +38,13 @@ Part of the [Basidiocarp ecosystem](https://github.com/basidiocarp) — see the 
 # Quick install (all ecosystem tools)
 curl -fsSL https://raw.githubusercontent.com/basidiocarp/.github/main/install.sh | sh
 
-# Mycelium only
+# Onboarding and repair
+stipe init
+
+# Install Mycelium
 cargo install --git https://github.com/basidiocarp/mycelium
 
-# Setup (hooks, MCP servers, capture hooks)
+# Lower-level integration after Stipe has onboarded the ecosystem
 mycelium init --ecosystem
 ```
 
@@ -72,7 +77,8 @@ flowchart LR
 ### Ecosystem Integration
 
 Mycelium is also the ecosystem orchestrator:
-- `mycelium init --ecosystem` — detects tools, registers MCP servers, installs hooks, initializes databases
+- `mycelium init --ecosystem` — lower-level integration that detects tools, registers MCP servers, installs hooks, and initializes databases
+- `stipe init` — primary onboarding and repair entry point for the ecosystem
 - Installs **Hyphae capture hooks** (errors, corrections, test results, code changes) into `~/.claude/hooks/`
 - Persistent Hyphae connection with auto-reconnect for large output chunking
 - Session summary hook captures task description, files modified, tools used, errors resolved

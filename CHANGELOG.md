@@ -2,6 +2,16 @@
 
 All notable changes to Mycelium are documented in this file.
 
+## v0.5.0 - 2026-03-22
+
+### Added
+
+- **`mycelium rewrite --explain`**: Shows whether a command rewrites through the built-in registry, a learned correction, or not at all, with a short reason for the decision.
+
+### Changed
+
+- **Onboarding handoff to Stipe**: Updated setup and update docs so `stipe init` is the primary onboarding and repair entry point, while `mycelium init --ecosystem` remains the lower-level integration path.
+
 ## v0.4.5 - 2026-03-22
 
 ### Fixed
