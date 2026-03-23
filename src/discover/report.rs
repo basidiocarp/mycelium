@@ -78,7 +78,7 @@ pub fn format_text(report: &DiscoverReport, limit: usize, verbose: bool) -> Stri
     out.push_str(&"=".repeat(52));
     out.push('\n');
     out.push_str(&format!(
-        "Scanned: {} sessions (last {} days), {} Bash commands\n",
+        "Scanned: {} sessions (last {} days), {} command executions\n",
         report.sessions_scanned, report.since_days, report.total_commands
     ));
     out.push_str(&format!(
@@ -150,7 +150,7 @@ pub fn format_text(report: &DiscoverReport, limit: usize, verbose: bool) -> Stri
         out.push_str("-> https://github.com/basidiocarp/mycelium/issues\n");
     }
 
-    out.push_str("\n~estimated from tool_result output sizes\n");
+    out.push_str("\n~estimated from command output sizes\n");
 
     if verbose && report.parse_errors > 0 {
         out.push_str(&format!("Parse errors skipped: {}\n", report.parse_errors));

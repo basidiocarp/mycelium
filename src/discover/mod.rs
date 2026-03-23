@@ -1,4 +1,4 @@
-//! Analyzes Claude Code session history to find commands that could benefit from Mycelium.
+//! Analyzes Claude Code and Codex session history to find commands that could benefit from Mycelium.
 pub mod provider;
 pub mod registry;
 mod report;
@@ -7,7 +7,10 @@ pub mod rules;
 use anyhow::Result;
 use std::collections::HashMap;
 
-use provider::{ClaudeProvider, SessionProvider};
+use provider::{
+    SessionSource, available_sources, discover_sessions, extract_commands,
+    project_filter_for_source,
+};
 use registry::{
     Classification, category_avg_tokens, classify_command, display_command_for_discover,
     split_command_chain,
@@ -31,7 +34,7 @@ struct UnsupportedBucket {
     example: String,
 }
 
-/// Analyze Claude Code session history and report missed Mycelium savings opportunities.
+/// Analyze Claude Code and Codex session history and report missed Mycelium savings opportunities.
 pub fn run(
     project: Option<&str>,
     all: bool,
@@ -40,27 +43,20 @@ pub fn run(
     format: &str,
     verbose: u8,
 ) -> Result<()> {
-    let provider = ClaudeProvider;
+    let cwd = std::env::current_dir()?;
+    let cwd_str = cwd.to_string_lossy().to_string();
 
-    // Determine project filter
-    let project_filter = if all {
-        None
-    } else if let Some(p) = project {
-        Some(p.to_string())
-    } else {
-        // Default: current working directory
-        let cwd = std::env::current_dir()?;
-        let cwd_str = cwd.to_string_lossy().to_string();
-        let encoded = ClaudeProvider::encode_project_path(&cwd_str);
-        Some(encoded)
-    };
-
-    let sessions = provider.discover_sessions(project_filter.as_deref(), Some(since_days))?;
+    let mut sessions: Vec<(SessionSource, std::path::PathBuf)> = Vec::new();
+    for source in available_sources() {
+        let project_filter = project_filter_for_source(source, project, all, &cwd_str);
+        let discovered = discover_sessions(source, project_filter.as_deref(), Some(since_days))?;
+        sessions.extend(discovered.into_iter().map(|path| (source, path)));
+    }
 
     if verbose > 0 {
         eprintln!("Scanning {} session files...", sessions.len());
-        for s in &sessions {
-            eprintln!("  {}", s.display());
+        for (source, s) in &sessions {
+            eprintln!("  [{}] {}", source.label(), s.display());
         }
     }
 
@@ -70,12 +66,17 @@ pub fn run(
     let mut supported_map: HashMap<&'static str, SupportedBucket> = HashMap::new();
     let mut unsupported_map: HashMap<String, UnsupportedBucket> = HashMap::new();
 
-    for session_path in &sessions {
-        let extracted = match provider.extract_commands(session_path) {
+    for (source, session_path) in &sessions {
+        let extracted = match extract_commands(*source, session_path) {
             Ok(cmds) => cmds,
             Err(e) => {
                 if verbose > 0 {
-                    eprintln!("Warning: skipping {}: {}", session_path.display(), e);
+                    eprintln!(
+                        "Warning: skipping [{}] {}: {}",
+                        source.label(),
+                        session_path.display(),
+                        e
+                    );
                 }
                 parse_errors += 1;
                 continue;

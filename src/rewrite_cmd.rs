@@ -32,6 +32,30 @@ pub fn run(cmd: &str, explain: bool) -> anyhow::Result<()> {
     std::process::exit(1);
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RuntimeResolution {
+    pub command: String,
+    pub rewritten: bool,
+    pub reason: String,
+}
+
+pub(crate) fn resolve_runtime_command(cmd: &str) -> RuntimeResolution {
+    let resolution = resolve(cmd);
+    let command = resolution
+        .rewritten
+        .clone()
+        .unwrap_or_else(|| resolution.input.clone());
+
+    RuntimeResolution {
+        command,
+        rewritten: matches!(
+            resolution.source,
+            RewriteSource::BuiltInRegistry | RewriteSource::LearnedCorrection
+        ),
+        reason: resolution.reason,
+    }
+}
+
 #[allow(dead_code)]
 pub fn explain(cmd: &str) -> String {
     render_explanation(&resolve(cmd))
@@ -280,5 +304,19 @@ mod tests {
             registry::rewrite_command("mycelium git status", &[]),
             Some("mycelium git status".into())
         );
+    }
+
+    #[test]
+    fn test_resolve_runtime_command_prefers_mycelium_equivalent() {
+        let resolution = resolve_runtime_command("git status");
+        assert_eq!(resolution.command, "mycelium git status");
+        assert!(resolution.rewritten);
+    }
+
+    #[test]
+    fn test_resolve_runtime_command_falls_back_to_original() {
+        let resolution = resolve_runtime_command("ansible-playbook site.yml");
+        assert_eq!(resolution.command, "ansible-playbook site.yml");
+        assert!(!resolution.rewritten);
     }
 }

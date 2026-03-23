@@ -123,8 +123,9 @@ mycelium wget <url>          # Compact download output (65%)
 ```bash
 mycelium gain                # View token savings statistics
 mycelium gain --history      # View command history with savings
-mycelium discover            # Analyze Claude Code sessions for missed Mycelium usage
+mycelium discover            # Analyze Claude Code and Codex sessions for missed Mycelium usage
 mycelium proxy <cmd>         # Run command without filtering (for debugging)
+mycelium invoke <cmd>        # Execute a command through Mycelium rewrite resolution
 mycelium init                # Add Mycelium instructions to CLAUDE.md
 mycelium init --global       # Add Mycelium to ~/.claude/CLAUDE.md
 ```

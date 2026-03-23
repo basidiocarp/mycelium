@@ -462,7 +462,7 @@ fn run_hook_only_mode(global: bool, patch_mode: PatchMode, verbose: u8) -> Resul
     println!("\nMycelium hook {} (hook-only mode).\n", hook_status);
     println!("  Hook: {}", hook_path.display());
     println!(
-        "  Note: No MYCELIUM.md created. Claude won't know about meta commands (gain, discover, proxy)."
+        "  Note: No MYCELIUM.md created. Claude won't know about meta commands (gain, discover, proxy, invoke)."
     );
 
     // Patch settings.json

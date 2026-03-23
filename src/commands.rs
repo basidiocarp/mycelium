@@ -27,7 +27,7 @@ use crate::filter;
   \x1b[1mInfrastructure:\x1b[0m     docker, kubectl, terraform, aws
   \x1b[1mLogs & Data:\x1b[0m        json, log, err, summary, env, deps
   \x1b[1mAnalytics:\x1b[0m          gain, discover, learn
-  \x1b[1mSetup:\x1b[0m              init, config, doctor, verify, self-update, completions, proxy, benchmark, plugin
+  \x1b[1mSetup:\x1b[0m              init, config, doctor, verify, self-update, completions, proxy, invoke, benchmark, plugin
 
 \x1b[1;4mOptions:\x1b[0m
 {options}
@@ -514,7 +514,7 @@ pub enum Commands {
         compare: Option<String>,
     },
 
-    /// Discover missed Mycelium savings from Claude Code history
+    /// Discover missed Mycelium savings from Claude Code and Codex history
     #[command(display_order = 101)]
     Discover {
         /// Filter by project path (substring match)
@@ -534,7 +534,7 @@ pub enum Commands {
         format: String,
     },
 
-    /// Learn CLI corrections from Claude Code error history
+    /// Learn CLI corrections from Claude Code and Codex error history
     #[command(display_order = 102)]
     Learn {
         /// Filter by project path (substring match)
@@ -661,8 +661,19 @@ pub enum Commands {
         args: Vec<OsString>,
     },
 
-    /// Measure token savings across available commands
+    /// Execute a shell command through Mycelium rewrite resolution
     #[command(display_order = 117)]
+    Invoke {
+        /// Raw shell command to execute
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, required = true)]
+        command: Vec<String>,
+        /// Explain the resolved execution path without running it
+        #[arg(long)]
+        explain: bool,
+    },
+
+    /// Measure token savings across available commands
+    #[command(display_order = 118)]
     Benchmark {
         /// CI mode: exit non-zero if <80% of tests show savings
         #[arg(long)]
@@ -670,7 +681,7 @@ pub enum Commands {
     },
 
     /// Manage filter plugins
-    #[command(display_order = 118)]
+    #[command(display_order = 119)]
     Plugin {
         #[command(subcommand)]
         command: PluginCommands,
@@ -1322,6 +1333,7 @@ pub const MYCELIUM_META_COMMANDS: &[&str] = &[
     "init",
     "config",
     "proxy",
+    "invoke",
     "hook-audit",
     "cc-economics",
     "doctor",
@@ -1343,6 +1355,33 @@ mod tests {
                 assert_eq!(cmd, "git status");
             }
             _ => panic!("Expected Rewrite command"),
+        }
+    }
+
+    #[test]
+    fn test_invoke_command_parses() {
+        let cli = Cli::try_parse_from(["mycelium", "invoke", "git", "status"]).unwrap();
+        match cli.command {
+            Commands::Invoke { command, explain } => {
+                assert_eq!(command, vec!["git".to_string(), "status".to_string()]);
+                assert!(!explain);
+            }
+            _ => panic!("Expected Invoke command"),
+        }
+    }
+
+    #[test]
+    fn test_invoke_preserves_single_argument_with_spaces() {
+        let cli = Cli::try_parse_from(["mycelium", "invoke", "rg", "foo bar", "src"]).unwrap();
+        match cli.command {
+            Commands::Invoke { command, explain } => {
+                assert_eq!(
+                    command,
+                    vec!["rg".to_string(), "foo bar".to_string(), "src".to_string()]
+                );
+                assert!(!explain);
+            }
+            _ => panic!("Expected Invoke command"),
         }
     }
 }

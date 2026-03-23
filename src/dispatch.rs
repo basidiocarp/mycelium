@@ -550,6 +550,13 @@ pub fn dispatch(cli: Cli) -> Result<()> {
             rewrite_cmd::run(&cmd, explain)?;
         }
 
+        Commands::Invoke {
+            ref command,
+            explain,
+        } => {
+            dispatch_invoke_command(command, explain, &cli)?;
+        }
+
         Commands::Proxy { ref args } => {
             dispatch_proxy(args, &cli)?;
         }
@@ -1191,10 +1198,6 @@ fn dispatch_npx(args: &[String], cli: &Cli) -> Result<()> {
 }
 
 fn dispatch_proxy(args: &[std::ffi::OsString], cli: &Cli) -> Result<()> {
-    use std::io::{Read, Write};
-    use std::process::{Command, Stdio};
-    use std::thread;
-
     if args.is_empty() {
         anyhow::bail!(
             "proxy requires a command to execute\nUsage: mycelium proxy <command> [args...]"
@@ -1213,12 +1216,91 @@ fn dispatch_proxy(args: &[std::ffi::OsString], cli: &Cli) -> Result<()> {
         eprintln!("Proxy mode: {} {}", cmd_name, cmd_args.join(" "));
     }
 
-    let mut child = Command::new(cmd_name.as_ref())
-        .args(&cmd_args)
+    let mut command = std::process::Command::new(cmd_name.as_ref());
+    command.args(&cmd_args);
+
+    run_spawned_command(
+        command,
+        &format!("{} {}", cmd_name, cmd_args.join(" ")),
+        &format!("mycelium proxy {} {}", cmd_name, cmd_args.join(" ")),
+        timer,
+    )
+}
+
+fn dispatch_invoke_command(command: &[String], explain: bool, cli: &Cli) -> Result<()> {
+    let rendered_command = render_shell_command(command);
+    let resolution = rewrite_cmd::resolve_runtime_command(&rendered_command);
+
+    if explain {
+        println!("Mycelium invoke");
+        println!("Input: {}", rendered_command.trim());
+        println!("Execute: {}", resolution.command);
+        println!(
+            "Mode: {}",
+            if resolution.rewritten {
+                "rewritten through Mycelium"
+            } else {
+                "raw shell command"
+            }
+        );
+        println!("Reason: {}", resolution.reason);
+        return Ok(());
+    }
+
+    if cli.verbose > 0 {
+        eprintln!("Invoke mode: {}", resolution.command);
+    }
+
+    let timer = tracking::TimedExecution::start();
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string());
+    let mut child_command = std::process::Command::new(shell);
+    if cli.skip_env {
+        child_command.env("SKIP_ENV_VALIDATION", "1");
+    }
+    child_command.arg("-lc").arg(&resolution.command);
+
+    run_spawned_command(
+        child_command,
+        &rendered_command,
+        &format!("mycelium invoke {}", resolution.command),
+        timer,
+    )
+}
+
+fn render_shell_command(args: &[String]) -> String {
+    args.iter()
+        .map(|arg| shell_escape_arg(arg))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn shell_escape_arg(arg: &str) -> String {
+    if !arg.is_empty()
+        && arg.chars().all(|c| {
+            c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.' | '/' | ':' | '@' | '+' | '=')
+        })
+    {
+        return arg.to_string();
+    }
+
+    format!("'{}'", arg.replace('\'', "'\"'\"'"))
+}
+
+fn run_spawned_command(
+    mut command: std::process::Command,
+    tracked_input: &str,
+    tracked_output: &str,
+    timer: tracking::TimedExecution,
+) -> Result<()> {
+    use std::io::{Read, Write};
+    use std::process::Stdio;
+    use std::thread;
+
+    let mut child = command
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .context(format!("Failed to execute command: {}", cmd_name))?;
+        .context("Failed to execute command")?;
 
     let stdout_pipe = child
         .stdout
@@ -1267,9 +1349,7 @@ fn dispatch_proxy(args: &[std::ffi::OsString], cli: &Cli) -> Result<()> {
         Ok(captured)
     });
 
-    let status = child
-        .wait()
-        .context(format!("Failed waiting for command: {}", cmd_name))?;
+    let status = child.wait().context("Failed waiting for command")?;
 
     let stdout_bytes = stdout_handle
         .join()
@@ -1282,15 +1362,8 @@ fn dispatch_proxy(args: &[std::ffi::OsString], cli: &Cli) -> Result<()> {
     let stderr = String::from_utf8_lossy(&stderr_bytes);
     let full_output = format!("{}{}", stdout, stderr);
 
-    // Track usage (input = output since no filtering)
-    timer.track(
-        &format!("{} {}", cmd_name, cmd_args.join(" ")),
-        &format!("mycelium proxy {} {}", cmd_name, cmd_args.join(" ")),
-        &full_output,
-        &full_output,
-    );
+    timer.track(tracked_input, tracked_output, &full_output, &full_output);
 
-    // Exit with same code as child process
     if !status.success() {
         std::process::exit(status.code().unwrap_or(1));
     }
@@ -1474,10 +1547,29 @@ mod tests {
         assert!(MYCELIUM_META_COMMANDS.contains(&"config"));
         assert!(MYCELIUM_META_COMMANDS.contains(&"discover"));
         assert!(MYCELIUM_META_COMMANDS.contains(&"proxy"));
+        assert!(MYCELIUM_META_COMMANDS.contains(&"invoke"));
         // Operational commands should NOT be in the meta list
         assert!(!MYCELIUM_META_COMMANDS.contains(&"git"));
         assert!(!MYCELIUM_META_COMMANDS.contains(&"cargo"));
         assert!(!MYCELIUM_META_COMMANDS.contains(&"ls"));
+    }
+
+    #[test]
+    fn test_render_shell_command_keeps_simple_arguments_unquoted() {
+        let args = vec!["git".to_string(), "status".to_string()];
+        assert_eq!(render_shell_command(&args), "git status");
+    }
+
+    #[test]
+    fn test_render_shell_command_quotes_arguments_with_spaces() {
+        let args = vec!["rg".to_string(), "foo bar".to_string(), "src".to_string()];
+        assert_eq!(render_shell_command(&args), "rg 'foo bar' src");
+    }
+
+    #[test]
+    fn test_render_shell_command_escapes_single_quotes() {
+        let args = vec!["printf".to_string(), "it's".to_string()];
+        assert_eq!(render_shell_command(&args), "printf 'it'\"'\"'s'");
     }
 
     // --- run_fallback: unrecognized commands trigger fallback ---

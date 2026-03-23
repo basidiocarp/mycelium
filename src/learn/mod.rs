@@ -1,16 +1,19 @@
-//! Learns correction patterns from Claude Code session history to suggest command improvements.
+//! Learns correction patterns from Claude Code and Codex session history to suggest command improvements.
 pub mod corrections_store;
 pub mod detector;
 pub mod report;
 pub mod types;
 
-use crate::discover::provider::{ClaudeProvider, SessionProvider};
+use crate::discover::provider::{
+    SessionSource, available_sources, discover_sessions, extract_commands,
+    project_filter_for_source,
+};
 use anyhow::Result;
 use corrections_store::{CORRECTIONS_JSON, UserCorrection, write_corrections_json};
 use detector::{CommandExecution, deduplicate_corrections, find_corrections};
 use report::{format_console_report, write_rules_file};
 
-/// Scan Claude Code sessions for error-then-correction patterns and report learned rules.
+/// Scan Claude Code and Codex sessions for error-then-correction patterns and report learned rules.
 pub fn run(
     project: Option<String>,
     all: bool,
@@ -20,34 +23,30 @@ pub fn run(
     min_confidence: f64,
     min_occurrences: usize,
 ) -> Result<()> {
-    let provider = ClaudeProvider;
+    let cwd = std::env::current_dir()?;
+    let cwd_str = cwd.to_string_lossy().to_string();
 
-    // Determine project filter (same logic as discover)
-    let project_filter = if all {
-        None
-    } else if let Some(p) = project {
-        Some(p)
-    } else {
-        // Default: current working directory
-        let cwd = std::env::current_dir()?;
-        let cwd_str = cwd.to_string_lossy().to_string();
-        let encoded = ClaudeProvider::encode_project_path(&cwd_str);
-        Some(encoded)
-    };
-
-    // Discover sessions
-    let sessions = provider.discover_sessions(project_filter.as_deref(), Some(since))?;
+    // Discover sessions across available Claude Code and Codex histories.
+    let mut sessions: Vec<(SessionSource, std::path::PathBuf)> = Vec::new();
+    for source in available_sources() {
+        let project_filter = project_filter_for_source(source, project.as_deref(), all, &cwd_str);
+        let discovered = discover_sessions(source, project_filter.as_deref(), Some(since))?;
+        sessions.extend(discovered.into_iter().map(|path| (source, path)));
+    }
 
     if sessions.is_empty() {
-        println!("No Claude Code sessions found in the last {} days.", since);
+        println!(
+            "No Claude Code or Codex sessions found in the last {} days.",
+            since
+        );
         return Ok(());
     }
 
     // Extract commands from all sessions
     let mut all_commands: Vec<CommandExecution> = Vec::new();
 
-    for session_path in &sessions {
-        let extracted = match provider.extract_commands(session_path) {
+    for (source, session_path) in &sessions {
+        let extracted = match extract_commands(*source, session_path) {
             Ok(cmds) => cmds,
             Err(_) => continue, // Skip malformed sessions
         };
