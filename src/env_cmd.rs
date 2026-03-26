@@ -67,10 +67,10 @@ pub fn run(filter: Option<&str>, show_all: bool, verbose: u8) -> Result<()> {
         for (k, v) in &path_vars {
             if k == "PATH" {
                 // Split PATH for readability
-                let paths: Vec<&str> = v.split(':').collect();
+                let paths = crate::platform::split_env_paths(v);
                 println!("  PATH ({} entries):", paths.len());
                 for p in paths.iter().take(5) {
-                    println!("    {}", p);
+                    println!("    {}", p.display());
                 }
                 if paths.len() > 5 {
                     println!("    ... +{} more", paths.len() - 5);

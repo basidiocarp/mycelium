@@ -352,7 +352,7 @@ pub fn show_config() -> Result<()> {
     println!("\nUsage:");
     println!("  mycelium init              # Full injection into local CLAUDE.md");
     println!(
-        "  mycelium init -g           # Hook + MYCELIUM.md + @MYCELIUM.md + settings.json (recommended)"
+        "  mycelium init -g           # Claude adapter hook + MYCELIUM.md + @MYCELIUM.md + settings.json"
     );
     println!("  mycelium init -g --auto-patch    # Same as above but no prompt");
     println!("  mycelium init -g --no-patch      # Skip settings.json (manual setup)");
@@ -368,8 +368,8 @@ pub fn show_config() -> Result<()> {
 /// Default mode: hook + slim MYCELIUM.md + @MYCELIUM.md reference
 #[cfg(not(unix))]
 fn run_default_mode(_global: bool, _patch_mode: PatchMode, _verbose: u8) -> Result<()> {
-    eprintln!("[!] Hook-based mode requires Unix (macOS/Linux).");
-    eprintln!("    Windows: use --claude-md mode for full injection.");
+    eprintln!("[!] Claude hook mode requires Unix (macOS/Linux).");
+    eprintln!("    Windows: use --claude-md mode for CLAUDE.md-only setup.");
     eprintln!("    Falling back to --claude-md mode.");
     run_claude_md_mode(_global, _verbose)
 }
@@ -401,13 +401,13 @@ fn run_default_mode(global: bool, patch_mode: PatchMode, verbose: u8) -> Result<
     } else {
         "already up to date"
     };
-    println!("\nMycelium hook {} (global).\n", hook_status);
-    println!("  Hook:      {}", hook_path.display());
+    println!("\nClaude Code adapter {} (global).\n", hook_status);
+    println!("  Hook:           {}", hook_path.display());
     println!(
         "  MYCELIUM.md:    {} (10 lines)",
         mycelium_md_path.display()
     );
-    println!("  CLAUDE.md: @MYCELIUM.md reference added");
+    println!("  CLAUDE.md:      @MYCELIUM.md reference added");
 
     if migrated {
         println!("\n  ok Migrated: removed 137-line Mycelium block from CLAUDE.md");
@@ -423,7 +423,7 @@ fn run_default_mode(global: bool, patch_mode: PatchMode, verbose: u8) -> Result<
             // Already printed by patch_settings_json
         }
         PatchResult::AlreadyPresent => {
-            println!("\n  settings.json: hook already present");
+            println!("\n  settings.json: Claude hook already present");
             println!("  Restart Claude Code. Test with: git status");
         }
         PatchResult::Declined | PatchResult::Skipped => {
@@ -459,10 +459,10 @@ fn run_hook_only_mode(global: bool, patch_mode: PatchMode, verbose: u8) -> Resul
     } else {
         "already up to date"
     };
-    println!("\nMycelium hook {} (hook-only mode).\n", hook_status);
+    println!("\nClaude Code adapter {} (hook-only mode).\n", hook_status);
     println!("  Hook: {}", hook_path.display());
     println!(
-        "  Note: No MYCELIUM.md created. Claude won't know about meta commands (gain, discover, proxy, invoke)."
+        "  Note: No MYCELIUM.md created. Claude Code will not see Mycelium meta commands (gain, discover, proxy, invoke)."
     );
 
     // Patch settings.json
@@ -474,7 +474,7 @@ fn run_hook_only_mode(global: bool, patch_mode: PatchMode, verbose: u8) -> Resul
             // Already printed by patch_settings_json
         }
         PatchResult::AlreadyPresent => {
-            println!("\n  settings.json: hook already present");
+            println!("\n  settings.json: Claude hook already present");
             println!("  Restart Claude Code. Test with: git status");
         }
         PatchResult::Declined | PatchResult::Skipped => {
@@ -556,9 +556,9 @@ fn run_claude_md_mode(global: bool, verbose: u8) -> Result<()> {
     }
 
     if global {
-        println!("   Claude Code will now use mycelium in all sessions");
+        println!("   Claude Code will now use Mycelium in all sessions");
     } else {
-        println!("   Claude Code will use mycelium in this project");
+        println!("   Claude Code will use Mycelium in this project");
     }
 
     Ok(())

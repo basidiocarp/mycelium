@@ -299,8 +299,7 @@ fn estimate_tokens(text: &str) -> usize {
 }
 
 fn run_shell(cmd: &str) -> String {
-    Command::new("sh")
-        .args(["-c", cmd])
+    crate::platform::shell_command(cmd)
         .output()
         .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
         .unwrap_or_default()
@@ -315,11 +314,7 @@ fn run_mycelium(binary: &str, args: &[&str]) -> String {
 }
 
 fn command_exists(cmd: &str) -> bool {
-    Command::new("which")
-        .arg(cmd)
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
+    crate::utils::which_command(cmd).is_some()
 }
 
 fn is_git_repo() -> bool {

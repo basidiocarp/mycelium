@@ -223,11 +223,7 @@ pub fn detect_package_manager() -> &'static str {
 /// Build a Command using the detected package manager's exec mechanism.
 /// Returns a Command ready to have tool-specific args appended.
 pub fn package_manager_exec(tool: &str) -> Command {
-    let tool_exists = Command::new("which")
-        .arg(tool)
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false);
+    let tool_exists = which::which(tool).is_ok();
 
     if tool_exists {
         Command::new(tool)
@@ -260,14 +256,10 @@ pub fn package_manager_exec(tool: &str) -> Command {
 
 /// Check if a command exists in PATH. Returns the full path if found.
 pub fn which_command(cmd: &str) -> Option<String> {
-    std::process::Command::new("which")
-        .arg(cmd)
-        .output()
+    which::which(cmd)
         .ok()
-        .filter(|o| o.status.success())
-        .and_then(|o| String::from_utf8(o.stdout).ok())
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
+        .map(|path| path.to_string_lossy().trim().to_string())
+        .filter(|path| !path.is_empty())
 }
 
 /// Extract the exit code from a process status, defaulting to 1 for signals.

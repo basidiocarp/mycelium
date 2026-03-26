@@ -1,4 +1,4 @@
-//! `mycelium init --ecosystem` — detect sibling tools and configure host clients.
+//! `mycelium init --ecosystem` — detect sibling tools and configure host adapters.
 
 use anyhow::Result;
 use colored::Colorize;
@@ -199,7 +199,7 @@ fn configure_detected_clients(
     }
 
     println!();
-    println!("{}", "Configuring detected MCP clients...".bold());
+    println!("{}", "Configuring detected host adapters...".bold());
 
     let mut client_configured: Vec<String> = Vec::new();
     let needs_claude_init = targets
@@ -240,13 +240,13 @@ fn configure_detected_clients(
         if let Err(e) = super::run(true, false, false, patch_mode, verbose) {
             eprintln!("  {} Mycelium global init failed: {}", "!".yellow(), e);
         } else {
-            client_configured.push("mycelium hooks + CLAUDE.md".to_string());
+            client_configured.push("Claude Code adapter (hook + CLAUDE.md)".to_string());
         }
     }
 
     if !client_configured.is_empty() {
         println!();
-        println!("  {} MCP servers registered for:", "\u{2713}".green());
+        println!("  {} Host adapters configured:", "\u{2713}".green());
         for name in &client_configured {
             println!("    - {name}");
         }

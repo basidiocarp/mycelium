@@ -7,6 +7,7 @@ pub mod discover;
 #[path = "vcs/git_filters/mod.rs"]
 pub mod git_filters;
 pub mod learn;
+pub mod platform;
 #[allow(dead_code)]
 #[path = "plugin.rs"]
 mod plugin;

@@ -55,20 +55,23 @@ fn check_version() {
 fn check_hook() {
     match integrity::verify_hook() {
         Ok(integrity::IntegrityStatus::Verified) => {
-            pass("hook", "installed and verified");
+            pass("claude adapter", "hook installed and verified");
         }
         Ok(integrity::IntegrityStatus::NotInstalled) => {
-            warn("hook", "not installed — run `mycelium init -g`");
+            warn(
+                "claude adapter",
+                "not installed — run `mycelium init -g` if you use Claude Code",
+            );
         }
         Ok(integrity::IntegrityStatus::NoBaseline) => {
             warn(
-                "hook",
+                "claude adapter",
                 "installed but no baseline hash — run `mycelium init -g`",
             );
         }
         Ok(integrity::IntegrityStatus::Tampered { expected, actual }) => {
             fail(
-                "hook",
+                "claude adapter",
                 &format!(
                     "TAMPERED — expected {}…, got {}…",
                     &expected[..8],
@@ -78,12 +81,12 @@ fn check_hook() {
         }
         Ok(integrity::IntegrityStatus::OrphanedHash) => {
             warn(
-                "hook",
+                "claude adapter",
                 "hash file exists but hook is missing — run `mycelium init -g`",
             );
         }
         Err(e) => {
-            fail("hook", &format!("error checking hook: {e}"));
+            fail("claude adapter", &format!("error checking hook: {e}"));
         }
     }
 }
@@ -134,19 +137,17 @@ fn check_tracking_db() {
 }
 
 fn check_settings_json() {
-    let home = match dirs::home_dir() {
-        Some(h) => h,
+    let settings_path = match crate::platform::claude_settings_path() {
+        Some(path) => path,
         None => {
-            warn("settings.json", "cannot determine home directory");
+            warn("claude settings", "cannot determine home directory");
             return;
         }
     };
-
-    let settings_path = home.join(".claude").join("settings.json");
     if !settings_path.exists() {
         warn(
-            "settings.json",
-            "not found — run `mycelium init -g` to register hook",
+            "claude settings",
+            "not found — run `mycelium init -g` if you use Claude Code",
         );
         return;
     }
@@ -154,12 +155,15 @@ fn check_settings_json() {
     match std::fs::read_to_string(&settings_path) {
         Ok(content) => {
             if content.contains("mycelium-rewrite") {
-                pass("settings.json", "hook registered");
+                pass("claude settings", "hook registered");
             } else {
-                warn("settings.json", "exists but mycelium hook not registered");
+                warn(
+                    "claude settings",
+                    "exists but Mycelium hook is not registered",
+                );
             }
         }
-        Err(e) => fail("settings.json", &format!("cannot read: {e}")),
+        Err(e) => fail("claude settings", &format!("cannot read: {e}")),
     }
 }
 
@@ -202,7 +206,11 @@ fn check_path() {
         .unwrap_or_default();
 
     let path_var = std::env::var("PATH").unwrap_or_default();
-    if path_var.split(':').any(|p| p == install_dir) {
+    let install_dir_path = std::path::PathBuf::from(&install_dir);
+    if crate::platform::split_env_paths(&path_var)
+        .iter()
+        .any(|path| path == &install_dir_path)
+    {
         pass("PATH", &format!("{install_dir} is in PATH"));
     } else {
         warn(
@@ -224,15 +232,10 @@ fn check_binary_collision() {
         }
     };
 
-    // Run `which mycelium` to find what's on PATH
-    let which_output = std::process::Command::new("which").arg("mycelium").output();
-
-    match which_output {
-        Ok(output) if output.status.success() => {
-            let which_path_raw = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    match crate::utils::which_command("mycelium") {
+        Some(which_path_raw) => {
             let which_path = PathBuf::from(&which_path_raw);
 
-            // Canonicalize both paths for reliable comparison (resolves symlinks)
             let exe_canonical = current_exe.canonicalize().unwrap_or(current_exe.clone());
             let which_canonical = which_path.canonicalize().unwrap_or(which_path.clone());
 
@@ -242,24 +245,17 @@ fn check_binary_collision() {
                 fail(
                     "binary collision",
                     &format!(
-                        "MISMATCH — running {} but `which mycelium` → {}",
+                        "MISMATCH — running {} but PATH resolves mycelium to {}",
                         current_exe.display(),
                         which_path_raw,
                     ),
                 );
             }
         }
-        Ok(_) => {
-            // which returned non-zero: mycelium not found on PATH at all
-            warn(
-                "binary collision",
-                &format!("mycelium not on PATH (running {})", current_exe.display()),
-            );
-        }
-        Err(e) => {
-            // `which` not available (e.g., Windows)
-            warn("binary collision", &format!("cannot run `which`: {e}"));
-        }
+        None => warn(
+            "binary collision",
+            &format!("mycelium not on PATH (running {})", current_exe.display()),
+        ),
     }
 }
 

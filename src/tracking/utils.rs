@@ -52,7 +52,7 @@ pub(super) fn current_project_path_string() -> String {
 /// 1. `override_path` argument (used in tests to avoid mutating the environment)
 /// 2. `MYCELIUM_DB_PATH` environment variable
 /// 3. `tracking.database_path` from `~/.config/mycelium/config.toml`
-/// 4. Platform-specific default (`~/.local/share/mycelium/history.db` on Linux)
+/// 4. Platform-specific default data directory
 pub fn resolve_db_path_info(override_path: Option<&str>) -> Result<DbPathInfo> {
     let config_path = crate::config::config_path()?;
 
@@ -84,9 +84,10 @@ pub fn resolve_db_path_info(override_path: Option<&str>) -> Result<DbPathInfo> {
         });
     }
 
-    let data_dir = dirs::data_local_dir().unwrap_or_else(|| PathBuf::from("."));
+    let data_dir =
+        crate::platform::mycelium_data_dir().unwrap_or_else(|| PathBuf::from(".").join("mycelium"));
     Ok(DbPathInfo {
-        path: data_dir.join("mycelium").join("history.db"),
+        path: data_dir.join("history.db"),
         source: DbPathSource::Default,
         config_path,
     })

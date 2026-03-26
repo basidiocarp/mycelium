@@ -1,4 +1,4 @@
-//! User configuration loaded from `~/.config/mycelium/config.toml`.
+//! User configuration loaded from the platform config directory.
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -297,8 +297,9 @@ impl Config {
 }
 
 pub fn config_path() -> Result<PathBuf> {
-    let config_dir = dirs::config_dir().unwrap_or_else(|| PathBuf::from("."));
-    Ok(config_dir.join("mycelium").join("config.toml"))
+    crate::platform::mycelium_config_dir()
+        .map(|dir| dir.join("config.toml"))
+        .ok_or_else(|| anyhow::anyhow!("could not determine mycelium config directory"))
 }
 
 #[allow(dead_code)]

@@ -578,7 +578,7 @@ pub enum Commands {
     },
 
     // ── Setup ────────────────────────────────────────────────────────────────
-    /// Initialize mycelium instructions in CLAUDE.md
+    /// Initialize Mycelium host adapters and CLAUDE.md instructions
     #[command(display_order = 110)]
     Init {
         /// Add to global ~/.claude/CLAUDE.md instead of local
@@ -597,7 +597,7 @@ pub enum Commands {
         #[arg(long = "hook-only", group = "mode")]
         hook_only: bool,
 
-        /// Detect sibling ecosystem tools and configure the available host clients
+        /// Detect sibling ecosystem tools and configure available host adapters
         #[arg(long, group = "mode")]
         ecosystem: bool,
 

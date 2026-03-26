@@ -45,7 +45,7 @@ fn get_tee_dir(config: &Config) -> Option<PathBuf> {
     }
 
     // Default: ~/.local/share/mycelium/tee/
-    dirs::data_local_dir().map(|d| d.join("mycelium").join("tee"))
+    crate::platform::mycelium_data_dir().map(|d| d.join("tee"))
 }
 
 /// Rotate old tee files: keep only the last `max_files`, delete the oldest.

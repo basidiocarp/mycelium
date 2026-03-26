@@ -8,9 +8,8 @@ fn default_true() -> bool {
 }
 
 fn default_plugin_dir() -> PathBuf {
-    dirs::config_dir()
-        .unwrap_or_else(|| PathBuf::from("~/.config"))
-        .join("mycelium")
+    crate::platform::mycelium_config_dir()
+        .unwrap_or_else(|| PathBuf::from(".").join("mycelium"))
         .join("plugins")
 }
 
@@ -35,10 +34,9 @@ impl Default for PluginConfig {
 /// Load [plugins] section from the mycelium config file, falling back to defaults.
 /// Reads independently to avoid a circular dependency with config.rs.
 fn load_plugin_config() -> PluginConfig {
-    let config_path = dirs::config_dir()
-        .unwrap_or_else(|| PathBuf::from("~/.config"))
-        .join("mycelium")
-        .join("config.toml");
+    let Ok(config_path) = crate::config::config_path() else {
+        return PluginConfig::default();
+    };
 
     if !config_path.exists() {
         return PluginConfig::default();

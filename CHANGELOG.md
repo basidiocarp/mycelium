@@ -2,6 +2,14 @@
 
 All notable changes to Mycelium are documented in this file.
 
+## v0.7.1 - 2026-03-26
+
+### Changed
+
+- **Cross-platform runtime plumbing**: Added a shared platform layer for config/data path resolution, shell dispatch, PATH parsing, and command lookup so Mycelium no longer assumes Unix-only `which`, `:`-separated PATH values, or direct `sh -c` execution in key runtime paths.
+- **Shared editor/config registration**: `mycelium init` now uses `spore`'s shared editor/config model for Codex CLI, Cursor, Windsurf, and Claude Desktop registration instead of maintaining a separate local TOML/JSON mutation path.
+- **Host-neutral setup guidance**: Onboarding, ecosystem setup, doctor output, and related CLI text now present Claude Code and Codex CLI as peer host adapters while still calling out Claude-specific hook setup where it actually exists.
+
 ## v0.7.0 - 2026-03-23
 
 ### Added

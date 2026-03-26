@@ -48,6 +48,7 @@ mod learn;
 mod lint_cmd;
 mod local_llm;
 mod parser;
+mod platform;
 mod plugin;
 mod plugin_cmd;
 mod psql_cmd;
@@ -304,9 +305,9 @@ mod tests {
     #[test]
     fn test_meta_commands_reject_bad_flags() {
         // Mycelium meta-commands should produce parse errors (not fall through to raw execution).
-        // Skip "proxy" because it uses trailing_var_arg (accepts any args by design).
+        // Skip meta-commands that intentionally accept arbitrary trailing args by design.
         for cmd in MYCELIUM_META_COMMANDS {
-            if *cmd == "proxy" {
+            if matches!(*cmd, "proxy" | "invoke") {
                 continue;
             }
             let result = Cli::try_parse_from(["mycelium", cmd, "--nonexistent-flag-xyz"]);

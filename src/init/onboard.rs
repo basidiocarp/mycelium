@@ -1,7 +1,7 @@
 //! `mycelium init --onboard` — interactive onboarding wizard.
 //!
 //! Walks the user through first-time setup of the Basidiocarp ecosystem:
-//! detect tools, configure the available host client, store first hyphae
+//! detect tools, configure available host adapters, store first hyphae
 //! memory, scan with rhizome, export code graph, and print a summary.
 //!
 //! Falls back to `--ecosystem` when stdin is not a TTY (CI, pipes).
@@ -67,14 +67,14 @@ pub fn run_onboard(verbose: u8) -> Result<()> {
             .collect::<Vec<_>>()
             .join(", ");
         println!("  Detected host clients: {host_label}");
-        if confirm("Register host MCP servers and install Claude hooks when available?") {
+        if confirm("Register detected host adapters and enable Claude hooks when available?") {
             configure_host_adapters(&host_clients, &hyphae_info, &rhizome_info, verbose)?;
         } else {
             println!("  Skipped host-adapter configuration.");
         }
     } else {
         println!(
-            "  {} No supported host client detected (Claude Code or Codex CLI) — skipping.",
+            "  {} No supported host adapter detected (Claude Code or Codex CLI) — skipping.",
             "!".yellow()
         );
         println!(
@@ -203,7 +203,7 @@ fn print_banner() {
     println!();
     println!("  This wizard will set up the Basidiocarp ecosystem:");
     println!("    1. Detect installed tools");
-    println!("    2. Configure your host client (Claude Code or Codex CLI)");
+    println!("    2. Configure your host adapters (Claude Code and/or Codex CLI)");
     println!("    3. Store a first memory in Hyphae");
     println!("    4. Scan your project with Rhizome");
     println!("    5. Export code graph to Hyphae");
@@ -381,7 +381,7 @@ fn configure_host_adapters(
         if let Err(e) = super::run(true, false, false, patch_mode, verbose) {
             eprintln!("  {} Mycelium global init failed: {}", "!".yellow(), e);
         } else {
-            configured.push("mycelium hooks + CLAUDE.md".to_string());
+            configured.push("Claude Code adapter (hook + CLAUDE.md)".to_string());
         }
     }
 
@@ -510,7 +510,7 @@ fn print_summary(tools: &[ToolInfo], cap_version: &Option<String>, host_clients:
     println!("  Tools: {}/{} installed", installed_count, total);
 
     if host_clients.is_empty() {
-        println!("  Host clients: not detected");
+        println!("  Host adapters: not detected");
     } else {
         for host in host_clients {
             println!("  {}: configured", host.name());
@@ -524,7 +524,7 @@ fn print_summary(tools: &[ToolInfo], cap_version: &Option<String>, host_clients:
         .any(|client| matches!(client, McpClient::ClaudeCode))
     {
         println!(
-            "    - Start Claude Code and test: {}",
+            "    - Verify Claude Code adapter: {}",
             "git status".dimmed()
         );
     }
@@ -533,7 +533,7 @@ fn print_summary(tools: &[ToolInfo], cap_version: &Option<String>, host_clients:
         .any(|client| matches!(client, McpClient::CodexCli))
     {
         println!(
-            "    - Start Codex CLI and check: {}",
+            "    - Verify Codex CLI adapter: {}",
             "cat ~/.codex/config.toml".dimmed()
         );
     }

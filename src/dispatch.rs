@@ -1228,7 +1228,7 @@ fn dispatch_proxy(args: &[std::ffi::OsString], cli: &Cli) -> Result<()> {
 }
 
 fn dispatch_invoke_command(command: &[String], explain: bool, cli: &Cli) -> Result<()> {
-    let rendered_command = render_shell_command(command);
+    let rendered_command = crate::platform::render_shell_command(command);
     let resolution = rewrite_cmd::resolve_runtime_command(&rendered_command);
 
     if explain {
@@ -1252,12 +1252,10 @@ fn dispatch_invoke_command(command: &[String], explain: bool, cli: &Cli) -> Resu
     }
 
     let timer = tracking::TimedExecution::start();
-    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string());
-    let mut child_command = std::process::Command::new(shell);
+    let mut child_command = crate::platform::invoke_shell_command(&resolution.command);
     if cli.skip_env {
         child_command.env("SKIP_ENV_VALIDATION", "1");
     }
-    child_command.arg("-lc").arg(&resolution.command);
 
     run_spawned_command(
         child_command,
@@ -1265,25 +1263,6 @@ fn dispatch_invoke_command(command: &[String], explain: bool, cli: &Cli) -> Resu
         &format!("mycelium invoke {}", resolution.command),
         timer,
     )
-}
-
-fn render_shell_command(args: &[String]) -> String {
-    args.iter()
-        .map(|arg| shell_escape_arg(arg))
-        .collect::<Vec<_>>()
-        .join(" ")
-}
-
-fn shell_escape_arg(arg: &str) -> String {
-    if !arg.is_empty()
-        && arg.chars().all(|c| {
-            c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.' | '/' | ':' | '@' | '+' | '=')
-        })
-    {
-        return arg.to_string();
-    }
-
-    format!("'{}'", arg.replace('\'', "'\"'\"'"))
 }
 
 fn run_spawned_command(
@@ -1554,26 +1533,7 @@ mod tests {
         assert!(!MYCELIUM_META_COMMANDS.contains(&"ls"));
     }
 
-    #[test]
-    fn test_render_shell_command_keeps_simple_arguments_unquoted() {
-        let args = vec!["git".to_string(), "status".to_string()];
-        assert_eq!(render_shell_command(&args), "git status");
-    }
-
-    #[test]
-    fn test_render_shell_command_quotes_arguments_with_spaces() {
-        let args = vec!["rg".to_string(), "foo bar".to_string(), "src".to_string()];
-        assert_eq!(render_shell_command(&args), "rg 'foo bar' src");
-    }
-
-    #[test]
-    fn test_render_shell_command_escapes_single_quotes() {
-        let args = vec!["printf".to_string(), "it's".to_string()];
-        assert_eq!(render_shell_command(&args), "printf 'it'\"'\"'s'");
-    }
-
     // --- run_fallback: unrecognized commands trigger fallback ---
-
     #[test]
     fn test_unrecognized_command_fails_parse() {
         let result = Cli::try_parse_from(["mycelium", "nonexistent-command"]);

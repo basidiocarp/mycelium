@@ -6,7 +6,7 @@
 use anyhow::{Context, Result};
 use colored::Colorize;
 use serde_json::{Map, Value, json};
-use toml::{self, Value as TomlValue};
+use spore::editors::{self, Editor, McpServer as EditorMcpServer};
 use std::fmt;
 use std::fs;
 use std::path::PathBuf;
@@ -25,6 +25,17 @@ pub enum McpClient {
 }
 
 impl McpClient {
+    fn shared_editor(self) -> Option<Editor> {
+        match self {
+            Self::ClaudeCode => Some(Editor::ClaudeCode),
+            Self::CodexCli => Some(Editor::CodexCli),
+            Self::Cursor => Some(Editor::Cursor),
+            Self::Windsurf => Some(Editor::Windsurf),
+            Self::ClaudeDesktop => Some(Editor::ClaudeDesktop),
+            Self::Cline | Self::Continue => None,
+        }
+    }
+
     /// Human-readable display name.
     pub fn name(self) -> &'static str {
         match self {
@@ -68,30 +79,12 @@ impl McpClient {
 
     /// Config file path for this client (if applicable).
     fn config_path(self) -> Option<PathBuf> {
-        let home = dirs::home_dir()?;
         match self {
-            Self::ClaudeCode => Some(home.join(".claude.json")),
-            Self::CodexCli => Some(home.join(".codex").join("config.toml")),
-            Self::Cursor => Some(home.join(".cursor").join("mcp.json")),
-            Self::Windsurf => Some(home.join(".windsurf").join("mcp.json")),
             Self::Cline => vscode_cline_settings_path(),
-            Self::Continue => Some(home.join(".continue").join("config.json")),
-            Self::ClaudeDesktop => {
-                #[cfg(target_os = "macos")]
-                {
-                    Some(
-                        home.join("Library")
-                            .join("Application Support")
-                            .join("Claude")
-                            .join("claude_desktop_config.json"),
-                    )
-                }
-                #[cfg(not(target_os = "macos"))]
-                {
-                    // Linux: ~/.config/Claude/claude_desktop_config.json
-                    dirs::config_dir().map(|d| d.join("Claude").join("claude_desktop_config.json"))
-                }
-            }
+            Self::Continue => dirs::home_dir().map(|home| home.join(".continue").join("config.json")),
+            _ => self
+                .shared_editor()
+                .and_then(|editor| editors::config_path(editor).ok()),
         }
     }
 }
@@ -115,10 +108,11 @@ const ALL_CLIENTS: [McpClient; 7] = [
 
 /// Detect which MCP clients are installed on this system.
 pub fn detect_clients() -> Vec<McpClient> {
+    let shared_detected = editors::detect();
     ALL_CLIENTS
         .iter()
         .copied()
-        .filter(|c| is_installed(*c))
+        .filter(|c| is_installed(*c, &shared_detected))
         .collect()
 }
 
@@ -136,33 +130,36 @@ pub fn is_host_client(client: McpClient) -> bool {
 }
 
 /// Check if a client appears to be installed.
-fn is_installed(client: McpClient) -> bool {
+fn is_installed(client: McpClient, shared_detected: &[Editor]) -> bool {
     match client {
         McpClient::ClaudeCode => {
-            // Check CLI first, fall back to config file
             Command::new("claude")
                 .arg("--version")
                 .output()
                 .is_ok_and(|o| o.status.success())
-                || client.config_path().is_some_and(|p| p.exists())
+                || shared_editor_detected(client, shared_detected)
         }
         McpClient::CodexCli => {
             Command::new("codex")
                 .arg("--version")
                 .output()
                 .is_ok_and(|o| o.status.success())
-                || client.config_path().is_some_and(|p| p.exists())
+                || shared_editor_detected(client, shared_detected)
         }
         McpClient::Cline => {
-            // Check if VS Code extensions dir has cline
             vscode_cline_extension_exists() || client.config_path().is_some_and(|p| p.exists())
         }
-        _ => client.config_path().is_some_and(|p| {
-            // For Cursor/Windsurf: check parent dir exists (app installed)
-            // For Continue/ClaudeDesktop: check config file or parent dir
+        McpClient::Continue => client.config_path().is_some_and(|p| {
             p.exists() || p.parent().is_some_and(|d| d.exists())
         }),
+        _ => shared_editor_detected(client, shared_detected),
     }
+}
+
+fn shared_editor_detected(client: McpClient, shared_detected: &[Editor]) -> bool {
+    client
+        .shared_editor()
+        .is_some_and(|editor| shared_detected.contains(&editor))
 }
 
 /// MCP server definition for registration.
@@ -178,12 +175,11 @@ pub struct ServerConfig {
 pub fn register_servers(client: McpClient, servers: &[ServerConfig], verbose: u8) -> Result<bool> {
     match client {
         McpClient::ClaudeCode => register_claude_code(servers, verbose),
-        McpClient::CodexCli => register_codex_cli(servers, verbose),
-        McpClient::Cursor | McpClient::Windsurf => {
-            register_json_mcp_config(client, servers, verbose)
-        }
+        McpClient::CodexCli
+        | McpClient::Cursor
+        | McpClient::Windsurf
+        | McpClient::ClaudeDesktop => register_spore_editor_config(client, servers, verbose),
         McpClient::Continue => register_continue(servers, verbose),
-        McpClient::ClaudeDesktop => register_json_mcp_config(client, servers, verbose),
         McpClient::Cline => {
             print_cline_snippet(servers);
             Ok(true)
@@ -255,137 +251,31 @@ fn register_claude_code(servers: &[ServerConfig], verbose: u8) -> Result<bool> {
     Ok(all_ok)
 }
 
-// ── Codex CLI ───────────────────────────────────────────────────────────────
-
-fn register_codex_cli(servers: &[ServerConfig], verbose: u8) -> Result<bool> {
-    let config_path = McpClient::CodexCli
-        .config_path()
-        .context("no Codex config path")?;
-
-    if let Some(parent) = config_path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-
-    let mut root: TomlValue = if config_path.exists() {
-        let backup = config_path.with_extension("toml.bak");
-        fs::copy(&config_path, &backup)?;
-        if verbose > 0 {
-            eprintln!(
-                "  Backed up {} → {}",
-                config_path.display(),
-                backup.display()
-            );
-        }
-        let content = fs::read_to_string(&config_path)?;
-        content
-            .parse()
-            .unwrap_or_else(|_| TomlValue::Table(toml::map::Map::new()))
-    } else {
-        TomlValue::Table(toml::map::Map::new())
-    };
-
-    let root_table = root
-        .as_table_mut()
-        .context("config root is not a TOML table")?;
-    let mcp_servers = root_table
-        .entry("mcp_servers")
-        .or_insert_with(|| TomlValue::Table(toml::map::Map::new()));
-    let servers_table = mcp_servers
-        .as_table_mut()
-        .context("mcp_servers is not a TOML table")?;
-
-    for server in servers {
-        let mut entry = toml::map::Map::new();
-        entry.insert(
-            "command".to_string(),
-            TomlValue::String(server.command.clone()),
-        );
-        entry.insert(
-            "args".to_string(),
-            TomlValue::Array(
-                server
-                    .args
-                    .iter()
-                    .map(|arg| TomlValue::String(arg.clone()))
-                    .collect(),
-            ),
-        );
-        servers_table.insert(server.name.clone(), TomlValue::Table(entry));
-    }
-
-    let content = toml::to_string_pretty(&root)?;
-    fs::write(&config_path, content)?;
-
-    if verbose > 0 {
-        eprintln!(
-            "  Wrote {} server(s) to {}",
-            servers.len(),
-            config_path.display()
-        );
-    }
-
-    Ok(true)
-}
-
-// ── JSON-based clients (Cursor, Windsurf, Claude Desktop) ───────────────────
-
-fn register_json_mcp_config(
+fn register_spore_editor_config(
     client: McpClient,
     servers: &[ServerConfig],
     verbose: u8,
 ) -> Result<bool> {
-    let config_path = client.config_path().context("no config path for client")?;
+    let editor = client
+        .shared_editor()
+        .context("client does not use shared editor registration")?;
+    let config_path = editors::config_path(editor)?;
+    let arg_storage: Vec<Vec<&str>> = servers
+        .iter()
+        .map(|server| server.args.iter().map(String::as_str).collect())
+        .collect();
+    let shared_servers: Vec<EditorMcpServer<'_>> = servers
+        .iter()
+        .zip(arg_storage.iter())
+        .map(|(server, args)| EditorMcpServer {
+            name: &server.name,
+            command: &server.command,
+            args,
+        })
+        .collect();
 
-    // Ensure parent directory exists
-    if let Some(parent) = config_path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-
-    // Read existing config or create empty object
-    let mut root: Value = if config_path.exists() {
-        // Backup before modifying
-        let backup = config_path.with_extension("json.bak");
-        fs::copy(&config_path, &backup)
-            .with_context(|| format!("failed to backup {}", config_path.display()))?;
-        if verbose > 0 {
-            eprintln!(
-                "  Backed up {} → {}",
-                config_path.display(),
-                backup.display()
-            );
-        }
-
-        let content = fs::read_to_string(&config_path)?;
-        serde_json::from_str(&content).unwrap_or_else(|_| json!({}))
-    } else {
-        json!({})
-    };
-
-    // Ensure mcpServers key exists
-    let mcp_servers = root
-        .as_object_mut()
-        .context("config root is not an object")?
-        .entry("mcpServers")
-        .or_insert_with(|| json!({}));
-
-    let mcp_map = mcp_servers
-        .as_object_mut()
-        .context("mcpServers is not an object")?;
-
-    // Merge servers
-    for server in servers {
-        mcp_map.insert(
-            server.name.clone(),
-            json!({
-                "command": server.command,
-                "args": server.args,
-            }),
-        );
-    }
-
-    // Write back
-    let json_str = serde_json::to_string_pretty(&root)?;
-    fs::write(&config_path, json_str)?;
+    editors::register_mcp_servers(editor, &shared_servers)
+        .with_context(|| format!("failed to register MCP servers for {}", client.name()))?;
 
     if verbose > 0 {
         eprintln!(
@@ -502,34 +392,7 @@ fn print_cline_snippet(servers: &[ServerConfig]) {
 
 /// Get the VS Code settings path where Cline stores MCP config.
 fn vscode_cline_settings_path() -> Option<PathBuf> {
-    let home = dirs::home_dir()?;
-    #[cfg(target_os = "macos")]
-    {
-        Some(
-            home.join("Library")
-                .join("Application Support")
-                .join("Code")
-                .join("User")
-                .join("settings.json"),
-        )
-    }
-    #[cfg(target_os = "linux")]
-    {
-        Some(
-            home.join(".config")
-                .join("Code")
-                .join("User")
-                .join("settings.json"),
-        )
-    }
-    #[cfg(target_os = "windows")]
-    {
-        dirs::config_dir().map(|d| d.join("Code").join("User").join("settings.json"))
-    }
-    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
-    {
-        None
-    }
+    editors::config_path(Editor::VsCode).ok()
 }
 
 /// Check if Cline extension directory exists in VS Code.
@@ -581,6 +444,27 @@ mod tests {
         let path = McpClient::CodexCli.config_path().unwrap();
         assert!(path.to_string_lossy().contains(".codex"));
         assert!(path.to_string_lossy().ends_with("config.toml"));
+    }
+
+    #[test]
+    fn test_shared_editor_mapping() {
+        assert_eq!(McpClient::ClaudeCode.shared_editor(), Some(Editor::ClaudeCode));
+        assert_eq!(McpClient::CodexCli.shared_editor(), Some(Editor::CodexCli));
+        assert_eq!(McpClient::Cursor.shared_editor(), Some(Editor::Cursor));
+        assert_eq!(McpClient::Windsurf.shared_editor(), Some(Editor::Windsurf));
+        assert_eq!(
+            McpClient::ClaudeDesktop.shared_editor(),
+            Some(Editor::ClaudeDesktop)
+        );
+        assert_eq!(McpClient::Cline.shared_editor(), None);
+        assert_eq!(McpClient::Continue.shared_editor(), None);
+    }
+
+    #[test]
+    fn test_cline_settings_path_uses_vscode_config_shape() {
+        let path = McpClient::Cline.config_path().unwrap();
+        assert!(path.to_string_lossy().contains("Code"));
+        assert!(path.to_string_lossy().ends_with("settings.json"));
     }
 
     #[test]

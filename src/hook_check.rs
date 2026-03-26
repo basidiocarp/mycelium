@@ -51,17 +51,12 @@ pub fn parse_hook_version(content: &str) -> u8 {
 }
 
 fn hook_installed_path() -> Option<PathBuf> {
-    let home = dirs::home_dir()?;
-    let path = home
-        .join(".claude")
-        .join("hooks")
-        .join("mycelium-rewrite.sh");
+    let path = crate::platform::claude_hooks_dir()?.join("mycelium-rewrite.sh");
     if path.exists() { Some(path) } else { None }
 }
 
 fn warn_marker_path() -> Option<PathBuf> {
-    let data_dir = dirs::data_local_dir()?.join("mycelium");
-    Some(data_dir.join(".hook_warn_last"))
+    Some(crate::platform::mycelium_data_dir()?.join(".hook_warn_last"))
 }
 
 #[cfg(test)]
