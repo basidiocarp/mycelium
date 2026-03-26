@@ -3,14 +3,13 @@ use anyhow::{Context, Result};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-/// Default log file location (aligned with hook's $HOME/.local/share/mycelium/).
+/// Default log file location (aligned with the platform data directory).
 fn default_log_path() -> PathBuf {
     if let Ok(dir) = std::env::var("MYCELIUM_AUDIT_DIR") {
         PathBuf::from(dir).join("hook-audit.log")
     } else {
-        let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
-        PathBuf::from(home)
-            .join(".local/share/mycelium")
+        crate::platform::mycelium_data_dir()
+            .unwrap_or_else(|| PathBuf::from(".").join("mycelium"))
             .join("hook-audit.log")
     }
 }
@@ -181,6 +180,20 @@ pub fn run(since_days: u64, verbose: u8) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_default_log_path_respects_env_override() {
+        unsafe {
+            std::env::set_var("MYCELIUM_AUDIT_DIR", "/tmp/mycelium-audit");
+        }
+        assert_eq!(
+            default_log_path(),
+            PathBuf::from("/tmp/mycelium-audit").join("hook-audit.log")
+        );
+        unsafe {
+            std::env::remove_var("MYCELIUM_AUDIT_DIR");
+        }
+    }
 
     #[test]
     fn test_parse_line_rewrite() {

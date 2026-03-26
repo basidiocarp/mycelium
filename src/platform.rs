@@ -26,30 +26,32 @@ pub fn claude_hooks_dir() -> Option<PathBuf> {
     claude_dir().map(|dir| dir.join("hooks"))
 }
 
-pub fn shell_command(command: &str) -> Command {
+fn preferred_shell_program() -> String {
     if cfg!(target_os = "windows") {
-        let mut cmd = Command::new("cmd");
-        cmd.args(["/C", command]);
-        cmd
+        std::env::var("COMSPEC").unwrap_or_else(|_| "cmd".to_string())
     } else {
-        let mut cmd = Command::new("sh");
-        cmd.args(["-c", command]);
-        cmd
+        std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string())
     }
 }
 
-pub fn invoke_shell_command(command: &str) -> Command {
+pub fn shell_command(command: &str) -> Command {
+    let mut cmd = Command::new(preferred_shell_program());
     if cfg!(target_os = "windows") {
-        let shell = std::env::var("COMSPEC").unwrap_or_else(|_| "cmd".to_string());
-        let mut cmd = Command::new(shell);
         cmd.args(["/C", command]);
-        cmd
     } else {
-        let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string());
-        let mut cmd = Command::new(shell);
-        cmd.args(["-lc", command]);
-        cmd
+        cmd.args(["-c", command]);
     }
+    cmd
+}
+
+pub fn invoke_shell_command(command: &str) -> Command {
+    let mut cmd = Command::new(preferred_shell_program());
+    if cfg!(target_os = "windows") {
+        cmd.args(["/C", command]);
+    } else {
+        cmd.args(["-l", "-c", command]);
+    }
+    cmd
 }
 
 pub fn render_shell_command(args: &[String]) -> String {

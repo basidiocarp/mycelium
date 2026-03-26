@@ -2,6 +2,13 @@
 
 All notable changes to Mycelium are documented in this file.
 
+## v0.7.2 - 2026-03-26
+
+### Fixed
+
+- **Platform-aware hook audit log path**: `mycelium hook-audit` now uses Mycelium's shared platform data directory instead of falling back to a Unix-shaped `HOME` path and `/tmp` when `HOME` is unavailable.
+- **Unified shell resolution**: Runtime shell execution now goes through one shared platform-aware resolver, avoiding direct `sh` assumptions and respecting the configured shell on non-Windows systems plus `COMSPEC` on Windows.
+
 ## v0.7.1 - 2026-03-26
 
 ### Changed
