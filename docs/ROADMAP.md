@@ -29,6 +29,9 @@
 - JSON envelope output mode (`--json` global flag)
 - Ultra-compact mode (`-u` flag)
 - Shell completions (bash, zsh, fish)
+- Shared platform-aware path and shell helpers instead of scattered Unix-only assumptions
+- More host-neutral onboarding and runtime wording across Claude and Codex flows
+- `spore`-backed editor/config registration for the shared host overlap set
 
 ### Quality
 - 1000+ unit tests across 25+ files
@@ -50,6 +53,10 @@
 - Splitting large files (>400 lines) into focused modules (see `.plans/split-large-files-v2.md`)
 - Parser migration: remaining filters to OutputParser trait (tsc, lint, gh)
 
+### Portability and Runtime
+- Finish removing residual Unix-shaped runtime behavior from less common command paths
+- Keep aligning host setup flows behind `stipe` while preserving Mycelium-specific diagnostics and explainability
+
 ---
 
 ## Planned
@@ -64,8 +71,10 @@
 - Per-project tracking isolation
 - Web dashboard (localhost) for visualizing trends
 - Prometheus/OpenMetrics export format
+- Explain mode that shows why a command was rewritten and what savings were achieved
 
 ### Developer Experience
 - Plugin system for user-defined filters
 - Config-driven filter customization
 - Better error messages and diagnostics
+- Deeper host-neutral runtime integration so Claude, Codex, and future hosts map cleanly into the same measurement model
