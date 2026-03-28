@@ -32,11 +32,14 @@ pub fn run(cmd: &str, explain: bool) -> anyhow::Result<()> {
     std::process::exit(1);
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct RuntimeResolution {
+    pub input: String,
     pub command: String,
     pub rewritten: bool,
+    pub source: String,
     pub reason: String,
+    pub estimated_savings_pct: Option<f64>,
 }
 
 pub(crate) fn resolve_runtime_command(cmd: &str) -> RuntimeResolution {
@@ -47,12 +50,15 @@ pub(crate) fn resolve_runtime_command(cmd: &str) -> RuntimeResolution {
         .unwrap_or_else(|| resolution.input.clone());
 
     RuntimeResolution {
+        input: resolution.input.clone(),
         command,
         rewritten: matches!(
             resolution.source,
             RewriteSource::BuiltInRegistry | RewriteSource::LearnedCorrection
         ),
+        source: source_label(resolution.source).to_string(),
         reason: resolution.reason,
+        estimated_savings_pct: resolution.estimated_savings_pct,
     }
 }
 
@@ -75,6 +81,7 @@ struct RewriteResolution {
     rewritten: Option<String>,
     source: RewriteSource,
     reason: String,
+    estimated_savings_pct: Option<f64>,
 }
 
 fn resolve(cmd: &str) -> RewriteResolution {
@@ -89,6 +96,7 @@ fn resolve(cmd: &str) -> RewriteResolution {
             rewritten: None,
             source: RewriteSource::NoRewrite,
             reason: "empty command".to_string(),
+            estimated_savings_pct: None,
         };
     }
 
@@ -99,6 +107,7 @@ fn resolve(cmd: &str) -> RewriteResolution {
             rewritten: Some(rewritten),
             source: RewriteSource::LearnedCorrection,
             reason: format!("exact match in {}", corrections_store::CORRECTIONS_JSON),
+            estimated_savings_pct: None,
         };
     }
 
@@ -109,11 +118,13 @@ fn resolve(cmd: &str) -> RewriteResolution {
             RewriteSource::BuiltInRegistry
         };
         let reason = explain_registry_match(&input, &excluded, source);
+        let estimated_savings_pct = registry_estimated_savings(&input, &excluded, source);
         return RewriteResolution {
             input,
             rewritten: Some(rewritten),
             source,
             reason,
+            estimated_savings_pct,
         };
     }
 
@@ -122,6 +133,7 @@ fn resolve(cmd: &str) -> RewriteResolution {
         rewritten: None,
         source: RewriteSource::NoRewrite,
         reason: explain_no_rewrite(&input, &excluded),
+        estimated_savings_pct: None,
     }
 }
 
@@ -133,6 +145,12 @@ fn render_explanation(resolution: &RewriteResolution) -> String {
     out.push_str(&format!("Source: {}\n", source_label(resolution.source)));
     if let Some(rewritten) = &resolution.rewritten {
         out.push_str(&format!("Output: {}\n", rewritten));
+    }
+    if let Some(estimated_savings_pct) = resolution.estimated_savings_pct {
+        out.push_str(&format!(
+            "Estimated savings: {:.1}%\n",
+            estimated_savings_pct
+        ));
     }
     out.push_str(&format!("Reason: {}\n", resolution.reason));
     out
@@ -152,6 +170,30 @@ fn source_label(source: RewriteSource) -> &'static str {
         RewriteSource::LearnedCorrection => "learned corrections",
         RewriteSource::Passthrough => "already Mycelium",
         RewriteSource::NoRewrite => "none",
+    }
+}
+
+fn registry_estimated_savings(
+    input: &str,
+    excluded: &[String],
+    source: RewriteSource,
+) -> Option<f64> {
+    if matches!(source, RewriteSource::Passthrough) {
+        return None;
+    }
+
+    let trimmed = input.trim();
+    let base = trimmed.split_whitespace().next().unwrap_or(trimmed);
+    if excluded.iter().any(|entry| entry == base) {
+        return None;
+    }
+
+    match registry::classify_command(trimmed) {
+        registry::Classification::Supported {
+            estimated_savings_pct,
+            ..
+        } => Some(estimated_savings_pct),
+        registry::Classification::Unsupported { .. } | registry::Classification::Ignored => None,
     }
 }
 
@@ -274,6 +316,7 @@ mod explain_tests {
         assert!(explanation.contains("Source: built-in registry"));
         assert!(explanation.contains("mycelium git status"));
         assert!(explanation.contains("matched Git rule"));
+        assert!(explanation.contains("Estimated savings:"));
     }
 
     #[test]
@@ -310,7 +353,10 @@ mod tests {
     fn test_resolve_runtime_command_prefers_mycelium_equivalent() {
         let resolution = resolve_runtime_command("git status");
         assert_eq!(resolution.command, "mycelium git status");
+        assert_eq!(resolution.input, "git status");
         assert!(resolution.rewritten);
+        assert_eq!(resolution.source, "built-in registry");
+        assert!(resolution.estimated_savings_pct.is_some());
     }
 
     #[test]
@@ -318,5 +364,7 @@ mod tests {
         let resolution = resolve_runtime_command("ansible-playbook site.yml");
         assert_eq!(resolution.command, "ansible-playbook site.yml");
         assert!(!resolution.rewritten);
+        assert_eq!(resolution.source, "none");
+        assert!(resolution.estimated_savings_pct.is_none());
     }
 }

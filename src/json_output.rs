@@ -1,7 +1,7 @@
 //! JSON envelope wrapper that includes token savings metrics alongside filtered output.
 use serde_json::json;
 
-use crate::tracking;
+use crate::{rewrite_cmd::RuntimeResolution, tracking};
 
 /// Wrap filtered command output in a JSON envelope with token savings metrics.
 pub fn wrap_output(
@@ -9,6 +9,8 @@ pub fn wrap_output(
     mycelium_command: &str,
     filtered_output: &str,
     raw_output: &str,
+    project_path: Option<&str>,
+    resolution: Option<&RuntimeResolution>,
 ) -> String {
     let tokens_raw = tracking::estimate_tokens(raw_output);
     let tokens_filtered = tracking::estimate_tokens(filtered_output);
@@ -24,7 +26,16 @@ pub fn wrap_output(
         "output": filtered_output,
         "tokens_raw": tokens_raw,
         "tokens_filtered": tokens_filtered,
-        "savings_pct": (savings_pct * 10.0).round() / 10.0
+        "savings_pct": (savings_pct * 10.0).round() / 10.0,
+        "project_path": project_path,
+        "rewrite": resolution.map(|resolution| json!({
+            "input": resolution.input,
+            "execute": resolution.command,
+            "rewritten": resolution.rewritten,
+            "source": resolution.source,
+            "reason": resolution.reason,
+            "estimated_savings_pct": resolution.estimated_savings_pct,
+        }))
     }))
     .unwrap_or_else(|_| "{}".to_string())
 }
@@ -49,11 +60,14 @@ mod tests {
             "mycelium git status",
             "filtered output",
             "raw output",
+            Some("/tmp/project"),
+            None,
         );
         let v: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
         assert_eq!(v["command"], "git status");
         assert_eq!(v["mycelium_command"], "mycelium git status");
         assert_eq!(v["output"], "filtered output");
+        assert_eq!(v["project_path"], "/tmp/project");
     }
 
     #[test]
@@ -69,7 +83,7 @@ mod tests {
         // raw_output is longer → filtered_output saves tokens
         let raw = "a".repeat(400); // 100 tokens
         let filtered = "a".repeat(40); // 10 tokens → 90% savings
-        let result = wrap_output("cmd", "mycelium cmd", &filtered, &raw);
+        let result = wrap_output("cmd", "mycelium cmd", &filtered, &raw, None, None);
         let v: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
         let savings = v["savings_pct"].as_f64().expect("f64");
         assert!(savings > 80.0, "expected >80% savings, got {savings}");
@@ -84,11 +98,37 @@ mod tests {
             "mycelium cargo test",
             "1 passed",
             "running 1 test\n1 passed",
+            None,
+            None,
         );
         let v: serde_json::Value = serde_json::from_str(&result).expect("must be valid JSON");
         assert!(v.is_object());
         assert!(v.get("savings_pct").is_some());
         assert!(v.get("tokens_raw").is_some());
         assert!(v.get("tokens_filtered").is_some());
+    }
+
+    #[test]
+    fn test_wrap_output_includes_rewrite_metadata() {
+        let resolution = RuntimeResolution {
+            input: "git status".to_string(),
+            command: "mycelium git status".to_string(),
+            rewritten: true,
+            source: "built-in registry".to_string(),
+            reason: "matched Git rule".to_string(),
+            estimated_savings_pct: Some(92.0),
+        };
+        let result = wrap_output(
+            "git status",
+            "mycelium git status",
+            "filtered output",
+            "raw output",
+            None,
+            Some(&resolution),
+        );
+        let v: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
+        assert_eq!(v["rewrite"]["rewritten"], true);
+        assert_eq!(v["rewrite"]["source"], "built-in registry");
+        assert_eq!(v["rewrite"]["estimated_savings_pct"], 92.0);
     }
 }

@@ -7,6 +7,8 @@ mod helpers;
 use crate::tracking::Tracker;
 use anyhow::{Context, Result};
 
+pub(crate) use helpers::resolve_project_scope;
+
 #[allow(clippy::too_many_arguments)]
 pub fn run(
     project: bool,

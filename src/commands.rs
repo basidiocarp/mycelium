@@ -707,6 +707,12 @@ pub enum Commands {
     /// Claude Code economics: spending (ccusage) vs savings (mycelium) analysis
     #[command(hide = true)]
     CcEconomics {
+        /// Filter Mycelium savings to the current project (ccusage spend remains global)
+        #[arg(short, long)]
+        project: bool,
+        /// Filter Mycelium savings to a specific project path (use '.' for current directory)
+        #[arg(long = "project-path", value_name = "PATH")]
+        project_path: Option<String>,
         /// Show detailed daily breakdown
         #[arg(short, long)]
         daily: bool,
@@ -1382,6 +1388,38 @@ mod tests {
                 assert!(!explain);
             }
             _ => panic!("Expected Invoke command"),
+        }
+    }
+
+    #[test]
+    fn test_cc_economics_project_flag_parses() {
+        let cli = Cli::try_parse_from(["mycelium", "cc-economics", "--project"]).unwrap();
+        match cli.command {
+            Commands::CcEconomics {
+                project,
+                project_path,
+                ..
+            } => {
+                assert!(project);
+                assert!(project_path.is_none());
+            }
+            _ => panic!("Expected CcEconomics command"),
+        }
+    }
+
+    #[test]
+    fn test_cc_economics_project_path_parses() {
+        let cli = Cli::try_parse_from(["mycelium", "cc-economics", "--project-path", "."]).unwrap();
+        match cli.command {
+            Commands::CcEconomics {
+                project,
+                project_path,
+                ..
+            } => {
+                assert!(!project);
+                assert_eq!(project_path.as_deref(), Some("."));
+            }
+            _ => panic!("Expected CcEconomics command"),
         }
     }
 }

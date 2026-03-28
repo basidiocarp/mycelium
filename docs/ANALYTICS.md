@@ -121,12 +121,19 @@ mycelium learn --format json               # JSON export
 
 ```bash
 mycelium cc-economics                      # Summary
+mycelium cc-economics --project            # Current project savings, global ccusage spend
+mycelium cc-economics --project-path .     # Specific project savings scope
 mycelium cc-economics --daily              # Daily breakdown
 mycelium cc-economics --weekly             # Weekly breakdown
 mycelium cc-economics --monthly            # Monthly breakdown
 mycelium cc-economics --all                # All breakdowns
 mycelium cc-economics --format json        # JSON export
 ```
+
+**Notes:**
+
+- `--project` and `--project-path` scope the Mycelium savings side of the report.
+- Claude Code spend from `ccusage` remains global because `ccusage` does not currently expose per-project attribution.
 
 ---
 
@@ -197,6 +204,7 @@ Internal command used by the hook. Prints the rewritten command to stdout (exit 
 
 ```bash
 mycelium rewrite "git status"           # -> "mycelium git status" (exit 0)
+mycelium rewrite --explain "git status" # Show rewrite reason + estimated savings
 mycelium rewrite "terraform plan"       # -> (exit 1, no rewrite)
 mycelium rewrite "mycelium git status"       # -> "mycelium git status" (exit 0, unchanged)
 ```

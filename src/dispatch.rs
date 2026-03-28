@@ -474,13 +474,24 @@ pub fn dispatch(cli: Cli) -> Result<()> {
         }
 
         Commands::CcEconomics {
+            project,
+            project_path,
             daily,
             weekly,
             monthly,
             all,
             format,
         } => {
-            cc_economics::run(daily, weekly, monthly, all, &format, cli.verbose)?;
+            cc_economics::run(
+                project,
+                project_path.as_deref(),
+                daily,
+                weekly,
+                monthly,
+                all,
+                &format,
+                cli.verbose,
+            )?;
         }
 
         Commands::Config { create } => {
@@ -1243,6 +1254,9 @@ fn dispatch_invoke_command(command: &[String], explain: bool, cli: &Cli) -> Resu
                 "raw shell command"
             }
         );
+        if let Some(estimated_savings_pct) = resolution.estimated_savings_pct {
+            println!("Estimated savings: {:.1}%", estimated_savings_pct);
+        }
         println!("Reason: {}", resolution.reason);
         return Ok(());
     }
@@ -1406,6 +1420,11 @@ fn dispatch_json(cli: Cli) -> Result<()> {
     let args: Vec<String> = std::env::args().skip(1).filter(|a| a != "--json").collect();
 
     let original_cmd = args.join(" ");
+    let rewrite_resolution = rewrite_cmd::resolve_runtime_command(&original_cmd);
+    let project_path = std::env::current_dir()
+        .ok()
+        .and_then(|path| path.canonicalize().ok().or(Some(path)))
+        .map(|path| path.to_string_lossy().to_string());
 
     // Capture the raw command output (first arg is the subcommand name as Mycelium sees it).
     // We need to know the underlying command name to get the "raw" token count.
@@ -1436,6 +1455,8 @@ fn dispatch_json(cli: Cli) -> Result<()> {
                 &format!("mycelium {original_cmd}"),
                 &filtered,
                 &raw_output,
+                project_path.as_deref(),
+                Some(&rewrite_resolution),
             )
         }
         Ok(output) => {

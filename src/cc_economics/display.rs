@@ -9,6 +9,36 @@ use crate::utils::{format_cpt, format_tokens, format_usd};
 use super::merge::{compute_totals, merge_daily, merge_monthly, merge_weekly};
 use super::models::PeriodEconomics;
 
+fn load_daily_tracking(
+    tracker: &Tracker,
+    project_scope: Option<&str>,
+) -> Result<Vec<crate::tracking::DayStats>> {
+    match project_scope {
+        Some(scope) => tracker.get_all_days_filtered(Some(scope)),
+        None => tracker.get_all_days(),
+    }
+}
+
+fn load_weekly_tracking(
+    tracker: &Tracker,
+    project_scope: Option<&str>,
+) -> Result<Vec<crate::tracking::WeekStats>> {
+    match project_scope {
+        Some(scope) => tracker.get_by_week_filtered(Some(scope)),
+        None => tracker.get_by_week(),
+    }
+}
+
+fn load_monthly_tracking(
+    tracker: &Tracker,
+    project_scope: Option<&str>,
+) -> Result<Vec<crate::tracking::MonthStats>> {
+    match project_scope {
+        Some(scope) => tracker.get_by_month_filtered(Some(scope)),
+        None => tracker.get_by_month(),
+    }
+}
+
 pub fn display_text(
     tracker: &Tracker,
     daily: bool,
@@ -16,31 +46,31 @@ pub fn display_text(
     monthly: bool,
     all: bool,
     verbose: u8,
+    project_scope: Option<&str>,
 ) -> Result<()> {
     // Default: summary view
     if !daily && !weekly && !monthly && !all {
-        display_summary(tracker, verbose)?;
+        display_summary(tracker, verbose, project_scope)?;
         return Ok(());
     }
 
     if all || daily {
-        display_daily(tracker, verbose)?;
+        display_daily(tracker, verbose, project_scope)?;
     }
     if all || weekly {
-        display_weekly(tracker, verbose)?;
+        display_weekly(tracker, verbose, project_scope)?;
     }
     if all || monthly {
-        display_monthly(tracker, verbose)?;
+        display_monthly(tracker, verbose, project_scope)?;
     }
 
     Ok(())
 }
 
-pub fn display_summary(tracker: &Tracker, verbose: u8) -> Result<()> {
+pub fn display_summary(tracker: &Tracker, verbose: u8, project_scope: Option<&str>) -> Result<()> {
     let cc_monthly =
         ccusage::fetch(Granularity::Monthly).context("Failed to fetch ccusage monthly data")?;
-    let tracking_monthly = tracker
-        .get_by_month()
+    let tracking_monthly = load_monthly_tracking(tracker, project_scope)
         .context("Failed to load monthly token savings from database")?;
     let periods = merge_monthly(cc_monthly, tracking_monthly);
 
@@ -54,6 +84,8 @@ pub fn display_summary(tracker: &Tracker, verbose: u8) -> Result<()> {
     println!("Claude Code Economics");
     println!("════════════════════════════════════════════════════");
     println!();
+
+    print_scope_note(project_scope);
 
     println!(
         "  Spent (ccusage):              {}",
@@ -154,46 +186,54 @@ pub fn display_summary(tracker: &Tracker, verbose: u8) -> Result<()> {
     Ok(())
 }
 
-pub fn display_daily(tracker: &Tracker, verbose: u8) -> Result<()> {
+pub fn display_daily(tracker: &Tracker, verbose: u8, project_scope: Option<&str>) -> Result<()> {
     let cc_daily =
         ccusage::fetch(Granularity::Daily).context("Failed to fetch ccusage daily data")?;
-    let tracking_daily = tracker
-        .get_all_days()
+    let tracking_daily = load_daily_tracking(tracker, project_scope)
         .context("Failed to load daily token savings from database")?;
     let periods = merge_daily(cc_daily, tracking_daily);
 
     println!("Daily Economics");
     println!("════════════════════════════════════════════════════");
+    print_scope_note(project_scope);
     print_period_table(&periods, verbose);
     Ok(())
 }
 
-pub fn display_weekly(tracker: &Tracker, verbose: u8) -> Result<()> {
+pub fn display_weekly(tracker: &Tracker, verbose: u8, project_scope: Option<&str>) -> Result<()> {
     let cc_weekly =
         ccusage::fetch(Granularity::Weekly).context("Failed to fetch ccusage weekly data")?;
-    let tracking_weekly = tracker
-        .get_by_week()
+    let tracking_weekly = load_weekly_tracking(tracker, project_scope)
         .context("Failed to load weekly token savings from database")?;
     let periods = merge_weekly(cc_weekly, tracking_weekly);
 
     println!("Weekly Economics");
     println!("════════════════════════════════════════════════════");
+    print_scope_note(project_scope);
     print_period_table(&periods, verbose);
     Ok(())
 }
 
-pub fn display_monthly(tracker: &Tracker, verbose: u8) -> Result<()> {
+pub fn display_monthly(tracker: &Tracker, verbose: u8, project_scope: Option<&str>) -> Result<()> {
     let cc_monthly =
         ccusage::fetch(Granularity::Monthly).context("Failed to fetch ccusage monthly data")?;
-    let tracking_monthly = tracker
-        .get_by_month()
+    let tracking_monthly = load_monthly_tracking(tracker, project_scope)
         .context("Failed to load monthly token savings from database")?;
     let periods = merge_monthly(cc_monthly, tracking_monthly);
 
     println!("Monthly Economics");
     println!("════════════════════════════════════════════════════");
+    print_scope_note(project_scope);
     print_period_table(&periods, verbose);
     Ok(())
+}
+
+fn print_scope_note(project_scope: Option<&str>) {
+    if let Some(scope) = project_scope {
+        println!("  Scope: {}", scope);
+        println!("  Note: Mycelium savings are project-scoped here; ccusage spend remains global.");
+        println!();
+    }
 }
 
 pub fn print_period_table(periods: &[PeriodEconomics], verbose: u8) {
