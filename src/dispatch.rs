@@ -436,6 +436,8 @@ pub fn dispatch(cli: Cli) -> Result<()> {
             project,
             project_path,
             projects,
+            diagnostics,
+            explain,
             graph,
             history,
             quota,
@@ -453,6 +455,8 @@ pub fn dispatch(cli: Cli) -> Result<()> {
                 project,
                 project_path.as_deref(),
                 projects,
+                diagnostics,
+                explain,
                 graph,
                 history,
                 quota,
@@ -1412,6 +1416,7 @@ pub fn is_operational_command(cmd: &Commands) -> bool {
             | Commands::Go { .. }
             | Commands::GolangciLint { .. }
             | Commands::Gt { .. }
+            | Commands::Invoke { .. }
     )
 }
 
@@ -1536,6 +1541,12 @@ mod tests {
     fn test_config_is_not_operational() {
         let cmd = parse_command(&["config"]);
         assert!(!is_operational_command(&cmd));
+    }
+
+    #[test]
+    fn test_invoke_is_operational() {
+        let cmd = parse_command(&["invoke", "git", "status"]);
+        assert!(is_operational_command(&cmd));
     }
 
     // --- MYCELIUM_META_COMMANDS constant covers the expected set ---

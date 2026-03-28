@@ -130,6 +130,8 @@ classify_command("git log -10")
     ↓
 rewrite_command("git log -10", excluded=[])
     ├─ Check for heredoc or arithmetic expansion (skip if found)
+    ├─ Fast-path obviously simple commands
+    ├─ Fall back to `conch-parser` for quoted or shell-heavy inputs
     ├─ Split compound commands (&&, ||, ;, |)
     ├─ Rewrite each segment with rewrite_segment()
     └─ Return Some("mycelium git log -10")
@@ -155,11 +157,23 @@ Output: "mycelium git add . && mycelium cargo test"
 
 ### Special Cases
 
-1. **Pipes** (`|`): Only rewrite the first command. The downstream pipeline remains unchanged.
+1. **Pipes, redirects, and shell grouping**: Do not rewrite. Downstream shell stages expect raw stdout and stderr, and Mycelium's summarized output is not shell-transparent.
    ```
    Input: "git log -10 | grep commit"
-   Output: "mycelium git log -10 | grep commit"
+   Output: None (no rewrite)
    ```
+
+   ```
+   Input: "git status > out.txt"
+   Output: None (no rewrite)
+   ```
+
+   ```
+   Input: "echo $(git status && cargo test)"
+   Output: None (no rewrite)
+   ```
+
+   For plain commands, the registry still uses a cheap fast path. When quoting or riskier shell syntax appears, it now validates the parsed shell AST and only rewrites simple commands or `&&` / `||` / `;` lists composed of safe simple commands.
 
 2. **head -N file**: Rewritten to `mycelium read file --max-lines N`
    ```
@@ -423,6 +437,7 @@ mycelium gain --projects         # Per-project breakdown
 mycelium gain --graph            # ASCII bar chart
 mycelium gain --quota            # Token quota usage (for Claude Code tier)
 mycelium gain --failures         # Commands that failed filtering
+mycelium gain --diagnostics      # Rewrite coverage and passthrough diagnostics
 mycelium gain --compare <cmd>    # Compare two commands' savings
 mycelium gain --json             # JSON export
 mycelium gain --csv              # CSV export
@@ -677,7 +692,7 @@ cargo insta accept           # Accept if changes are correct
 mycelium --verbose git log    # Verbose output (vvv = more verbose)
 mycelium proxy git log        # Run without filtering (raw output)
 mycelium discover             # Analyze Claude Code sessions
-mycelium hook-audit           # Check hook installation status
+mycelium hook-audit           # Inspect raw hook rewrite/skip metrics
 ```
 
 ---

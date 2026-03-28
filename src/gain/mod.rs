@@ -3,6 +3,7 @@ mod compare;
 mod display;
 mod export;
 mod helpers;
+mod rewrite_diagnostics;
 
 use crate::tracking::Tracker;
 use anyhow::{Context, Result};
@@ -14,6 +15,8 @@ pub fn run(
     project: bool,
     project_path: Option<&str>,
     projects: bool,
+    diagnostics: bool,
+    explain: bool,
     graph: bool,
     history: bool,
     quota: bool,
@@ -48,6 +51,15 @@ pub fn run(
 
     if failures {
         return display::show_failures(&tracker);
+    }
+
+    if diagnostics {
+        let project_scope = helpers::resolve_project_scope(project, project_path)?;
+        return rewrite_diagnostics::show_rewrite_diagnostics(
+            &tracker,
+            project_scope.as_deref(),
+            explain,
+        );
     }
 
     // Handle export formats

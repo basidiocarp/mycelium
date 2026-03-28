@@ -1,6 +1,9 @@
 //! TypeScript compiler filter that groups errors by file and error code.
 use crate::parser::types::{Diagnostic, DiagnosticReport, DiagnosticSeverity};
-use crate::parser::{FormatMode, OutputParser, ParseResult, TokenFormatter};
+use crate::parser::{
+    FormatMode, OutputParser, ParseResult, TokenFormatter, emit_degradation_warning,
+    emit_passthrough_warning, truncate_output,
+};
 use crate::utils::which_command;
 use anyhow::{Context, Result};
 use regex::Regex;
@@ -39,8 +42,14 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
     let mode = FormatMode::Compact;
     let filtered = match parse_result {
         ParseResult::Full(report) => report.format(mode),
-        ParseResult::Degraded(report, _) => report.format(mode),
-        ParseResult::Passthrough(raw_out) => raw_out,
+        ParseResult::Degraded(report, warnings) => {
+            emit_degradation_warning("tsc", &warnings.join(", "));
+            report.format(mode)
+        }
+        ParseResult::Passthrough(raw_out) => {
+            emit_passthrough_warning("tsc", "No parseable TypeScript diagnostics found");
+            raw_out
+        }
     };
 
     let exit_code = utils::exit_code(&output.status);
@@ -86,6 +95,7 @@ impl OutputParser for TscParser {
         let mut diagnostics: Vec<Diagnostic> = Vec::new();
         let lines: Vec<&str> = input.lines().collect();
         let mut i = 0;
+        let mut unmatched_nonempty = 0usize;
 
         while i < lines.len() {
             let line = lines[i];
@@ -119,11 +129,30 @@ impl OutputParser for TscParser {
                 }
                 diagnostics.push(diag);
             } else {
+                let trimmed = line.trim();
+                if !trimmed.is_empty()
+                    && !trimmed.starts_with("Found ")
+                    && !trimmed.starts_with("Watching for file changes")
+                {
+                    unmatched_nonempty += 1;
+                }
                 i += 1;
             }
         }
 
         if diagnostics.is_empty() {
+            let has_success_summary = input.contains("Found 0 errors");
+            let only_empty_or_summary = lines.iter().all(|line| {
+                let trimmed = line.trim();
+                trimmed.is_empty()
+                    || trimmed.starts_with("Found ")
+                    || trimmed.starts_with("Watching for file changes")
+            });
+
+            if !has_success_summary && !only_empty_or_summary {
+                return ParseResult::Passthrough(truncate_output(input, 2000));
+            }
+
             return ParseResult::Full(DiagnosticReport {
                 tool: "TypeScript".to_string(),
                 total_errors: 0,
@@ -159,14 +188,26 @@ impl OutputParser for TscParser {
             files.len()
         };
 
-        ParseResult::Full(DiagnosticReport {
+        let report = DiagnosticReport {
             tool: "TypeScript".to_string(),
             total_errors,
             total_warnings,
             files_affected,
             diagnostics,
             by_code,
-        })
+        };
+
+        if unmatched_nonempty > 0 {
+            ParseResult::Degraded(
+                report,
+                vec![format!(
+                    "ignored {} non-diagnostic line(s) while parsing compiler output",
+                    unmatched_nonempty
+                )],
+            )
+        } else {
+            ParseResult::Full(report)
+        }
     }
 }
 
@@ -260,5 +301,23 @@ src/app.tsx(20,5): error TS2345: Argument of type 'number' is not assignable to 
         let output = "Found 0 errors. Watching for file changes.";
         let result = filter_tsc_output(output);
         assert!(result.contains("No errors found"));
+    }
+
+    #[test]
+    fn test_tsc_parser_degrades_when_non_diagnostic_lines_are_present() {
+        let output = "\
+Scope: 4 workspace projects
+src/app.ts(10,3): error TS2322: Type 'string' is not assignable to type 'number'.
+";
+
+        let result = TscParser::parse(output);
+        assert_eq!(result.tier(), 2);
+    }
+
+    #[test]
+    fn test_tsc_parser_passthroughs_unstructured_nonempty_output() {
+        let output = "npm ERR! command failed\nKilled";
+        let result = TscParser::parse(output);
+        assert_eq!(result.tier(), 3);
     }
 }

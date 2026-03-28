@@ -75,6 +75,23 @@ pub(super) fn init_schema(conn: &Connection) -> Result<()> {
         "ALTER TABLE commands ADD COLUMN format_mode TEXT DEFAULT ''",
         [],
     );
+    // Migration: add execution_kind for reliable passthrough diagnostics
+    let _ = conn.execute(
+        "ALTER TABLE commands ADD COLUMN execution_kind TEXT DEFAULT 'filtered'",
+        [],
+    );
+    let _ = conn.execute(
+        "UPDATE commands
+         SET execution_kind = 'passthrough'
+         WHERE execution_kind IS NULL
+            OR (
+                execution_kind = 'filtered'
+                AND input_tokens = 0
+                AND output_tokens = 0
+                AND mycelium_cmd LIKE '%(passthrough)%'
+            )",
+        [],
+    );
 
     conn.execute(
         "CREATE TABLE IF NOT EXISTS parse_failures (

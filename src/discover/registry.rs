@@ -4,6 +4,13 @@ use std::sync::OnceLock;
 
 use super::rules::{IGNORED_EXACT, IGNORED_PREFIXES, PATTERNS, RULES};
 
+#[path = "registry_compound.rs"]
+mod compound;
+#[path = "registry_parser.rs"]
+mod parser;
+#[path = "registry_shell.rs"]
+mod shell;
+
 /// Result of classifying a command.
 #[derive(Debug, PartialEq)]
 pub enum Classification {
@@ -56,49 +63,108 @@ fn compiled() -> &'static Vec<Regex> {
     })
 }
 
-fn env_prefix() -> &'static Regex {
-    static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| {
-        Regex::new(r"^(?:sudo\s+|env\s+|[A-Z_][A-Z0-9_]*=[^\s]*\s+)+").expect("valid regex")
-    })
-}
-
-/// If a task runner is being used as a clear direct-execution wrapper, return the underlying command.
-///
-/// This intentionally only recognizes explicit raw-command forms rather than opaque recipe names.
-pub(crate) fn unwrap_task_runner_command(cmd: &str) -> Option<&str> {
+pub(crate) fn rewrite_primary_command(cmd: &str) -> Option<String> {
     let trimmed = cmd.trim();
     if trimmed.is_empty() {
         return None;
     }
 
-    if let Some(rest) = trimmed.strip_prefix("mise ") {
-        let rest = rest.trim_start();
-        if let Some(payload) = rest.strip_prefix("exec -- ") {
-            return Some(payload.trim_start());
-        }
-        if let Some(payload) = rest.strip_prefix("x -- ") {
-            return Some(payload.trim_start());
-        }
-        if let Some(payload) = rest.strip_prefix("exec ") {
-            return Some(payload.trim_start());
-        }
-        if let Some(payload) = rest.strip_prefix("x ") {
-            return Some(payload.trim_start());
-        }
+    let (_, cmd_clean) = shell::strip_env_prefix_segments(trimmed);
+    let effective = shell::unwrap_all_task_runner_commands(&cmd_clean);
+
+    effective.split_whitespace().next().map(ToString::to_string)
+}
+
+pub fn split_command_chain(cmd: &str) -> Vec<&str> {
+    compound::split_command_chain(cmd)
+}
+
+fn rewrite_segment_passthrough_reason(cmd: &str, excluded: &[String]) -> Option<String> {
+    let trimmed = cmd.trim();
+    if trimmed.is_empty() {
+        return Some("empty command".to_string());
     }
 
-    if let Some(rest) = trimmed.strip_prefix("just ") {
-        let rest = rest.trim_start();
-        if let Some(payload) = rest.strip_prefix("-- ") {
-            return Some(payload.trim_start());
-        }
+    let (env_prefix, _) = shell::strip_env_prefix_segments(trimmed);
+    if env_prefix
+        .split_whitespace()
+        .any(|token| token == "MYCELIUM_DISABLED=1")
+    {
+        return Some("MYCELIUM_DISABLED=1 disables rewrite for this command".to_string());
     }
 
-    if let Some(rest) = trimmed.strip_prefix("task ") {
-        let rest = rest.trim_start();
-        if let Some(payload) = rest.strip_prefix("-- ") {
-            return Some(payload.trim_start());
+    if let Some(base) = rewrite_primary_command(trimmed)
+        && excluded.iter().any(|entry| entry == &base)
+    {
+        return Some(format!("command base `{base}` is excluded by config"));
+    }
+
+    if shell::command_has_structured_gh_output(trimmed) {
+        return Some(
+            "gh --json/--jq/--template output is structured, so it is not rewritten".to_string(),
+        );
+    }
+
+    None
+}
+
+fn rewrite_shape_block_reason(cmd: &str) -> Option<String> {
+    let trimmed = cmd.trim();
+    if trimmed.is_empty() {
+        return Some("empty command".to_string());
+    }
+
+    if parser::rewrite_shape_requires_parser(trimmed) {
+        if !parser::parser_allows_rewrite_shape(trimmed) {
+            return Some(
+                "command contains shell constructs that require raw shell semantics".to_string(),
+            );
+        }
+
+        return None;
+    }
+
+    if shell::contains_unquoted_sequence(trimmed, b"<<") {
+        return Some("command contains a heredoc, so it is not rewritten".to_string());
+    }
+
+    if shell::contains_unquoted_sequence(trimmed, b"$((") {
+        return Some("command contains arithmetic expansion, so it is not rewritten".to_string());
+    }
+
+    if shell::has_unsafe_shell_syntax(trimmed) {
+        return Some(
+            "command contains pipelines, redirections, or shell grouping that require raw shell semantics"
+                .to_string(),
+        );
+    }
+
+    None
+}
+
+pub(crate) fn rewrite_block_reason(cmd: &str, excluded: &[String]) -> Option<String> {
+    if let Some(reason) = rewrite_shape_block_reason(cmd) {
+        return Some(reason);
+    }
+
+    let trimmed = cmd.trim();
+    let segments = split_command_chain(trimmed);
+    if segments.len() == 1 {
+        return rewrite_segment_passthrough_reason(trimmed, excluded);
+    }
+
+    None
+}
+
+#[allow(dead_code)]
+pub(crate) fn learned_correction_block_reason(cmd: &str, excluded: &[String]) -> Option<String> {
+    if let Some(reason) = rewrite_shape_block_reason(cmd) {
+        return Some(reason);
+    }
+
+    for segment in split_command_chain(cmd) {
+        if let Some(reason) = rewrite_segment_passthrough_reason(segment, excluded) {
+            return Some(reason);
         }
     }
 
@@ -115,9 +181,8 @@ pub(crate) fn display_command_for_discover(cmd: &str) -> String {
         return String::new();
     }
 
-    let stripped = env_prefix().replace(trimmed, "");
-    let cmd_clean = stripped.trim();
-    let display_source = unwrap_task_runner_command(cmd_clean).unwrap_or(cmd_clean);
+    let (_, cmd_clean) = shell::strip_env_prefix_segments(trimmed);
+    let display_source = shell::unwrap_task_runner_command(&cmd_clean).unwrap_or(&cmd_clean);
     let parts: Vec<&str> = display_source.splitn(3, char::is_whitespace).collect();
     match parts.len() {
         0 => String::new(),
@@ -146,23 +211,22 @@ pub fn classify_command(cmd: &str) -> Classification {
     }
 
     // Strip env prefixes (sudo, env VAR=val, VAR=val)
-    let stripped = env_prefix().replace(trimmed, "");
-    let cmd_clean = stripped.trim();
+    let (_, cmd_clean) = shell::strip_env_prefix_segments(trimmed);
     if cmd_clean.is_empty() {
         return Classification::Ignored;
     }
 
-    if let Some(inner) = unwrap_task_runner_command(cmd_clean) {
+    if let Some(inner) = shell::unwrap_task_runner_command(&cmd_clean) {
         return classify_command(inner);
     }
 
     // Fast check with RegexSet — take the last (most specific) match
-    let matches: Vec<usize> = regex_set().matches(cmd_clean).into_iter().collect();
+    let matches: Vec<usize> = regex_set().matches(&cmd_clean).into_iter().collect();
     if let Some(&idx) = matches.last() {
         let rule = &RULES[idx];
 
         // Extract subcommand for savings override and status detection
-        let (savings, status) = if let Some(caps) = compiled()[idx].captures(cmd_clean) {
+        let (savings, status) = if let Some(caps) = compiled()[idx].captures(&cmd_clean) {
             if let Some(sub) = caps.get(1) {
                 let subcmd = sub.as_str();
                 // Check if this subcommand has a special status
@@ -197,7 +261,7 @@ pub fn classify_command(cmd: &str) -> Classification {
         }
     } else {
         // Extract base command for unsupported
-        let base = extract_base_command(cmd_clean);
+        let base = extract_base_command(&cmd_clean);
         if base.is_empty() {
             Classification::Ignored
         } else {
@@ -237,106 +301,17 @@ fn extract_base_command(cmd: &str) -> &str {
     }
 }
 
-/// Split a command chain on `&&`, `||`, `;` outside quotes.
-/// For pipes `|`, only keep the first command.
-/// Lines with `<<` (heredoc) or `$((` are returned whole.
-pub fn split_command_chain(cmd: &str) -> Vec<&str> {
-    let trimmed = cmd.trim();
-    if trimmed.is_empty() {
-        return vec![];
-    }
-
-    // Heredoc or arithmetic expansion: treat as single command
-    if trimmed.contains("<<") || trimmed.contains("$((") {
-        return vec![trimmed];
-    }
-
-    let mut results = Vec::new();
-    let mut start = 0;
-    let bytes = trimmed.as_bytes();
-    let len = bytes.len();
-    let mut i = 0;
-    let mut in_single = false;
-    let mut in_double = false;
-    let mut pipe_seen = false;
-
-    while i < len {
-        let b = bytes[i];
-        match b {
-            b'\'' if !in_double => {
-                in_single = !in_single;
-                i += 1;
-            }
-            b'"' if !in_single => {
-                in_double = !in_double;
-                i += 1;
-            }
-            b'|' if !in_single && !in_double => {
-                if i + 1 < len && bytes[i + 1] == b'|' {
-                    // ||
-                    let segment = trimmed[start..i].trim();
-                    if !segment.is_empty() {
-                        results.push(segment);
-                    }
-                    i += 2;
-                    start = i;
-                } else {
-                    // pipe: keep only first command
-                    let segment = trimmed[start..i].trim();
-                    if !segment.is_empty() {
-                        results.push(segment);
-                    }
-                    pipe_seen = true;
-                    break;
-                }
-            }
-            b'&' if !in_single && !in_double && i + 1 < len && bytes[i + 1] == b'&' => {
-                let segment = trimmed[start..i].trim();
-                if !segment.is_empty() {
-                    results.push(segment);
-                }
-                i += 2;
-                start = i;
-            }
-            b';' if !in_single && !in_double => {
-                let segment = trimmed[start..i].trim();
-                if !segment.is_empty() {
-                    results.push(segment);
-                }
-                i += 1;
-                start = i;
-            }
-            _ => {
-                i += 1;
-            }
-        }
-    }
-
-    if !pipe_seen && start < len {
-        let segment = trimmed[start..].trim();
-        if !segment.is_empty() {
-            results.push(segment);
-        }
-    }
-
-    results
-}
-
 /// Rewrite a raw command to its Mycelium equivalent.
 ///
 /// Returns `Some(rewritten)` if the command has a Mycelium equivalent or is already Mycelium.
 /// Returns `None` if the command is unsupported or ignored (hook should pass through).
 ///
 /// Handles compound commands (`&&`, `||`, `;`) by rewriting each segment independently.
-/// For pipes (`|`), only rewrites the first command (the filter stays raw).
+/// Piped commands are left unchanged because downstream stages expect raw stdout,
+/// not Mycelium's summarized output.
 pub fn rewrite_command(cmd: &str, excluded: &[String]) -> Option<String> {
     let trimmed = cmd.trim();
     if trimmed.is_empty() {
-        return None;
-    }
-
-    // Heredoc or arithmetic expansion — unsafe to split/rewrite
-    if trimmed.contains("<<") || trimmed.contains("$((") {
         return None;
     }
 
@@ -352,6 +327,10 @@ pub fn rewrite_command(cmd: &str, excluded: &[String]) -> Option<String> {
         return Some(trimmed.to_string());
     }
 
+    if rewrite_block_reason(trimmed, excluded).is_some() {
+        return None;
+    }
+
     rewrite_compound(trimmed, excluded)
 }
 
@@ -365,10 +344,22 @@ fn rewrite_compound(cmd: &str, excluded: &[String]) -> Option<String> {
     let mut i = 0;
     let mut in_single = false;
     let mut in_double = false;
+    let mut escaped = false;
 
     while i < len {
         let b = bytes[i];
+
+        if escaped {
+            escaped = false;
+            i += 1;
+            continue;
+        }
+
         match b {
+            b'\\' if !in_single => {
+                escaped = true;
+                i += 1;
+            }
             b'\'' if !in_double => {
                 in_single = !in_single;
                 i += 1;
@@ -394,18 +385,8 @@ fn rewrite_compound(cmd: &str, excluded: &[String]) -> Option<String> {
                     }
                     seg_start = i;
                 } else {
-                    // `|` pipe — rewrite first segment only, pass through the rest unchanged
-                    let seg = cmd[seg_start..i].trim();
-                    let rewritten =
-                        rewrite_segment(seg, excluded).unwrap_or_else(|| seg.to_string());
-                    if rewritten != seg {
-                        any_changed = true;
-                    }
-                    result.push_str(&rewritten);
-                    // Preserve the space before the pipe that was lost by trim()
-                    result.push(' ');
-                    result.push_str(cmd[i..].trim_start());
-                    return if any_changed { Some(result) } else { None };
+                    // Piped commands should have been rejected before compound rewriting.
+                    return None;
                 }
             }
             b'&' if !in_single && !in_double && i + 1 < len && bytes[i + 1] == b'&' => {
@@ -524,14 +505,15 @@ fn rewrite_segment(seg: &str, excluded: &[String]) -> Option<String> {
         return Some(trimmed.to_string());
     }
 
-    let stripped_cow = env_prefix().replace(trimmed, "");
-    let env_prefix_len = trimmed.len() - stripped_cow.len();
-    let env_prefix = &trimmed[..env_prefix_len];
-    let cmd_clean = stripped_cow.trim();
+    if rewrite_segment_passthrough_reason(trimmed, excluded).is_some() {
+        return None;
+    }
 
-    if let Some(inner) = unwrap_task_runner_command(cmd_clean) {
-        let rewritten = rewrite_segment(inner, excluded)?;
-        return Some(format!("{}{}", env_prefix, rewritten));
+    let (env_prefix, cmd_clean) = shell::strip_env_prefix_segments(trimmed);
+
+    if let Some(wrapper) = shell::split_task_runner_command(&cmd_clean) {
+        let rewritten = rewrite_segment(wrapper.inner, excluded)?;
+        return Some(format!("{env_prefix}{}{rewritten}", wrapper.prefix));
     }
 
     // Special case: `head -N file` / `head --lines=N file` → `mycelium read file --max-lines N`
@@ -539,18 +521,20 @@ fn rewrite_segment(seg: &str, excluded: &[String]) -> Option<String> {
     // Only intercept when head has a flag (-N, --lines=N, -c, etc.); plain `head file` falls
     // through to the generic rewrite below and produces `mycelium read file` as expected.
     if cmd_clean.starts_with("head -") {
-        return rewrite_head_numeric(cmd_clean);
+        return rewrite_head_numeric(&cmd_clean);
     }
 
     // Use classify_command for correct ignore/prefix handling
-    let mycelium_equivalent = match classify_command(cmd_clean) {
+    let mycelium_equivalent = match classify_command(&cmd_clean) {
         Classification::Supported {
             mycelium_equivalent,
             ..
         } => {
             // Check if the base command is excluded from rewriting (#243)
-            let base = trimmed.split_whitespace().next().unwrap_or("");
-            if excluded.iter().any(|e| e == base) {
+            let Some(base) = rewrite_primary_command(trimmed) else {
+                return None;
+            };
+            if excluded.iter().any(|e| e == &base) {
                 return None;
             }
             mycelium_equivalent
@@ -558,35 +542,18 @@ fn rewrite_segment(seg: &str, excluded: &[String]) -> Option<String> {
         _ => return None,
     };
 
-    // #345: MYCELIUM_DISABLED=1 in env prefix → skip rewrite entirely
-    if env_prefix.contains("MYCELIUM_DISABLED=") {
-        return None;
-    }
-
     // Find the matching rule — pick the rule whose rewrite_prefixes actually match the input,
     // since multiple rules can share the same mycelium_cmd (e.g. diff + diffsitter).
     let rule = RULES.iter().find(|r| {
         r.mycelium_cmd == mycelium_equivalent
             && r.rewrite_prefixes
                 .iter()
-                .any(|&p| strip_word_prefix(cmd_clean, p).is_some())
+                .any(|&p| strip_word_prefix(&cmd_clean, p).is_some())
     })?;
-
-    // #196: gh with --json/--jq/--template produces structured output that
-    // mycelium gh would corrupt — skip rewrite so the caller gets raw JSON.
-    if rule.mycelium_cmd == "mycelium gh" {
-        let args_lower = cmd_clean.to_lowercase();
-        if args_lower.contains("--json")
-            || args_lower.contains("--jq")
-            || args_lower.contains("--template")
-        {
-            return None;
-        }
-    }
 
     // Try each rewrite prefix (longest first) with word-boundary check
     for &prefix in rule.rewrite_prefixes {
-        if let Some(rest) = strip_word_prefix(cmd_clean, prefix) {
+        if let Some(rest) = strip_word_prefix(&cmd_clean, prefix) {
             let rewritten = if rest.is_empty() {
                 format!("{}{}", env_prefix, rule.mycelium_cmd)
             } else {

@@ -8,8 +8,8 @@ use jiff::Timestamp;
 use rusqlite::params;
 
 use super::{
-    CommandRecord, CommandStats, DayStats, GainSummary, MonthStats, ProjectStats, Tracker,
-    WeekStats, project_filter_params,
+    CommandRecord, CommandStats, DayStats, GainSummary, MonthStats, PassthroughCommandStat,
+    PassthroughSummary, ProjectStats, Tracker, WeekStats, project_filter_params,
 };
 
 /// A row from the parse health query.
@@ -138,6 +138,58 @@ impl Tracker {
         let mut result: Vec<_> = rows.collect::<Result<Vec<_>, _>>()?;
         result.reverse();
         Ok(result)
+    }
+
+    /// Get aggregate passthrough statistics filtered by project path.
+    pub fn get_passthrough_summary_filtered(
+        &self,
+        project_path: Option<&str>,
+    ) -> Result<PassthroughSummary> {
+        let (project_exact, project_glob) = project_filter_params(project_path);
+
+        let total_commands: i64 = self.conn.query_row(
+            "SELECT COUNT(*)
+             FROM commands
+             WHERE execution_kind = 'passthrough'
+               AND (?1 IS NULL OR project_path = ?1 OR project_path GLOB ?2)",
+            params![project_exact, project_glob],
+            |row| row.get(0),
+        )?;
+
+        let total_exec_time_ms: i64 = self.conn.query_row(
+            "SELECT COALESCE(SUM(exec_time_ms), 0)
+             FROM commands
+             WHERE execution_kind = 'passthrough'
+               AND (?1 IS NULL OR project_path = ?1 OR project_path GLOB ?2)",
+            params![project_exact, project_glob],
+            |row| row.get(0),
+        )?;
+
+        let mut stmt = self.conn.prepare(
+            "SELECT original_cmd, COUNT(*), COALESCE(SUM(exec_time_ms), 0)
+             FROM commands
+             WHERE execution_kind = 'passthrough'
+               AND (?1 IS NULL OR project_path = ?1 OR project_path GLOB ?2)
+             GROUP BY original_cmd
+             ORDER BY COUNT(*) DESC, original_cmd ASC
+             LIMIT 5",
+        )?;
+
+        let top_commands = stmt
+            .query_map(params![project_exact, project_glob], |row| {
+                Ok(PassthroughCommandStat {
+                    command: row.get(0)?,
+                    count: row.get::<_, i64>(1)? as usize,
+                    total_exec_time_ms: row.get::<_, i64>(2)? as u64,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(PassthroughSummary {
+            total_commands: total_commands as usize,
+            total_exec_time_ms: total_exec_time_ms as u64,
+            top_commands,
+        })
     }
 
     /// Get daily statistics for all recorded days.

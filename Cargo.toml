@@ -23,6 +23,7 @@ path = "src/lib.rs"
 clap = { version = "4", features = ["derive"] }
 clap_complete = "4"
 anyhow = "1"
+conch-parser = { path = "vendor/conch-parser" }
 ignore = "0.4"
 regex = "1"
 serde = { version = "1", features = ["derive"] }

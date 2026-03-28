@@ -40,6 +40,8 @@ mycelium gain --monthly              # Month-by-month breakdown
 mycelium gain --all                  # All breakdowns
 mycelium gain --quota -t pro         # Estimated savings on monthly quota
 mycelium gain --failures             # Parsing failure log (fallback commands)
+mycelium gain --diagnostics          # Rewrite quality + passthrough diagnostics
+mycelium gain --diagnostics --explain # Explain diagnostic scoring and scope
 mycelium gain --format json          # JSON export (for dashboards)
 mycelium gain --format csv           # CSV export
 ```
@@ -53,6 +55,8 @@ mycelium gain --format csv           # CSV export
 | `--history` | `-H` | Recent command history |
 | `--quota` | `-q` | Estimated savings on monthly quota |
 | `--tier` | `-t` | Subscription tier: `pro`, `5x`, `20x` (default: `20x`) |
+| `--diagnostics` | — | Rewrite coverage, parse recovery, and passthrough diagnostics |
+| `--explain` | — | With `--diagnostics`, explain diagnostic scoring and scope |
 | `--daily` | `-d` | Daily breakdown |
 | `--weekly` | `-w` | Weekly breakdown |
 | `--monthly` | `-m` | Monthly breakdown |
@@ -60,8 +64,14 @@ mycelium gain --format csv           # CSV export
 | `--format` | `-f` | Output format: `text`, `json`, `csv` |
 | `--failures` | `-F` | Show fallback commands |
 
+### Diagnostics notes
+
+- quality score, hook coverage, and parse recovery are global
+- passthrough summaries honor `--project` / `--project-path`
+- diagnostics output is text-only; it does not support `--format json` or `--format csv`
+
 **Example output:**
-```
+```text
 $ mycelium gain
 Mycelium Token Savings Summary
   Total commands:     1,247

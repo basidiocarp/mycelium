@@ -110,9 +110,8 @@ impl TimedExecution {
     /// ```
     pub fn track_passthrough(&self, original_cmd: &str, mycelium_cmd: &str) {
         let elapsed_ms = self.start.elapsed().as_millis() as u64;
-        // input_tokens=0, output_tokens=0 won't dilute savings statistics
         if let Ok(tracker) = Tracker::new() {
-            let _ = tracker.record(original_cmd, mycelium_cmd, 0, 0, elapsed_ms);
+            let _ = tracker.record_passthrough(original_cmd, mycelium_cmd, elapsed_ms);
         }
     }
 

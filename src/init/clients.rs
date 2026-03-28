@@ -411,6 +411,10 @@ fn vscode_cline_extension_exists() -> bool {
         })
 }
 
+pub(crate) fn host_config_path(client: McpClient) -> Option<PathBuf> {
+    client.config_path()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

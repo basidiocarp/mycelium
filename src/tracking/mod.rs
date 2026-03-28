@@ -242,6 +242,28 @@ pub struct CommandStats {
     pub exec_time_ms: u64,
 }
 
+/// Aggregated passthrough usage statistics.
+#[derive(Debug, Clone)]
+pub struct PassthroughSummary {
+    /// Number of passthrough command executions recorded.
+    pub total_commands: usize,
+    /// Total passthrough execution time in milliseconds.
+    pub total_exec_time_ms: u64,
+    /// Top passthrough commands by frequency.
+    pub top_commands: Vec<PassthroughCommandStat>,
+}
+
+/// Statistics for a single passthrough command.
+#[derive(Debug, Clone)]
+pub struct PassthroughCommandStat {
+    /// Original raw command that Mycelium passed through.
+    pub command: String,
+    /// Number of times the command ran in passthrough mode.
+    pub count: usize,
+    /// Total passthrough execution time in milliseconds.
+    pub total_exec_time_ms: u64,
+}
+
 /// Individual parse failure record.
 #[derive(Debug)]
 #[allow(dead_code)]
@@ -340,8 +362,8 @@ impl Tracker {
         let project_path = current_project_path_string();
 
         self.conn.execute(
-            "INSERT INTO commands (timestamp, original_cmd, mycelium_cmd, project_path, input_tokens, output_tokens, saved_tokens, savings_pct, exec_time_ms)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            "INSERT INTO commands (timestamp, original_cmd, mycelium_cmd, project_path, input_tokens, output_tokens, saved_tokens, savings_pct, exec_time_ms, execution_kind)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             params![
                 Timestamp::now().to_string(),
                 original_cmd,
@@ -351,7 +373,8 @@ impl Tracker {
                 output_tokens as i64,
                 saved as i64,
                 pct,
-                exec_time_ms as i64
+                exec_time_ms as i64,
+                "filtered",
             ],
         )?;
 
@@ -389,8 +412,8 @@ impl Tracker {
         let project_path = current_project_path_string();
 
         self.conn.execute(
-            "INSERT INTO commands (timestamp, original_cmd, mycelium_cmd, project_path, input_tokens, output_tokens, saved_tokens, savings_pct, exec_time_ms, parse_tier, format_mode)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            "INSERT INTO commands (timestamp, original_cmd, mycelium_cmd, project_path, input_tokens, output_tokens, saved_tokens, savings_pct, exec_time_ms, parse_tier, format_mode, execution_kind)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
             params![
                 Timestamp::now().to_string(),
                 original_cmd,
@@ -402,7 +425,33 @@ impl Tracker {
                 pct,
                 exec_time_ms as i64,
                 parse_tier as i64,
-                format_mode
+                format_mode,
+                "filtered",
+            ],
+        )?;
+
+        self.cleanup_old()?;
+        Ok(())
+    }
+
+    /// Record a passthrough command execution with timing only.
+    pub fn record_passthrough(
+        &self,
+        original_cmd: &str,
+        mycelium_cmd: &str,
+        exec_time_ms: u64,
+    ) -> Result<()> {
+        let project_path = current_project_path_string();
+
+        self.conn.execute(
+            "INSERT INTO commands (timestamp, original_cmd, mycelium_cmd, project_path, input_tokens, output_tokens, saved_tokens, savings_pct, exec_time_ms, execution_kind)
+             VALUES (?1, ?2, ?3, ?4, 0, 0, 0, 0.0, ?5, 'passthrough')",
+            params![
+                Timestamp::now().to_string(),
+                original_cmd,
+                mycelium_cmd,
+                project_path,
+                exec_time_ms as i64,
             ],
         )?;
 

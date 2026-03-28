@@ -79,7 +79,7 @@ fn test_tracker_record_and_recent() {
     });
 }
 
-// 4. track_passthrough doesn't dilute stats (input=0, output=0)
+// 4. track_passthrough doesn't dilute stats
 #[test]
 fn test_track_passthrough_no_dilution() {
     with_test_db("test_track_passthrough_no_dilution", |db_path| {
@@ -95,9 +95,9 @@ fn test_track_passthrough_no_dilution() {
             .record("cmd1", &cmd1, 1000, 200, 10)
             .expect("Failed to record cmd1");
 
-        // Record passthrough (0, 0)
+        // Record passthrough through the dedicated tracking path
         tracker
-            .record("cmd2", &cmd2, 0, 0, 5)
+            .record_passthrough("cmd2", &cmd2, 5)
             .expect("Failed to record passthrough");
 
         // Verify both records exist in recent history
@@ -155,6 +155,97 @@ fn test_timed_execution_passthrough() {
         assert_eq!(pt.savings_pct, 0.0);
         assert_eq!(pt.saved_tokens, 0);
     });
+}
+
+#[test]
+fn test_get_passthrough_summary_filtered_groups_passthrough_commands() {
+    with_test_db(
+        "test_get_passthrough_summary_filtered_groups_passthrough_commands",
+        |db_path| {
+            let tracker =
+                Tracker::new_with_override(Some(db_path)).expect("Failed to create tracker");
+
+            tracker
+                .record_passthrough("git tag --list", "mycelium git tag (passthrough)", 5)
+                .expect("Failed to record passthrough 1");
+            tracker
+                .record_passthrough("git tag --list", "mycelium git tag (passthrough)", 7)
+                .expect("Failed to record passthrough 2");
+            tracker
+                .record("git status", "mycelium git status", 100, 20, 3)
+                .expect("Failed to record filtered command");
+
+            let summary = tracker
+                .get_passthrough_summary_filtered(None)
+                .expect("Failed to load passthrough summary");
+
+            assert_eq!(summary.total_commands, 2);
+            assert_eq!(summary.total_exec_time_ms, 12);
+            assert_eq!(summary.top_commands.len(), 1);
+            assert_eq!(summary.top_commands[0].command, "git tag --list");
+            assert_eq!(summary.top_commands[0].count, 2);
+        },
+    );
+}
+
+#[test]
+fn test_get_passthrough_summary_filtered_respects_project_scope() {
+    with_test_db(
+        "test_get_passthrough_summary_filtered_respects_project_scope",
+        |db_path| {
+            let tracker =
+                Tracker::new_with_override(Some(db_path)).expect("Failed to create tracker");
+
+            tracker
+                .conn
+                .execute(
+                    "INSERT INTO commands (timestamp, original_cmd, mycelium_cmd, project_path, \
+                 input_tokens, output_tokens, saved_tokens, savings_pct, exec_time_ms, execution_kind) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                    rusqlite::params![
+                        "2026-03-28T12:00:00Z",
+                        "git tag --list",
+                        "mycelium git tag (passthrough)",
+                        "/tmp/project-a",
+                        0_i64,
+                        0_i64,
+                        0_i64,
+                        0.0_f64,
+                        5_i64,
+                        "passthrough",
+                    ],
+                )
+                .expect("Failed to insert project a row");
+
+            tracker
+                .conn
+                .execute(
+                    "INSERT INTO commands (timestamp, original_cmd, mycelium_cmd, project_path, \
+                 input_tokens, output_tokens, saved_tokens, savings_pct, exec_time_ms, execution_kind) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                    rusqlite::params![
+                        "2026-03-28T12:05:00Z",
+                        "gh run view",
+                        "mycelium gh run view (passthrough)",
+                        "/tmp/project-b",
+                        0_i64,
+                        0_i64,
+                        0_i64,
+                        0.0_f64,
+                        9_i64,
+                        "passthrough",
+                    ],
+                )
+                .expect("Failed to insert project b row");
+
+            let summary = tracker
+                .get_passthrough_summary_filtered(Some("/tmp/project-a"))
+                .expect("Failed to load scoped passthrough summary");
+
+            assert_eq!(summary.total_commands, 1);
+            assert_eq!(summary.top_commands[0].command, "git tag --list");
+        },
+    );
 }
 
 // 7. get_db_path respects an explicit override path

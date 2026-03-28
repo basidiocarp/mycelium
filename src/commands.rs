@@ -476,6 +476,28 @@ pub enum Commands {
         /// Show per-project breakdown table
         #[arg(long)]
         projects: bool,
+        /// Show rewrite quality scoring and passthrough diagnostics
+        #[arg(
+            long,
+            conflicts_with_all = [
+                "projects",
+                "graph",
+                "history",
+                "quota",
+                "daily",
+                "weekly",
+                "monthly",
+                "all",
+                "failures",
+                "status",
+                "compare",
+                "format",
+            ]
+        )]
+        diagnostics: bool,
+        /// Explain how diagnostics are computed and which metrics are scoped globally vs per-project
+        #[arg(long, requires = "diagnostics")]
+        explain: bool,
         /// Show ASCII graph of daily savings
         #[arg(short, long)]
         graph: bool,
@@ -1431,5 +1453,55 @@ mod tests {
             Commands::CcEconomics { project, .. } => assert!(project),
             _ => panic!("Expected CcEconomics command"),
         }
+    }
+
+    #[test]
+    fn test_gain_diagnostics_flag_parses() {
+        let cli = Cli::try_parse_from(["mycelium", "gain", "--diagnostics"]).unwrap();
+        match cli.command {
+            Commands::Gain { diagnostics, .. } => assert!(diagnostics),
+            _ => panic!("Expected Gain command"),
+        }
+    }
+
+    #[test]
+    fn test_gain_diagnostics_conflicts_with_history() {
+        let err = match Cli::try_parse_from(["mycelium", "gain", "--diagnostics", "--history"]) {
+            Ok(_) => panic!("expected clap conflict"),
+            Err(err) => err,
+        };
+        assert_eq!(err.kind(), clap::error::ErrorKind::ArgumentConflict);
+    }
+
+    #[test]
+    fn test_gain_diagnostics_conflicts_with_format() {
+        let err =
+            match Cli::try_parse_from(["mycelium", "gain", "--diagnostics", "--format", "json"]) {
+                Ok(_) => panic!("expected clap conflict"),
+                Err(err) => err,
+            };
+        assert_eq!(err.kind(), clap::error::ErrorKind::ArgumentConflict);
+    }
+
+    #[test]
+    fn test_gain_diagnostics_explain_flag_requires_diagnostics() {
+        let cli = Cli::try_parse_from(["mycelium", "gain", "--diagnostics", "--explain"]).unwrap();
+        match cli.command {
+            Commands::Gain {
+                diagnostics,
+                explain,
+                ..
+            } => {
+                assert!(diagnostics);
+                assert!(explain);
+            }
+            _ => panic!("Expected Gain command"),
+        }
+
+        let err = match Cli::try_parse_from(["mycelium", "gain", "--explain"]) {
+            Ok(_) => panic!("expected clap validation error"),
+            Err(err) => err,
+        };
+        assert_eq!(err.kind(), clap::error::ErrorKind::MissingRequiredArgument);
     }
 }

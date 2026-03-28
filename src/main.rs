@@ -35,6 +35,7 @@ mod vcs;
 pub use vcs::gh_cmd;
 pub use vcs::git;
 pub use vcs::gt_cmd;
+mod hook_audit;
 mod hook_audit_cmd;
 mod hook_check;
 mod hyphae;

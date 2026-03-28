@@ -1,6 +1,7 @@
 //! Bootstraps Mycelium integration by installing hooks and patching CLAUDE.md.
 mod claude_md;
 mod hook;
+pub(crate) mod host_status;
 mod json_patch;
 
 use anyhow::Result;
@@ -349,6 +350,20 @@ pub fn show_config() -> Result<()> {
         println!("- settings.json: not found");
     }
 
+    println!("\nHost adapters:");
+    for status in host_status::collect_host_adapter_statuses() {
+        let marker = if status.configured { "ok" } else { "-" };
+        let detected = if status.detected {
+            "detected"
+        } else {
+            "not detected"
+        };
+        println!(
+            "{} {}: {} ({})",
+            marker, status.name, status.detail, detected
+        );
+    }
+
     println!("\nUsage:");
     println!("  mycelium init              # Full injection into local CLAUDE.md");
     println!(
@@ -361,6 +376,10 @@ pub fn show_config() -> Result<()> {
         "  mycelium init -g --claude-md     # Legacy: full injection into ~/.claude/CLAUDE.md"
     );
     println!("  mycelium init -g --hook-only     # Hook only, no MYCELIUM.md");
+    println!(
+        "  {}                 # Preferred first-time host setup / repair flow",
+        host_status::operator_setup_hint()
+    );
 
     Ok(())
 }

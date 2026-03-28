@@ -84,11 +84,12 @@ struct RewriteResolution {
     estimated_savings_pct: Option<f64>,
 }
 
-fn resolve(cmd: &str) -> RewriteResolution {
+fn resolve_with_inputs(
+    cmd: &str,
+    excluded: &[String],
+    user_corrections: &[corrections_store::UserCorrection],
+) -> RewriteResolution {
     let input = cmd.trim().to_string();
-    let excluded = crate::config::Config::load()
-        .map(|c| c.hooks.exclude_commands)
-        .unwrap_or_default();
 
     if input.is_empty() {
         return RewriteResolution {
@@ -100,7 +101,16 @@ fn resolve(cmd: &str) -> RewriteResolution {
         };
     }
 
-    let user_corrections = corrections_store::load_corrections(corrections_store::CORRECTIONS_JSON);
+    if let Some(reason) = registry::learned_correction_block_reason(&input, excluded) {
+        return RewriteResolution {
+            input,
+            rewritten: None,
+            source: RewriteSource::NoRewrite,
+            reason,
+            estimated_savings_pct: None,
+        };
+    }
+
     if let Some(rewritten) = corrections_store::apply_correction(&input, &user_corrections) {
         return RewriteResolution {
             input,
@@ -137,6 +147,14 @@ fn resolve(cmd: &str) -> RewriteResolution {
     }
 }
 
+fn resolve(cmd: &str) -> RewriteResolution {
+    let excluded = crate::config::Config::load()
+        .map(|c| c.hooks.exclude_commands)
+        .unwrap_or_default();
+    let user_corrections = corrections_store::load_corrections(corrections_store::CORRECTIONS_JSON);
+    resolve_with_inputs(cmd, &excluded, &user_corrections)
+}
+
 fn render_explanation(resolution: &RewriteResolution) -> String {
     let mut out = String::new();
     out.push_str("Mycelium rewrite explanation\n");
@@ -153,7 +171,38 @@ fn render_explanation(resolution: &RewriteResolution) -> String {
         ));
     }
     out.push_str(&format!("Reason: {}\n", resolution.reason));
+    for line in compound_segment_lines(&resolution.input) {
+        out.push_str(&line);
+        out.push('\n');
+    }
     out
+}
+
+fn compound_segment_lines(input: &str) -> Vec<String> {
+    let segments = registry::split_command_chain(input.trim());
+    if segments.len() <= 1 {
+        return Vec::new();
+    }
+
+    let excluded = crate::config::Config::load()
+        .map(|c| c.hooks.exclude_commands)
+        .unwrap_or_default();
+    let user_corrections = corrections_store::load_corrections(corrections_store::CORRECTIONS_JSON);
+
+    let mut lines = vec!["Segments:".to_string()];
+    for segment in segments {
+        let trimmed = segment.trim();
+        let resolution = resolve_with_inputs(trimmed, &excluded, &user_corrections);
+        let output = resolution.rewritten.as_deref().unwrap_or(trimmed);
+        lines.push(format!(
+            "  - {} => {} ({}, reason: {})",
+            trimmed,
+            output,
+            result_label(&resolution),
+            resolution.reason
+        ));
+    }
+    lines
 }
 
 fn result_label(resolution: &RewriteResolution) -> &'static str {
@@ -183,8 +232,8 @@ fn registry_estimated_savings(
     }
 
     let trimmed = input.trim();
-    let base = trimmed.split_whitespace().next().unwrap_or(trimmed);
-    if excluded.iter().any(|entry| entry == base) {
+    let base = registry::rewrite_primary_command(trimmed)?;
+    if excluded.iter().any(|entry| entry == &base) {
         return None;
     }
 
@@ -203,6 +252,10 @@ fn explain_registry_match(input: &str, excluded: &[String], source: RewriteSourc
     }
 
     let trimmed = input.trim();
+    if let Some(reason) = registry::rewrite_block_reason(trimmed, excluded) {
+        return reason;
+    }
+
     let segments = registry::split_command_chain(trimmed);
     if segments.len() > 1 {
         return format!(
@@ -220,8 +273,14 @@ fn explain_registry_match(input: &str, excluded: &[String], source: RewriteSourc
             status,
         } => {
             let savings = format!("{:.1}", estimated_savings_pct);
-            let base = trimmed.split_whitespace().next().unwrap_or(trimmed);
-            if excluded.iter().any(|entry| entry == base) {
+            let base = registry::rewrite_primary_command(trimmed).unwrap_or_else(|| {
+                trimmed
+                    .split_whitespace()
+                    .next()
+                    .unwrap_or(trimmed)
+                    .to_string()
+            });
+            if excluded.iter().any(|entry| entry == &base) {
                 format!("command base `{}` is excluded by config", base)
             } else {
                 format!(
@@ -242,9 +301,8 @@ fn explain_registry_match(input: &str, excluded: &[String], source: RewriteSourc
 }
 
 fn explain_no_rewrite(input: &str, excluded: &[String]) -> String {
-    if input.contains("<<") || input.contains("$((") {
-        return "command contains heredoc or arithmetic expansion, so it is not rewritten"
-            .to_string();
+    if let Some(reason) = registry::rewrite_block_reason(input, excluded) {
+        return reason;
     }
 
     let segments = registry::split_command_chain(input);
@@ -269,10 +327,6 @@ fn explain_no_rewrite_segment(segment: &str, excluded: &[String]) -> String {
         return "command already starts with `mycelium`".to_string();
     }
 
-    if trimmed.contains("MYCELIUM_DISABLED=1") {
-        return "MYCELIUM_DISABLED=1 disables rewrite for this command".to_string();
-    }
-
     if trimmed.starts_with("head -") {
         return "head is only rewritten for supported numeric forms".to_string();
     }
@@ -285,8 +339,14 @@ fn explain_no_rewrite_segment(segment: &str, excluded: &[String]) -> String {
             estimated_savings_pct,
             status,
         } => {
-            let base = trimmed.split_whitespace().next().unwrap_or(trimmed);
-            if excluded.iter().any(|entry| entry == base) {
+            let base = registry::rewrite_primary_command(trimmed).unwrap_or_else(|| {
+                trimmed
+                    .split_whitespace()
+                    .next()
+                    .unwrap_or(trimmed)
+                    .to_string()
+            });
+            if excluded.iter().any(|entry| entry == &base) {
                 format!("command base `{}` is excluded by config", base)
             } else {
                 format!(
@@ -324,6 +384,14 @@ mod explain_tests {
         let explanation = explain("ansible-playbook site.yml");
         assert!(explanation.contains("Result: no rewrite"));
         assert!(explanation.contains("ansible-playbook"));
+    }
+
+    #[test]
+    fn test_explain_compound_command_lists_segment_breakdown() {
+        let explanation = explain("git status && gh pr list --json number");
+        assert!(explanation.contains("Segments:"));
+        assert!(explanation.contains("git status"));
+        assert!(explanation.contains("gh pr list --json number"));
     }
 }
 
@@ -366,5 +434,46 @@ mod tests {
         assert!(!resolution.rewritten);
         assert_eq!(resolution.source, "none");
         assert!(resolution.estimated_savings_pct.is_none());
+    }
+
+    #[test]
+    fn test_learned_correction_respects_rewrite_guards() {
+        let corrections = vec![corrections_store::UserCorrection {
+            wrong: "git log -10 | grep feat".to_string(),
+            right: "mycelium git log -10 | grep feat".to_string(),
+        }];
+
+        let resolution = resolve_with_inputs("git log -10 | grep feat", &[], &corrections);
+        assert!(resolution.rewritten.is_none());
+        assert_eq!(resolution.source, RewriteSource::NoRewrite);
+    }
+
+    #[test]
+    fn test_learned_correction_respects_nested_wrapper_gh_guards() {
+        let corrections = vec![corrections_store::UserCorrection {
+            wrong: "mise exec -- just -- gh pr list --json number".to_string(),
+            right: "mise exec -- just -- mycelium gh pr list --json number".to_string(),
+        }];
+
+        let resolution = resolve_with_inputs(
+            "mise exec -- just -- gh pr list --json number",
+            &[],
+            &corrections,
+        );
+        assert!(resolution.rewritten.is_none());
+        assert_eq!(resolution.source, RewriteSource::NoRewrite);
+    }
+
+    #[test]
+    fn test_learned_correction_respects_compound_segment_passthrough_guards() {
+        let corrections = vec![corrections_store::UserCorrection {
+            wrong: "git status && gh pr list --json number".to_string(),
+            right: "mycelium git status && mycelium gh pr list --json number".to_string(),
+        }];
+
+        let resolution =
+            resolve_with_inputs("git status && gh pr list --json number", &[], &corrections);
+        assert!(resolution.rewritten.is_none());
+        assert_eq!(resolution.source, RewriteSource::NoRewrite);
     }
 }

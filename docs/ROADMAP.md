@@ -78,3 +78,29 @@
 - Config-driven filter customization
 - Better error messages and diagnostics
 - Deeper host-neutral runtime integration so Claude, Codex, and future hosts map cleanly into the same measurement model
+
+### Competitive Priorities
+
+#### Copy
+- Add operator-facing quality metrics for rewrites and passthroughs, not just token savings
+- Improve onboarding and setup ergonomics across supported hosts
+- Expand ecosystem coverage selectively where CLI parity and raw-output semantics are well understood
+- Track missed-opportunity and passthrough cases explicitly so rewrite rules can be tuned from real usage
+
+#### Avoid
+- Do not trade semantic fidelity for headline token savings
+- Do not broaden hook or rewrite behavior faster than it can be verified with regression tests
+- Do not infer shell safety from string matching alone when parser-backed validation is available
+- Do not expand host and tool support faster than exact-output and exit-code parity can be preserved
+
+#### Watch
+- Cross-agent host support, where the integration value is high but the hook and permission surface grows quickly
+- Windows support, where installation and runtime compatibility tend to regress first
+- User-configurable rewrite and filter policy, especially where trust boundaries are unclear
+- Release velocity around core rewrite logic, so rapid iteration does not reintroduce semantic-loss bugs
+
+#### Near-Term Order
+1. Add rewrite quality scoring and passthrough diagnostics
+2. Improve onboarding, install, and init flows
+3. Expand ecosystem coverage only after command-parity tests exist
+4. Keep growing the semantic-fidelity regression suite for rewritten commands

@@ -1,6 +1,9 @@
 //! GitHub CLI workflow run sub-command handlers.
 
-use crate::parser::{FormatMode, OutputParser, ParseResult, TokenFormatter};
+use crate::parser::{
+    FormatMode, OutputParser, ParseResult, TokenFormatter, emit_passthrough_warning,
+    truncate_output,
+};
 use crate::tracking;
 use anyhow::{Context, Result};
 use std::process::Command;
@@ -24,8 +27,16 @@ pub(super) fn run_workflow(args: &[String], verbose: u8, ultra_compact: bool) ->
 }
 
 fn should_passthrough_run_list(args: &[String]) -> bool {
-    args.iter()
-        .any(|a| a == "--json" || a == "--jq" || a == "--template")
+    args.iter().any(|arg| is_structured_output_flag(arg))
+}
+
+fn is_structured_output_flag(arg: &str) -> bool {
+    arg == "--json"
+        || arg == "--jq"
+        || arg == "--template"
+        || arg.starts_with("--json=")
+        || arg.starts_with("--jq=")
+        || arg.starts_with("--template=")
 }
 
 fn list_runs(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()> {
@@ -102,17 +113,106 @@ fn list_runs(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()> {
     Ok(())
 }
 
+struct RunViewAnalysis {
+    filtered: String,
+    parse_tier: u8,
+}
+
+#[derive(Debug)]
+struct GhRunViewSummary {
+    status: Option<String>,
+    conclusion: Option<String>,
+    failed_jobs: Vec<String>,
+}
+
+struct GhRunViewParser;
+
+impl OutputParser for GhRunViewParser {
+    type Output = GhRunViewSummary;
+
+    fn parse(input: &str) -> ParseResult<Self::Output> {
+        let mut status = None;
+        let mut conclusion = None;
+        let mut failed_jobs = Vec::new();
+        let mut in_jobs = false;
+        let mut saw_useful_line = false;
+
+        for line in input.lines() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+
+            if let Some(value) = trimmed.strip_prefix("Status:") {
+                status = Some(value.trim().to_string());
+                saw_useful_line = true;
+                continue;
+            }
+            if let Some(value) = trimmed.strip_prefix("Conclusion:") {
+                conclusion = Some(value.trim().to_string());
+                saw_useful_line = true;
+                continue;
+            }
+            if trimmed == "JOBS" {
+                in_jobs = true;
+                saw_useful_line = true;
+                continue;
+            }
+            if in_jobs
+                && (trimmed.contains('✗') || trimmed.contains('X') || trimmed.contains("fail"))
+            {
+                failed_jobs.push(trimmed.to_string());
+                saw_useful_line = true;
+            }
+        }
+
+        if !saw_useful_line {
+            emit_passthrough_warning("gh run view", "No parseable summary lines found");
+            return ParseResult::Passthrough(truncate_output(input, 2000));
+        }
+
+        ParseResult::Full(GhRunViewSummary {
+            status,
+            conclusion,
+            failed_jobs,
+        })
+    }
+}
+
+fn filter_run_view_output(raw: &str, run_id: Option<&str>) -> RunViewAnalysis {
+    match GhRunViewParser::parse(raw) {
+        ParseResult::Full(summary) | ParseResult::Degraded(summary, _) => {
+            let mut filtered = format!(
+                "Workflow Run{}\n",
+                run_id.map(|id| format!(" #{}", id)).unwrap_or_default()
+            );
+            if let Some(status) = summary.status {
+                filtered.push_str(&format!("  Status: {}\n", status));
+            }
+            if let Some(conclusion) = summary.conclusion {
+                filtered.push_str(&format!("  Conclusion: {}\n", conclusion));
+            }
+            for failed_job in summary.failed_jobs {
+                filtered.push_str(&format!("  FAIL: {}\n", failed_job));
+            }
+            RunViewAnalysis {
+                filtered,
+                parse_tier: 1,
+            }
+        }
+        ParseResult::Passthrough(raw_out) => RunViewAnalysis {
+            filtered: raw_out,
+            parse_tier: 3,
+        },
+    }
+}
+
 /// Check if run view args should bypass filtering and pass through directly.
 /// Flags like --log-failed, --log, and --json produce output that the filter
 /// would incorrectly strip.
 fn should_passthrough_run_view(extra_args: &[String]) -> bool {
     extra_args.iter().any(|a| {
-        a == "--log-failed"
-            || a == "--log"
-            || a == "--json"
-            || a == "--jq"
-            || a == "--template"
-            || a == "--web"
+        a == "--log-failed" || a == "--log" || is_structured_output_flag(a) || a == "--web"
     })
 }
 
@@ -155,12 +255,6 @@ fn view_run(args: &[String], _verbose: u8) -> Result<()> {
         std::process::exit(output.status.code().unwrap_or(1));
     }
 
-    // Parse output and show only failures
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let mut in_jobs = false;
-
-    let mut filtered = String::new();
-
     let run_label = run_id
         .as_deref()
         .map(|id| format!("gh run view {}", id))
@@ -169,40 +263,16 @@ fn view_run(args: &[String], _verbose: u8) -> Result<()> {
         .as_deref()
         .map(|id| format!("mycelium gh run view {}", id))
         .unwrap_or_else(|| "mycelium gh run view".to_string());
-
-    let line = format!(
-        "Workflow Run{}\n",
-        run_id
-            .as_deref()
-            .map(|id| format!(" #{}", id))
-            .unwrap_or_default()
+    let analysis = filter_run_view_output(&raw, run_id.as_deref());
+    print!("{}", analysis.filtered);
+    timer.track_with_parse_info(
+        &run_label,
+        &mycelium_label,
+        &raw,
+        &analysis.filtered,
+        analysis.parse_tier,
+        "compact",
     );
-    filtered.push_str(&line);
-    print!("{}", line);
-
-    for line in stdout.lines() {
-        if line.contains("JOBS") {
-            in_jobs = true;
-        }
-
-        if in_jobs {
-            if line.contains('✓') || line.contains("success") {
-                // Skip successful jobs in compact mode
-                continue;
-            }
-            if line.contains('✗') || line.contains("fail") {
-                let formatted = format!("  FAIL: {}\n", line.trim());
-                filtered.push_str(&formatted);
-                print!("{}", formatted);
-            }
-        } else if line.contains("Status:") || line.contains("Conclusion:") {
-            let formatted = format!("  {}\n", line.trim());
-            filtered.push_str(&formatted);
-            print!("{}", formatted);
-        }
-    }
-
-    timer.track_with_parse_info(&run_label, &mycelium_label, &raw, &filtered, 1, "compact");
     Ok(())
 }
 
@@ -234,10 +304,14 @@ mod tests {
             "--jq".into(),
             ".jobs".into()
         ]));
+        assert!(should_passthrough_run_view(&["--jq=.jobs".into()]));
         assert!(should_passthrough_run_view(&[
             "--template".into(),
             "{{.jobs}}".into()
         ]));
+        assert!(should_passthrough_run_view(
+            &["--template={{.jobs}}".into()]
+        ));
         assert!(should_passthrough_run_view(&["--web".into()]));
     }
 
@@ -254,17 +328,53 @@ mod tests {
     #[test]
     fn test_run_list_passthrough_json_template() {
         assert!(should_passthrough_run_list(&["--json".into()]));
+        assert!(should_passthrough_run_list(&["--json=databaseId".into()]));
         assert!(should_passthrough_run_list(&[
             "--jq".into(),
             ".workflowName".into()
         ]));
+        assert!(should_passthrough_run_list(&["--jq=.workflowName".into()]));
         assert!(should_passthrough_run_list(&[
             "--template".into(),
             "{{.workflowName}}".into()
+        ]));
+        assert!(should_passthrough_run_list(&[
+            "--template={{.workflowName}}".into()
         ]));
         assert!(!should_passthrough_run_list(&[
             "--limit".into(),
             "5".into()
         ]));
+    }
+
+    #[test]
+    fn test_filter_run_view_output_reports_failed_jobs_only() {
+        let raw = "\
+Workflow Run #123
+Status: completed
+Conclusion: failure
+
+JOBS
+✓ build in 2m10s
+X integration-tests in 4m20s
+✓ lint in 45s
+";
+
+        let parsed = filter_run_view_output(raw, Some("123"));
+        assert_eq!(parsed.parse_tier, 1);
+        assert!(parsed.filtered.contains("Workflow Run #123"));
+        assert!(
+            parsed
+                .filtered
+                .contains("FAIL: X integration-tests in 4m20s")
+        );
+        assert!(!parsed.filtered.contains("✓ build"));
+    }
+
+    #[test]
+    fn test_filter_run_view_output_passthroughs_unstructured_text() {
+        let raw = "gh: authentication required";
+        let parsed = filter_run_view_output(raw, None);
+        assert_eq!(parsed.parse_tier, 3);
     }
 }

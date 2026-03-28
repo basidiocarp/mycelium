@@ -256,7 +256,7 @@ fn test_split_chain_semicolon() {
 
 #[test]
 fn test_split_pipe_first_only() {
-    assert_eq!(split_command_chain("a | b"), vec!["a"]);
+    assert_eq!(split_command_chain("a | b"), vec!["a | b"]);
 }
 
 #[test]
@@ -450,11 +450,8 @@ fn test_rewrite_next_build() {
 
 #[test]
 fn test_rewrite_pipe_first_only() {
-    // After a pipe, the filter command stays raw
-    assert_eq!(
-        rewrite_command("git log -10 | grep feat", &[]),
-        Some("mycelium git log -10 | grep feat".into())
-    );
+    // Piped commands stay raw so downstream stages receive native stdout.
+    assert_eq!(rewrite_command("git log -10 | grep feat", &[]), None);
 }
 
 #[test]
@@ -512,43 +509,27 @@ fn test_rewrite_non_mycelium_disabled_env_still_rewrites() {
 
 #[test]
 fn test_rewrite_redirect_2_gt_amp_1_with_pipe() {
-    assert_eq!(
-        rewrite_command("cargo test 2>&1 | head", &[]),
-        Some("mycelium cargo test 2>&1 | head".into())
-    );
+    assert_eq!(rewrite_command("cargo test 2>&1 | head", &[]), None);
 }
 
 #[test]
 fn test_rewrite_redirect_2_gt_amp_1_trailing() {
-    assert_eq!(
-        rewrite_command("cargo test 2>&1", &[]),
-        Some("mycelium cargo test 2>&1".into())
-    );
+    assert_eq!(rewrite_command("cargo test 2>&1", &[]), None);
 }
 
 #[test]
 fn test_rewrite_redirect_plain_2_devnull() {
-    // 2>/dev/null has no `&`, never broken — non-regression
-    assert_eq!(
-        rewrite_command("git status 2>/dev/null", &[]),
-        Some("mycelium git status 2>/dev/null".into())
-    );
+    assert_eq!(rewrite_command("git status 2>/dev/null", &[]), None);
 }
 
 #[test]
 fn test_rewrite_redirect_2_gt_amp_1_with_and() {
-    assert_eq!(
-        rewrite_command("cargo test 2>&1 && echo done", &[]),
-        Some("mycelium cargo test 2>&1 && echo done".into())
-    );
+    assert_eq!(rewrite_command("cargo test 2>&1 && echo done", &[]), None);
 }
 
 #[test]
 fn test_rewrite_redirect_amp_gt_devnull() {
-    assert_eq!(
-        rewrite_command("cargo test &>/dev/null", &[]),
-        Some("mycelium cargo test &>/dev/null".into())
-    );
+    assert_eq!(rewrite_command("cargo test &>/dev/null", &[]), None);
 }
 
 #[test]
@@ -1190,19 +1171,13 @@ fn test_rewrite_compound_semicolon() {
 
 #[test]
 fn test_rewrite_compound_pipe_raw_filter() {
-    // Pipe: rewrite first segment only, pass through rest unchanged
-    assert_eq!(
-        rewrite_command("cargo test | grep FAILED", &[]),
-        Some("mycelium cargo test | grep FAILED".into())
-    );
+    // Pipe: keep raw so downstream filters see native stdout.
+    assert_eq!(rewrite_command("cargo test | grep FAILED", &[]), None);
 }
 
 #[test]
 fn test_rewrite_compound_pipe_git_grep() {
-    assert_eq!(
-        rewrite_command("git log -10 | grep feat", &[]),
-        Some("mycelium git log -10 | grep feat".into())
-    );
+    assert_eq!(rewrite_command("git log -10 | grep feat", &[]), None);
 }
 
 #[test]
@@ -1409,15 +1384,23 @@ fn test_classify_task_runner_direct_exec_commands() {
 fn test_rewrite_task_runner_direct_exec_commands() {
     assert_eq!(
         rewrite_command("mise exec -- cargo test", &[]),
-        Some("mycelium cargo test".into())
+        Some("mise exec -- mycelium cargo test".into())
     );
     assert_eq!(
         rewrite_command("just -- git status", &[]),
-        Some("mycelium git status".into())
+        Some("just -- mycelium git status".into())
     );
     assert_eq!(
         rewrite_command("task -- cargo test", &[]),
-        Some("mycelium cargo test".into())
+        Some("task -- mycelium cargo test".into())
+    );
+}
+
+#[test]
+fn test_rewrite_nested_task_runner_structured_gh_stays_raw() {
+    assert_eq!(
+        rewrite_command("mise exec -- just -- gh pr list --json number", &[]),
+        None
     );
 }
 
@@ -1437,6 +1420,138 @@ fn test_display_command_for_discover_uses_wrapped_command() {
         display_command_for_discover("just -- git status"),
         "git status"
     );
+}
+
+#[test]
+fn test_rewrite_excluded_command_with_env_prefix_stays_raw() {
+    let excluded = vec!["git".to_string()];
+    assert_eq!(rewrite_command("FOO=1 git status", &excluded), None);
+}
+
+#[test]
+fn test_rewrite_excluded_command_with_sudo_stays_raw() {
+    let excluded = vec!["git".to_string()];
+    assert_eq!(rewrite_command("sudo git status", &excluded), None);
+}
+
+#[test]
+fn test_rewrite_literal_pipe_in_quoted_argument_still_rewrites() {
+    assert_eq!(
+        rewrite_command("git log --grep 'feat|fix'", &[]),
+        Some("mycelium git log --grep 'feat|fix'".into())
+    );
+    assert_eq!(
+        rewrite_command("rg 'foo|bar' src", &[]),
+        Some("mycelium grep 'foo|bar' src".into())
+    );
+}
+
+#[test]
+fn test_rewrite_escaped_shell_metacharacters_still_rewrites() {
+    assert_eq!(
+        rewrite_command(r"rg foo\|bar src", &[]),
+        Some(r"mycelium grep foo\|bar src".into())
+    );
+    assert_eq!(
+        rewrite_command(r"rg foo\;bar src", &[]),
+        Some(r"mycelium grep foo\;bar src".into())
+    );
+}
+
+#[test]
+fn test_rewrite_command_substitution_stays_raw() {
+    assert_eq!(
+        rewrite_command("echo $(git status && cargo test)", &[]),
+        None
+    );
+}
+
+#[test]
+fn test_rewrite_backticks_stay_raw() {
+    assert_eq!(
+        rewrite_command("echo `git status && cargo test`", &[]),
+        None
+    );
+}
+
+#[test]
+fn test_rewrite_subshell_group_stays_raw() {
+    assert_eq!(
+        rewrite_command("git status && (cargo test; git status)", &[]),
+        None
+    );
+}
+
+#[test]
+fn test_rewrite_brace_group_stays_raw() {
+    assert_eq!(rewrite_command("{ git status; cargo test; }", &[]), None);
+}
+
+#[test]
+fn test_rewrite_literal_mycelium_disabled_value_still_rewrites() {
+    assert_eq!(
+        rewrite_command("git log --grep MYCELIUM_DISABLED=1", &[]),
+        Some("mycelium git log --grep MYCELIUM_DISABLED=1".into())
+    );
+}
+
+#[test]
+fn test_rewrite_gh_literal_json_argument_still_rewrites() {
+    assert_eq!(
+        rewrite_command("gh pr list --search '--json'", &[]),
+        Some("mycelium gh pr list --search '--json'".into())
+    );
+}
+
+#[test]
+fn test_rewrite_compound_preserves_structured_gh_passthrough_on_later_segment() {
+    assert_eq!(
+        rewrite_command("git status && gh pr list --json number", &[]),
+        Some("mycelium git status && gh pr list --json number".into())
+    );
+}
+
+#[test]
+fn test_rewrite_compound_preserves_mycelium_disabled_on_later_segment() {
+    assert_eq!(
+        rewrite_command("git status && MYCELIUM_DISABLED=1 cargo test", &[]),
+        Some("mycelium git status && MYCELIUM_DISABLED=1 cargo test".into())
+    );
+}
+
+#[test]
+fn test_rewrite_literal_heredoc_and_arithmetic_markers_still_rewrites() {
+    assert_eq!(
+        rewrite_command("git log --grep '<<'", &[]),
+        Some("mycelium git log --grep '<<'".into())
+    );
+    assert_eq!(
+        rewrite_command("git log --grep '$((value))'", &[]),
+        Some("mycelium git log --grep '$((value))'".into())
+    );
+}
+
+#[test]
+fn test_rewrite_safe_quoted_compound_list_still_rewrites() {
+    assert_eq!(
+        rewrite_command("git log --grep 'feat|fix' && cargo test", &[]),
+        Some("mycelium git log --grep 'feat|fix' && mycelium cargo test".into())
+    );
+}
+
+#[test]
+fn test_rewrite_ansi_c_quoted_argument_stays_raw() {
+    assert_eq!(rewrite_command(r"rg $'foo\nbar' src", &[]), None);
+}
+
+#[test]
+fn test_rewrite_here_string_stays_raw() {
+    assert_eq!(rewrite_command("git status <<< foo", &[]), None);
+}
+
+#[test]
+fn test_rewrite_process_substitution_stays_raw() {
+    assert_eq!(rewrite_command("git diff <(cat old) <(cat new)", &[]), None);
 }
 
 #[test]

@@ -50,7 +50,7 @@ jobs:
 
       - name: Install cross (aarch64-linux)
         if: matrix.cross
-        uses: taiki-e/install-action@v2.69.6
+        uses: taiki-e/install-action@v2.69.7
         with:
           tool: cross
 
@@ -111,7 +111,7 @@ jobs:
         run: cargo build --release
 
       - name: Install packaging tools
-        uses: taiki-e/install-action@v2.69.6
+        uses: taiki-e/install-action@v2.69.7
         with:
           tool: cargo-deb,cargo-generate-rpm
 
@@ -149,7 +149,7 @@ jobs:
         run: |
           mkdir release
           find artifacts -type f \( -name '*.tar.gz' -o -name '*.zip' -o -name '*.deb' -o -name '*.rpm' \) -exec cp {} release/ \;
-          cd release && sha256sum * > SHA256SUMS
+          cd release && sha256sum ./* > SHA256SUMS
 
       - name: Extract release notes from tag
         id: notes

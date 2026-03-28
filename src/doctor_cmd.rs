@@ -7,6 +7,7 @@ use anyhow::Result;
 use colored::Colorize;
 use std::path::PathBuf;
 
+use crate::init::host_status;
 use crate::{config, integrity, plugin, tracking};
 
 pub fn run() -> Result<()> {
@@ -16,6 +17,7 @@ pub fn run() -> Result<()> {
     check_version();
     check_hook();
     check_settings_json();
+    check_codex_cli();
     check_config();
     check_tracking_db();
     check_plugin_dir();
@@ -55,23 +57,26 @@ fn check_version() {
 fn check_hook() {
     match integrity::verify_hook() {
         Ok(integrity::IntegrityStatus::Verified) => {
-            pass("claude adapter", "hook installed and verified");
+            pass("Claude Code hook", "installed and verified");
         }
         Ok(integrity::IntegrityStatus::NotInstalled) => {
             warn(
-                "claude adapter",
-                "not installed — run `mycelium init -g` if you use Claude Code",
+                "Claude Code hook",
+                &format!(
+                    "not installed — run `{}` if you use Claude Code",
+                    host_status::claude_setup_hint()
+                ),
             );
         }
         Ok(integrity::IntegrityStatus::NoBaseline) => {
             warn(
-                "claude adapter",
+                "Claude Code hook",
                 "installed but no baseline hash — run `mycelium init -g`",
             );
         }
         Ok(integrity::IntegrityStatus::Tampered { expected, actual }) => {
             fail(
-                "claude adapter",
+                "Claude Code hook",
                 &format!(
                     "TAMPERED — expected {}…, got {}…",
                     &expected[..8],
@@ -81,12 +86,12 @@ fn check_hook() {
         }
         Ok(integrity::IntegrityStatus::OrphanedHash) => {
             warn(
-                "claude adapter",
+                "Claude Code hook",
                 "hash file exists but hook is missing — run `mycelium init -g`",
             );
         }
         Err(e) => {
-            fail("claude adapter", &format!("error checking hook: {e}"));
+            fail("Claude Code hook", &format!("error checking hook: {e}"));
         }
     }
 }
@@ -164,6 +169,32 @@ fn check_settings_json() {
             }
         }
         Err(e) => fail("claude settings", &format!("cannot read: {e}")),
+    }
+}
+
+fn check_codex_cli() {
+    let status = host_status::collect_host_adapter_statuses()
+        .into_iter()
+        .find(|status| status.name == "Codex CLI");
+
+    let Some(status) = status else {
+        warn("Codex CLI", "status unavailable");
+        return;
+    };
+
+    if status.configured {
+        pass("Codex CLI", &status.detail);
+    } else if status.detected {
+        warn(
+            "Codex CLI",
+            &format!(
+                "{} — run `{}` to register MCP servers",
+                status.detail,
+                host_status::codex_setup_hint()
+            ),
+        );
+    } else {
+        warn("Codex CLI", &status.detail);
     }
 }
 

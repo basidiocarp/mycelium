@@ -2,6 +2,7 @@
 pub mod eslint;
 pub mod pylint;
 
+use crate::parser::{OutputParser, ParseResult, truncate_output};
 use crate::python::mypy as mypy_cmd;
 use crate::python::ruff as ruff_cmd;
 use crate::tracking;
@@ -11,6 +12,46 @@ use std::process::Command;
 
 pub use eslint::filter_eslint_json;
 pub use pylint::{filter_generic_lint, filter_pylint_json};
+
+struct LintAnalysis {
+    filtered: String,
+    parse_tier: u8,
+}
+
+struct GenericLintParser;
+
+fn has_explicit_output_format(args: &[String]) -> bool {
+    let mut iter = args.iter().peekable();
+    while let Some(arg) = iter.next() {
+        if arg == "--output-format" {
+            if iter.peek().is_some() {
+                return true;
+            }
+            continue;
+        }
+        if arg.starts_with("--output-format=") {
+            return true;
+        }
+    }
+    false
+}
+
+fn should_skip_output_format_arg(linter: &str, args: &[String], idx: usize) -> bool {
+    if !matches!(linter, "ruff" | "pylint") {
+        return false;
+    }
+
+    let arg = &args[idx];
+    if arg.starts_with("--output-format=") {
+        return true;
+    }
+
+    if arg == "--output-format" {
+        return true;
+    }
+
+    idx > 0 && args[idx - 1] == "--output-format"
+}
 
 /// Compact file path (remove common prefixes)
 pub(super) fn compact_path(path: &str) -> String {
@@ -86,13 +127,13 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
         }
         "ruff" => {
             // Force JSON output for ruff check
-            if !effective_args.contains(&"--output-format".to_string()) {
+            if !has_explicit_output_format(effective_args) {
                 cmd.arg("check").arg("--output-format=json");
             }
         }
         "pylint" => {
             // Force JSON2 output for pylint
-            if !effective_args.contains(&"--output-format".to_string()) {
+            if !has_explicit_output_format(effective_args) {
                 cmd.arg("--output-format=json2");
             }
         }
@@ -118,12 +159,8 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
         1
     };
 
-    for arg in &effective_args[start_idx..] {
-        // Skip --output-format if we already added it
-        if linter == "ruff" && arg.starts_with("--output-format") {
-            continue;
-        }
-        if linter == "pylint" && arg.starts_with("--output-format") {
+    for (offset, arg) in effective_args[start_idx..].iter().enumerate() {
+        if should_skip_output_format_arg(linter, effective_args, start_idx + offset) {
             continue;
         }
         cmd.arg(arg);
@@ -134,7 +171,12 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
         let has_path = effective_args
             .iter()
             .skip(start_idx)
-            .any(|a| !a.starts_with('-') && !a.contains('='));
+            .enumerate()
+            .any(|(offset, arg)| {
+                !should_skip_output_format_arg(linter, effective_args, start_idx + offset)
+                    && !arg.starts_with('-')
+                    && !arg.contains('=')
+            });
         if !has_path {
             cmd.arg(".");
         }
@@ -166,21 +208,8 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
     let stderr = String::from_utf8_lossy(&output.stderr);
     let raw = format!("{}\n{}", stdout, stderr);
 
-    // Dispatch to appropriate filter based on linter
-    let filtered = match linter {
-        "eslint" => filter_eslint_json(&stdout),
-        "ruff" => {
-            // Reuse ruff_cmd's JSON parser
-            if !stdout.trim().is_empty() {
-                ruff_cmd::filter_ruff_check_json(&stdout)
-            } else {
-                "✓ Ruff: No issues found".to_string()
-            }
-        }
-        "pylint" => filter_pylint_json(&stdout),
-        "mypy" => mypy_cmd::filter_mypy_output(&raw),
-        _ => filter_generic_lint(&raw),
-    };
+    let analysis = analyze_lint_output(linter, &stdout, &raw);
+    let filtered = analysis.filtered;
 
     let exit_code = output
         .status
@@ -197,7 +226,7 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
         &format!("mycelium lint {} {}", linter, args.join(" ")),
         &raw,
         &filtered,
-        1,
+        analysis.parse_tier,
         "compact",
     );
 
@@ -206,6 +235,140 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn analyze_lint_output(linter: &str, stdout: &str, raw: &str) -> LintAnalysis {
+    match linter {
+        "eslint" => match eslint::EslintParser::parse(stdout) {
+            ParseResult::Full(_) => LintAnalysis {
+                filtered: filter_eslint_json(stdout),
+                parse_tier: 1,
+            },
+            ParseResult::Degraded(_, _) => LintAnalysis {
+                filtered: filter_eslint_json(stdout),
+                parse_tier: 2,
+            },
+            ParseResult::Passthrough(_) => LintAnalysis {
+                filtered: filter_eslint_json(stdout),
+                parse_tier: 3,
+            },
+        },
+        "ruff" => {
+            let filtered = if !stdout.trim().is_empty() {
+                ruff_cmd::filter_ruff_check_json(stdout)
+            } else {
+                "✓ Ruff: No issues found".to_string()
+            };
+            LintAnalysis {
+                filtered,
+                parse_tier: 1,
+            }
+        }
+        "pylint" => match pylint::PylintParser::parse(stdout) {
+            ParseResult::Full(_) => LintAnalysis {
+                filtered: filter_pylint_json(stdout),
+                parse_tier: 1,
+            },
+            ParseResult::Degraded(_, _) => LintAnalysis {
+                filtered: filter_pylint_json(stdout),
+                parse_tier: 2,
+            },
+            ParseResult::Passthrough(_) => LintAnalysis {
+                filtered: filter_pylint_json(stdout),
+                parse_tier: 3,
+            },
+        },
+        "mypy" => LintAnalysis {
+            filtered: mypy_cmd::filter_mypy_output(raw),
+            parse_tier: 2,
+        },
+        _ => match GenericLintParser::parse(raw) {
+            ParseResult::Full(_) => LintAnalysis {
+                filtered: filter_generic_lint(raw),
+                parse_tier: 1,
+            },
+            ParseResult::Degraded(_, _) => LintAnalysis {
+                filtered: filter_generic_lint(raw),
+                parse_tier: 2,
+            },
+            ParseResult::Passthrough(raw_out) => LintAnalysis {
+                filtered: raw_out,
+                parse_tier: 3,
+            },
+        },
+    }
+}
+
+impl OutputParser for GenericLintParser {
+    type Output = crate::parser::types::DiagnosticReport;
+
+    fn parse(input: &str) -> ParseResult<Self::Output> {
+        use crate::parser::types::{Diagnostic, DiagnosticReport, DiagnosticSeverity};
+
+        let mut diagnostics = Vec::new();
+        let mut warnings = 0usize;
+        let mut errors = 0usize;
+
+        for (idx, line) in input.lines().enumerate() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+
+            let lowered = trimmed.to_lowercase();
+            let severity = if lowered.contains("error") && !lowered.contains("0 error") {
+                errors += 1;
+                Some(DiagnosticSeverity::Error)
+            } else if lowered.contains("warning") {
+                warnings += 1;
+                Some(DiagnosticSeverity::Warning)
+            } else {
+                None
+            };
+
+            if let Some(severity) = severity {
+                diagnostics.push(Diagnostic {
+                    file: "output".to_string(),
+                    line: idx + 1,
+                    column: 0,
+                    severity,
+                    code: "generic".to_string(),
+                    message: trimmed.to_string(),
+                    context: Vec::new(),
+                });
+            }
+        }
+
+        if diagnostics.is_empty() {
+            if input.trim().is_empty()
+                || input.to_lowercase().contains("no issues")
+                || input.to_lowercase().contains("0 errors")
+            {
+                return ParseResult::Full(DiagnosticReport {
+                    tool: "Lint".to_string(),
+                    total_errors: 0,
+                    total_warnings: 0,
+                    files_affected: 0,
+                    diagnostics: Vec::new(),
+                    by_code: Vec::new(),
+                });
+            }
+
+            return ParseResult::Passthrough(truncate_output(input, 2000));
+        }
+
+        ParseResult::Degraded(
+            DiagnosticReport {
+                tool: "Lint".to_string(),
+                total_errors: errors,
+                total_warnings: warnings,
+                files_affected: 1,
+                diagnostics,
+                by_code: vec![("generic".to_string(), errors + warnings)],
+            },
+            vec!["generic heuristic lint parser".to_string()],
+        )
+    }
 }
 
 #[cfg(test)]
@@ -308,5 +471,62 @@ mod tests {
         assert!(!is_python_linter("eslint"));
         assert!(!is_python_linter("biome"));
         assert!(!is_python_linter("unknown"));
+    }
+
+    #[test]
+    fn test_analyze_lint_output_eslint_passthroughs_invalid_json() {
+        let analysis = analyze_lint_output("eslint", "{not-json}", "{not-json}");
+        assert_eq!(analysis.parse_tier, 3);
+    }
+
+    #[test]
+    fn test_analyze_lint_output_generic_lint_is_degraded() {
+        let analysis = analyze_lint_output(
+            "biome",
+            "src/app.ts:1:1 error: unexpected thing\nsrc/app.ts:2:1 warning: style",
+            "src/app.ts:1:1 error: unexpected thing\nsrc/app.ts:2:1 warning: style",
+        );
+        assert_eq!(analysis.parse_tier, 2);
+        assert!(analysis.filtered.contains("Lint: 1 errors, 1 warnings"));
+    }
+
+    #[test]
+    fn test_has_explicit_output_format_supports_split_and_equals_forms() {
+        assert!(has_explicit_output_format(&[
+            "--output-format".into(),
+            "json".into()
+        ]));
+        assert!(has_explicit_output_format(&["--output-format=json".into()]));
+        assert!(!has_explicit_output_format(&["--fix".into(), ".".into()]));
+    }
+
+    #[test]
+    fn test_skip_output_format_arg_consumes_split_value_token() {
+        let args = vec![
+            "ruff".into(),
+            "check".into(),
+            "--output-format".into(),
+            "json".into(),
+            ".".into(),
+        ];
+        assert!(should_skip_output_format_arg("ruff", &args, 2));
+        assert!(should_skip_output_format_arg("ruff", &args, 3));
+        assert!(!should_skip_output_format_arg("ruff", &args, 4));
+    }
+
+    #[test]
+    fn test_split_output_format_value_is_not_treated_as_path() {
+        let effective_args = vec!["pylint".into(), "--output-format".into(), "json2".into()];
+        let start_idx = 1;
+        let has_path = effective_args
+            .iter()
+            .skip(start_idx)
+            .enumerate()
+            .any(|(offset, arg)| {
+                !should_skip_output_format_arg("pylint", &effective_args, start_idx + offset)
+                    && !arg.starts_with('-')
+                    && !arg.contains('=')
+            });
+        assert!(!has_path);
     }
 }
