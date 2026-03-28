@@ -115,19 +115,20 @@ mycelium learn --format json               # JSON export
 
 ---
 
-### `mycelium cc-economics` -- Claude Code Economic Analysis
+### `mycelium economics` -- Claude Code Economic Analysis
 
 **Purpose:** Compares Claude Code spending (via ccusage) with Mycelium savings.
 
 ```bash
-mycelium cc-economics                      # Summary
-mycelium cc-economics --project            # Current project savings, global ccusage spend
-mycelium cc-economics --project-path .     # Specific project savings scope
-mycelium cc-economics --daily              # Daily breakdown
-mycelium cc-economics --weekly             # Weekly breakdown
-mycelium cc-economics --monthly            # Monthly breakdown
-mycelium cc-economics --all                # All breakdowns
-mycelium cc-economics --format json        # JSON export
+mycelium economics                         # Summary
+mycelium economics --project               # Current project savings, global ccusage spend
+mycelium economics --project-path .        # Specific project savings scope
+mycelium economics --daily                 # Daily breakdown
+mycelium economics --weekly                # Weekly breakdown
+mycelium economics --monthly               # Monthly breakdown
+mycelium economics --all                   # All breakdowns
+mycelium economics --format json           # JSON export
+mycelium cc-economics                      # Compatibility alias
 ```
 
 **Notes:**

@@ -75,7 +75,7 @@ mycelium --skip-env next build  # Disable Next.js env validation
 | Packages | pnpm, npm, pip, deps, prisma | 60-80% |
 | Containers | docker, kubectl | 60-90% |
 | Data | json, env, log, curl, wget | 40-85% |
-| Analytics | gain, discover, learn, cc-economics | N/A (meta) |
+| Analytics | gain, discover, learn, economics | N/A (meta) |
 
 ---
 

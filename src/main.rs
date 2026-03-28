@@ -330,6 +330,7 @@ mod tests {
             vec!["mycelium", "config"],
             vec!["mycelium", "proxy", "echo", "hi"],
             vec!["mycelium", "hook-audit"],
+            vec!["mycelium", "economics"],
             vec!["mycelium", "cc-economics"],
         ];
         for args in &meta_cmds_that_parse {

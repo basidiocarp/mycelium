@@ -193,7 +193,7 @@ block-beta
 | **Network** | `wget_cmd.rs`, `curl_cmd.rs` | wget, curl | 70-95% |
 | **Infra** | `aws_cmd/`, `psql_cmd.rs`, `terraform_cmd.rs` | aws, psql, terraform | 75-80% |
 | **GitHub CLI** | `vcs/gh_cmd/`, `vcs/gh_pr/` | gh pr/issue/run | 26-87% |
-| **Analytics** | `gain/`, `discover/`, `learn/`, `cc_economics/` | gain, discover, learn, cc-economics | N/A |
+| **Analytics** | `gain/`, `discover/`, `learn/`, `cc_economics/` | gain, discover, learn, economics (`cc-economics` alias) | N/A |
 | **Shared** | `utils.rs`, `filter.rs`, `tracking/`, `parser/`, `tee.rs` | (infrastructure) | N/A |
 
 60+ modules across 17 directories
@@ -206,7 +206,7 @@ block-beta
 - **JS/TS Tooling**: 8 modules in `js/` + `lint_cmd/` (modern frontend/fullstack development)
 - **Python Tooling**: 4 modules in `python/` + `lint_cmd/pylint.rs` (ruff, pytest, pip, mypy)
 - **Go Tooling**: 2 modules in `go_eco/` (go test/build/vet, golangci-lint)
-- **Analytics**: 4 modules (gain, discover, learn, cc-economics)
+- **Analytics**: 4 modules (gain, discover, learn, economics / `cc-economics` alias)
 - **Parser Framework**: `parser/` with OutputParser trait, ParseResult<T>, TokenFormatter
 
 ---

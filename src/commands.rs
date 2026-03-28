@@ -26,7 +26,7 @@ use crate::filter;
   \x1b[1mDatabases & APIs:\x1b[0m   psql, prisma, curl, wget
   \x1b[1mInfrastructure:\x1b[0m     docker, kubectl, terraform, aws
   \x1b[1mLogs & Data:\x1b[0m        json, log, err, summary, env, deps
-  \x1b[1mAnalytics:\x1b[0m          gain, discover, learn
+  \x1b[1mAnalytics:\x1b[0m          gain, discover, learn, economics
   \x1b[1mSetup:\x1b[0m              init, config, doctor, verify, self-update, completions, proxy, invoke, benchmark, plugin
 
 \x1b[1;4mOptions:\x1b[0m
@@ -704,8 +704,8 @@ pub enum Commands {
         days: u32,
     },
 
-    /// Claude Code economics: spending (ccusage) vs savings (mycelium) analysis
-    #[command(hide = true)]
+    /// Economics: global Claude Code spend (ccusage) vs Mycelium savings
+    #[command(display_order = 104, name = "economics", alias = "cc-economics")]
     CcEconomics {
         /// Filter Mycelium savings to the current project (ccusage spend remains global)
         #[arg(short, long)]
@@ -1341,6 +1341,7 @@ pub const MYCELIUM_META_COMMANDS: &[&str] = &[
     "proxy",
     "invoke",
     "hook-audit",
+    "economics",
     "cc-economics",
     "doctor",
     "self-update",
@@ -1393,7 +1394,7 @@ mod tests {
 
     #[test]
     fn test_cc_economics_project_flag_parses() {
-        let cli = Cli::try_parse_from(["mycelium", "cc-economics", "--project"]).unwrap();
+        let cli = Cli::try_parse_from(["mycelium", "economics", "--project"]).unwrap();
         match cli.command {
             Commands::CcEconomics {
                 project,
@@ -1409,7 +1410,7 @@ mod tests {
 
     #[test]
     fn test_cc_economics_project_path_parses() {
-        let cli = Cli::try_parse_from(["mycelium", "cc-economics", "--project-path", "."]).unwrap();
+        let cli = Cli::try_parse_from(["mycelium", "economics", "--project-path", "."]).unwrap();
         match cli.command {
             Commands::CcEconomics {
                 project,
@@ -1419,6 +1420,15 @@ mod tests {
                 assert!(!project);
                 assert_eq!(project_path.as_deref(), Some("."));
             }
+            _ => panic!("Expected CcEconomics command"),
+        }
+    }
+
+    #[test]
+    fn test_cc_economics_alias_still_parses() {
+        let cli = Cli::try_parse_from(["mycelium", "cc-economics", "--project"]).unwrap();
+        match cli.command {
+            Commands::CcEconomics { project, .. } => assert!(project),
             _ => panic!("Expected CcEconomics command"),
         }
     }

@@ -42,7 +42,7 @@ dispatch::dispatch(cli) → route to command handler
 When Clap fails to parse, fallback handles non-meta commands:
 
 1. **No args**: Show Clap's error
-2. **Meta command** (gain, discover, init, learn, config, proxy, hook-audit, cc-economics): Always show Clap error (don't fall back)
+2. **Meta command** (gain, discover, init, learn, config, proxy, hook-audit, economics / cc-economics): Always show Clap error (don't fall back)
 3. **Plugin check**: Look for user plugin before raw passthrough
 4. **Raw execution**: Run the command unchanged, with timing and stats tracking
 
