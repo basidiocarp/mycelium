@@ -369,42 +369,43 @@ This ensures test failures aren't missed due to output redirection quirks.
 
 ### Database: `src/tracking.rs` and `src/gain/`
 
-Mycelium stores token savings in SQLite at `~/.local/share/mycelium/tracking.db`:
+Mycelium stores token savings in SQLite at the resolved tracking database path (`history.db` in the platform data directory by default). Use `mycelium gain --status` to inspect the exact path on the current machine.
 
 ```sql
 CREATE TABLE commands (
     id INTEGER PRIMARY KEY,
     timestamp TEXT,              -- ISO8601 timestamp
-    project TEXT,                -- detected current directory name
-    command TEXT,                -- the command run (git status, cargo test, etc.)
-    category TEXT,               -- Git, Cargo, Tests, Build, etc.
-    raw_tokens INTEGER,          -- word count of raw output
-    filtered_tokens INTEGER,     -- word count of filtered output
-    actual_runtime_ms INTEGER,   -- wall-clock time including filter
-    execution_status TEXT,       -- success, failure, passthrough
+    original_cmd TEXT,           -- raw command run (git status, cargo test, etc.)
+    mycelium_cmd TEXT,           -- executed Mycelium form
+    project_path TEXT,           -- canonical current working directory
+    input_tokens INTEGER,        -- estimated raw output tokens
+    output_tokens INTEGER,       -- filtered output tokens
+    saved_tokens INTEGER,        -- input_tokens - output_tokens
+    savings_pct REAL,            -- saved_tokens / input_tokens
+    exec_time_ms INTEGER         -- wall-clock time including filter
 );
 ```
 
-### Tracking Flow: `src/tracking.rs::TimedExecution`
+### Tracking Flow: `src/tracking/timer.rs::TimedExecution`
 
 ```rust
 let timer = tracking::TimedExecution::start();
 
 // ... run command and filter ...
 
-timer.track_filtered(
-    "git log",          // command
-    raw_len,            // raw bytes
-    filtered_len,       // filtered bytes
-    "Git",              // category
+timer.track(
+    "git log",                  // original command
+    "mycelium git log",         // executed Mycelium command
+    raw_output,                 // raw text
+    filtered_output,            // filtered text
 );
 
 // Inserts row to SQLite with:
 // - Current timestamp
-// - Detected project name (cwd)
-// - Raw/filtered token counts (word count approximation)
+// - Canonical project path (cwd)
+// - Estimated raw/filtered token counts
+// - Saved tokens and savings percentage
 // - Actual runtime
-// - Execution status
 ```
 
 ### Display: `src/gain/display.rs`
@@ -426,6 +427,8 @@ mycelium gain --compare <cmd>    # Compare two commands' savings
 mycelium gain --json             # JSON export
 mycelium gain --csv              # CSV export
 ```
+
+`mycelium economics` merges that tracking data with `ccusage`. When `--project` or `--project-path` is set, the Mycelium savings side is project-scoped while `ccusage` spend remains global.
 
 Example output:
 ```
@@ -550,8 +553,8 @@ git::log::run_log(["-10"], None, 0, [])
     │   │   └─ filtered_output = "abc123 John | ...\ndef456 Jane | ...\n" (800 tokens)
     │   └─ Return filtered_output
     ├─ println!("{}", filtered_output)
-    ├─ timer.track_filtered("git log", 4000, 800, "Git")
-    │   └─ Insert to tracking.db
+    ├─ timer.track(...)
+    │   └─ Insert to history.db in the resolved data directory
     └─ Ok(())
     ↓
 Output: compact log to stdout
@@ -562,7 +565,7 @@ Output: compact log to stdout
 ```
 User: git log
     ↓
-Zsh/Bash hook:
+Shell hook:
     ├─ Hook triggered before execution
     ├─ Call: mycelium rewrite "git log"
     │   └─ src/dispatch.rs::rewrite_cmd()
@@ -760,7 +763,7 @@ src/
 
 ### With Cap
 
-- **Data source**: Reads mycelium tracking.db
+- **Data source**: Reads the Mycelium tracking database (`history.db`)
 - **Analytics**: Visualizes token savings over time
 
 ---

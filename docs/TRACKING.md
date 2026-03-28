@@ -15,10 +15,10 @@ Comprehensive documentation for Mycelium's token savings tracking system.
 ## Overview
 
 Mycelium's tracking system records every command execution to provide analytics on token savings. The system:
-- Stores command history in SQLite (~/.local/share/mycelium/history.db)
+- Stores command history in a platform-specific SQLite database
 - Tracks input/output tokens, savings percentage, and execution time
 - Automatically cleans up records older than 90 days
-- Provides aggregation APIs (daily/weekly/monthly)
+- Provides aggregation APIs (daily/weekly/monthly and project-scoped views)
 - Exports to JSON/CSV for external integrations
 
 ## Architecture
@@ -31,7 +31,7 @@ flowchart TD
     B --> C["command runs"]
     C --> D["TimedExecution::track(original_cmd, mycelium_cmd, input, output)"]
     D --> E["Tracker::record(original_cmd, mycelium_cmd, input_tokens, output_tokens, exec_time_ms)"]
-    E --> F[("SQLite database\n~/.local/share/mycelium/history.db")]
+    E --> F[("SQLite database\nplatform data dir / history.db")]
     F --> G["Aggregation APIs\nget_summary, get_all_days, etc."]
     G --> H["CLI output (mycelium gain)\nor JSON/CSV export"]
 ```
@@ -40,7 +40,9 @@ flowchart TD
 
 - **Linux**: `~/.local/share/mycelium/history.db`
 - **macOS**: `~/Library/Application Support/mycelium/history.db`
-- **Windows**: `%APPDATA%\mycelium\history.db`
+- **Windows**: `%LOCALAPPDATA%\mycelium\history.db`
+
+Use `mycelium gain --status` to see the exact database path and whether it came from config, environment, or the platform default.
 
 ### Data Retention
 
@@ -533,7 +535,7 @@ let _ = conn.execute(
 
 - **Local storage only**: Database never leaves the machine
 - **No telemetry**: Mycelium does not phone home (telemetry was removed)
-- **User control**: Users can delete `~/.local/share/mycelium/history.db` anytime
+- **User control**: Users can delete the resolved tracking database anytime
 - **90-day retention**: Old data automatically purged
 
 ## Troubleshooting
@@ -542,15 +544,15 @@ let _ = conn.execute(
 
 If you see "database is locked" errors:
 - Ensure only one Mycelium process writes at a time
-- Check file permissions on `~/.local/share/mycelium/history.db`
-- Delete and recreate: `rm ~/.local/share/mycelium/history.db && mycelium gain`
+- Check file permissions on the resolved database path from `mycelium gain --status`
+- Delete and recreate the resolved database file, then run `mycelium gain`
 
 ### Missing exec_time_ms column
 
 Older databases may not have the `exec_time_ms` column. Mycelium automatically migrates on first use, but you can force it:
 
 ```bash
-sqlite3 ~/.local/share/mycelium/history.db \
+sqlite3 <resolved-history.db-path> \
   "ALTER TABLE commands ADD COLUMN exec_time_ms INTEGER DEFAULT 0"
 ```
 
@@ -560,12 +562,12 @@ Token estimation uses `~4 chars = 1 token`. This is approximate. For precise cou
 
 ## Future Enhancements
 
-Planned improvements (contributions welcome):
+Planned improvements:
 
 - [ ] Export to Prometheus/OpenMetrics format
 - [ ] Support for custom retention periods (not just 90 days)
 - [ ] SQLite WAL mode for concurrent writes
-- [ ] Per-project tracking (multiple databases)
+- [ ] Better per-project spend attribution for `mycelium economics`
 - [ ] Integration with Claude API for precise token counts
 - [ ] Web dashboard (localhost) for visualizing trends
 

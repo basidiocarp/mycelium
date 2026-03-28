@@ -35,7 +35,7 @@ flowchart LR
     E --> F["Filter/Compress"]
     F --> G["Compact Stats\n(90% reduction)"]
     G --> H["tracking::track()"]
-    H --> I["SQLite INSERT\n~/.local/share/mycelium/"]
+    H --> I["SQLite INSERT\nplatform data dir / history.db"]
     G --> J["Terminal Output\n3 commits +142/-89"]
 ```
 
@@ -50,7 +50,7 @@ flowchart LR
 | **Filter Engine**    | filter.rs                                          | Language-aware code filtering                      |
 | **Parser Framework** | parser/ (mod.rs, types.rs, formatter.rs)           | OutputParser trait, ParseResult<T>, TokenFormatter |
 | **Tracking**         | tracking/ (mod.rs, queries.rs, timer.rs, utils.rs) | SQLite-based token metrics                         |
-| **Analytics**        | gain/, discover/, learn/, cc_economics/            | Token savings analysis and reporting               |
+| **Analytics**        | gain/, discover/, learn/, cc_economics/            | Token savings analysis, economics reporting, and explain surfaces |
 | **Config**           | config.rs, init/                                   | User preferences, LLM integration                  |
 
 ### Design Principles
@@ -72,7 +72,7 @@ sequenceDiagram
     participant HK as mycelium-rewrite.sh
     participant MY as Mycelium binary
 
-    CC->>SJ: Bash: "git status"
+    CC->>SJ: Shell command: "git status"
     SJ->>HK: PreToolUse hook
     HK->>HK: detect: git → rewrite
     HK-->>SJ: updatedInput: "mycelium git status"
@@ -86,7 +86,7 @@ sequenceDiagram
 **Installed files:**
 | File | Purpose |
 |------|---------|
-| `~/.claude/hooks/mycelium-rewrite.sh` | Thin delegator (calls `mycelium rewrite`, ~50 lines) |
+| `~/.claude/hooks/mycelium-rewrite.sh` | Thin delegator (calls `mycelium rewrite`) |
 | `~/.claude/settings.json` | Hook registry (PreToolUse registration) |
 | `~/.claude/Mycelium.md` | Minimal context hint (10 lines) |
 
@@ -117,7 +117,7 @@ flowchart TD
     P3["**Phase 3: EXECUTE**\nCommand::new('git').args(['log','--oneline','-5'])\nCapture stdout (500 chars), stderr, exit_code"]
     P4["**Phase 4: FILTER**\ngit::format_git_output()\nStrategy: Stats Extraction\n→ '5 commits, +142/-89' (20 chars, 96% reduction)"]
     P5["**Phase 5: PRINT**\nTerminal: '5 commits, +142/-89 ✓'\n(verbose > 0 → debug on stderr)"]
-    P6["**Phase 6: TRACK**\ntracking::track()\nSQLite INSERT: 125 input → 5 output = 96%\n~/.local/share/mycelium/history.db"]
+    P6["**Phase 6: TRACK**\ntracking::track()\nSQLite INSERT: 125 input → 5 output = 96%\nplatform data dir / history.db"]
 
     P1 --> P2 --> P3 --> P4 --> P5 --> P6
 ```
@@ -454,7 +454,7 @@ flowchart TD
     E["**1. ESTIMATE**\nestimate_tokens(text)\n~4 chars = 1 token"]
     C["**2. CALCULATE**\ninput_tokens - output_tokens = saved\nsavings_pct = (saved / input) × 100"]
     R["**3. RECORD**\nINSERT INTO commands\n(timestamp, cmds, tokens, savings, exec_time_ms)"]
-    S[("**4. STORAGE**\n~/.local/share/mycelium/history.db")]
+    S[("**4. STORAGE**\nplatform data dir / history.db")]
     CL["**5. CLEANUP**\nDELETE WHERE timestamp < now - 90 days\n(on every INSERT)"]
     RP["**6. REPORTING**\n$ mycelium gain\nSELECT COUNT, SUM, AVG FROM commands"]
 

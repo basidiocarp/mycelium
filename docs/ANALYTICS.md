@@ -19,9 +19,11 @@
 
 Mycelium records each command execution in a SQLite database:
 
-- **Location:** `~/.local/share/mycelium/history.db` (Linux), `~/Library/Application Support/mycelium/history.db` (macOS)
+- **Location:** `~/.local/share/mycelium/history.db` (Linux), `~/Library/Application Support/mycelium/history.db` (macOS), `%LOCALAPPDATA%\\mycelium\\history.db` (Windows)
 - **Retention:** 90-day automatic cleanup
 - **Metrics:** input/output tokens, savings percentage, execution time, project
+
+Use `mycelium gain --status` to inspect the resolved path on the current machine.
 
 ---
 
@@ -154,7 +156,7 @@ mycelium hook-audit --since 0              # Full history
 
 ### How It Works
 
-The Mycelium hook intercepts Bash commands in Claude Code **before execution** and automatically rewrites them into their Mycelium equivalent.
+The Mycelium hook intercepts shell commands in Claude Code **before execution** and automatically rewrites them into their Mycelium equivalent.
 
 **Flow:**
 ```mermaid
@@ -164,7 +166,7 @@ sequenceDiagram
     participant HK as mycelium-rewrite.sh
     participant MY as Mycelium
 
-    CC->>SJ: Bash: "git status"
+    CC->>SJ: Shell command: "git status"
     SJ->>HK: PreToolUse hook
     HK->>MY: mycelium rewrite "git status"
     MY-->>HK: "mycelium git status"
@@ -175,7 +177,7 @@ sequenceDiagram
 
 **Key points:**
 - Claude never sees the rewrite -- it simply receives optimized output
-- The hook is a lightweight delegator (~50 lines of bash) that calls `mycelium rewrite`
+- The hook is a thin delegator that calls `mycelium rewrite`
 - All rewrite logic lives in the Rust registry (`src/discover/registry.rs`)
 - Commands already prefixed with `mycelium` pass through unchanged
 - Heredocs (`<<`) are not modified
@@ -315,14 +317,14 @@ When a command fails, Mycelium automatically saves the complete raw output to a 
 
 **How it works:**
 1. The command fails (exit code != 0)
-2. Mycelium saves the raw output to `~/.local/share/mycelium/tee/`
+2. Mycelium saves the raw output to the resolved tee directory (platform data dir by default, or `MYCELIUM_TEE_DIR`)
 3. The file path is displayed in the filtered output
 4. The LLM can read the file if more details are needed
 
 **Output:**
 ```
 FAILED: 2/15 tests
-[full output: ~/.local/share/mycelium/tee/1707753600_cargo_test.log]
+[full output: <resolved tee dir>/1707753600_cargo_test.log]
 ```
 
 **Configuration:**
