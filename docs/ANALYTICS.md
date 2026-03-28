@@ -188,9 +188,9 @@ sequenceDiagram
 **Key points:**
 - Claude never sees the rewrite -- it simply receives optimized output
 - The hook is a thin delegator that calls `mycelium rewrite`
-- All rewrite logic lives in the Rust registry (`src/discover/registry.rs`)
+- Rewrite decisions live in the Rust registry modules (`src/discover/registry.rs` and `src/discover/registry_parser.rs`)
 - Commands already prefixed with `mycelium` pass through unchanged
-- Heredocs (`<<`) are not modified
+- Commands with risky shell syntax like pipes, redirects, command substitution, subshells, or process substitution pass through unchanged
 - Unrecognized commands pass through unchanged
 
 ### Installation

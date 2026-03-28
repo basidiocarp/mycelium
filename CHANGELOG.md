@@ -2,6 +2,13 @@
 
 All notable changes to Mycelium are documented in this file.
 
+## v0.7.3 - 2026-03-28
+
+### Changed
+
+- **Shell parser backend**: Rewrite safety validation now uses `tree-sitter-bash` instead of the deprecated vendored `conch-parser`, and the obsolete vendored parser directory has been removed.
+- **Rewrite docs alignment**: Internal architecture, analytics, and feature notes now describe parser-backed shell safety instead of the old regex-only rewrite model.
+
 ## v0.7.2 - 2026-03-26
 
 ### Fixed

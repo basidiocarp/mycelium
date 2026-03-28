@@ -131,7 +131,7 @@ classify_command("git log -10")
 rewrite_command("git log -10", excluded=[])
     ├─ Check for heredoc or arithmetic expansion (skip if found)
     ├─ Fast-path obviously simple commands
-    ├─ Fall back to `conch-parser` for quoted or shell-heavy inputs
+    ├─ Fall back to `tree-sitter-bash` for quoted or shell-heavy inputs
     ├─ Split compound commands (&&, ||, ;, |)
     ├─ Rewrite each segment with rewrite_segment()
     └─ Return Some("mycelium git log -10")
@@ -645,8 +645,8 @@ Agent can later call: hyphae_get_command_chunks(document_id="xyz123")
 ### 3. Registry-Based Rewriting
 
 - **Why**: Centralized, testable command transformation logic
-- **How**: Regex patterns + rules table in `discover/registry.rs`
-- **Benefit**: Easy to add new commands, easy to test
+- **How**: Regex patterns and rules in `discover/registry.rs` classify plain commands quickly, while `discover/registry_parser.rs` uses `tree-sitter-bash` to reject quoted or shell-heavy commands that are not safe to rewrite
+- **Benefit**: Fast path for common commands, fail-safe passthrough for risky shell syntax, easy to test
 
 ### 4. Hook-Based Interception
 
@@ -676,6 +676,7 @@ Agent can later call: hyphae_get_command_chunks(document_id="xyz123")
    - Snapshot tests with `insta`
    - Token accuracy tests (verify ≥60% savings)
 6. Add to registry: `src/discover/registry.rs` (if hook rewriting needed)
+7. If the rewrite introduces new quoting or shell-shape edge cases, add or update parser safety coverage in `src/discover/registry_parser.rs`
 
 ### Testing Snapshot Changes
 
@@ -706,7 +707,10 @@ src/
 ├── dispatch.rs                # Command routing
 ├── discover/
 │   ├── mod.rs
-│   └── registry.rs            # Command classification & rewriting
+│   ├── registry.rs            # Command classification & rewrite orchestration
+│   ├── registry_compound.rs   # Compound command splitting and rewrite helpers
+│   ├── registry_parser.rs     # tree-sitter-bash safety validation for shell-heavy inputs
+│   └── registry_shell.rs      # Cheap shell-shape detection and wrapper handling
 ├── hyphae.rs                  # Output routing logic
 ├── hyphae_client.rs           # Persistent Hyphae MCP connection
 ├── gain/                      # Token analytics

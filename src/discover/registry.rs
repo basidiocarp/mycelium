@@ -531,9 +531,7 @@ fn rewrite_segment(seg: &str, excluded: &[String]) -> Option<String> {
             ..
         } => {
             // Check if the base command is excluded from rewriting (#243)
-            let Some(base) = rewrite_primary_command(trimmed) else {
-                return None;
-            };
+            let base = rewrite_primary_command(trimmed)?;
             if excluded.iter().any(|e| e == &base) {
                 return None;
             }

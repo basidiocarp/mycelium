@@ -120,7 +120,7 @@ RTK issue family:
 
 Mycelium already has an explicit guard:
 
-- `gh` commands with `--json`, `--jq`, or `--template` skip rewrite, documented in [docs/INTERNALS.md](./docs/INTERNALS.md) lines 169-173.
+- `gh` commands with `--json`, `--jq`, or `--template` skip rewrite, documented in the structured-output section of [docs/INTERNALS.md](./docs/INTERNALS.md).
 
 That is a good protection against filtering data that is meant for machine consumption.
 

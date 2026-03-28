@@ -63,7 +63,7 @@ flowchart LR
 
 ### Hook Architecture (v0.9.5+)
 
-The recommended deployment mode uses a Claude Code PreToolUse hook for 100% transparent command rewriting.
+The recommended deployment mode uses a Claude Code PreToolUse hook for parser-backed command rewriting when the command shape is safe to transform.
 
 ```mermaid
 sequenceDiagram
@@ -74,13 +74,13 @@ sequenceDiagram
 
     CC->>SJ: Shell command: "git status"
     SJ->>HK: PreToolUse hook
-    HK->>HK: detect: git → rewrite
+    HK->>HK: classify + validate shell shape
     HK-->>SJ: updatedInput: "mycelium git status"
     SJ->>MY: execute: mycelium git status
     MY->>MY: run git, filter, track
     MY-->>CC: "3 modified, 1 untracked ✓" (~10 tokens vs ~200 raw)
 
-    Note over CC: Claude never sees the rewrite —<br/>it only sees optimized output.
+    Note over CC: Safe commands rewrite transparently —<br/>risky shell syntax stays raw.
 ```
 
 **Installed files:**
@@ -95,8 +95,8 @@ Two hook strategies:
 ```mermaid
 flowchart LR
     subgraph AR["Auto-Rewrite (default)"]
-        A1["Hook intercepts command"] --> A2["Rewrites before execution"]
-        A2 --> A3["100% adoption\nZero context overhead"]
+        A1["Hook intercepts command"] --> A2["Rewrites safe commands before execution"]
+        A2 --> A3["High adoption\nZero context overhead"]
     end
     subgraph SG["Suggest (non-intrusive)"]
         S1["Hook emits systemMessage hint"] --> S2["Claude decides autonomously"]

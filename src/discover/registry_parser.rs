@@ -1,18 +1,4 @@
-use conch_parser::ast::{
-    AndOr as ParsedAndOr, Command as ParsedCommand, ComplexWord as ParsedComplexWord,
-    DefaultAndOrList as ParsedAndOrList, DefaultListableCommand as ParsedListableCommand,
-    DefaultParameterSubstitution as ParsedParameterSubstitution,
-    DefaultPipeableCommand as ParsedPipeableCommand, DefaultSimpleCommand as ParsedSimpleCommand,
-    DefaultSimpleWord as ParsedSimpleWord, DefaultWord as ParsedWord,
-    ListableCommand as ParsedListableCommandKind,
-    ParameterSubstitution as ParsedParameterSubstitutionKind,
-    PipeableCommand as ParsedPipeableCommandKind, RedirectOrCmdWord as ParsedRedirectOrCmdWord,
-    RedirectOrEnvVar as ParsedRedirectOrEnvVar, SimpleWord as ParsedSimpleWordKind,
-    TopLevelCommand as ParsedTopLevelCommand, TopLevelWord as ParsedTopLevelWord,
-    Word as ParsedWordKind,
-};
-use conch_parser::lexer::Lexer as ShellLexer;
-use conch_parser::parse::DefaultParser as ShellParser;
+use tree_sitter::{Node, Parser, TreeCursor};
 
 use super::shell::{has_unsupported_shell_quoting, needs_shell_parser_fallback};
 
@@ -26,121 +12,151 @@ pub(super) fn parser_allows_rewrite_shape(cmd: &str) -> bool {
         return false;
     }
 
-    let mut parser = ShellParser::new(ShellLexer::new(trimmed.chars()));
-
-    loop {
-        match parser.complete_command() {
-            Ok(Some(command)) => {
-                if !parsed_top_level_command_is_safe(&command) {
-                    return false;
-                }
-            }
-            Ok(None) => return true,
-            Err(_) => return false,
-        }
+    let mut parser = Parser::new();
+    if parser
+        .set_language(&tree_sitter_bash::LANGUAGE.into())
+        .is_err()
+    {
+        return false;
     }
+
+    let Some(tree) = parser.parse(trimmed, None) else {
+        return false;
+    };
+
+    let root = tree.root_node();
+    !root.has_error() && parsed_tree_is_safe(root, trimmed.as_bytes())
 }
 
 pub(super) fn rewrite_shape_requires_parser(cmd: &str) -> bool {
     needs_shell_parser_fallback(cmd)
 }
 
-fn parsed_top_level_command_is_safe(command: &ParsedTopLevelCommand<String>) -> bool {
-    match &command.0 {
-        ParsedCommand::Job(_) => false,
-        ParsedCommand::List(list) => parsed_and_or_list_is_safe(list),
-    }
+fn parsed_tree_is_safe(root: Node<'_>, source: &[u8]) -> bool {
+    let mut cursor = root.walk();
+    walk_tree(root, source, &mut cursor)
 }
 
-fn parsed_and_or_list_is_safe(list: &ParsedAndOrList) -> bool {
-    parsed_listable_command_is_safe(&list.first)
-        && list.rest.iter().all(|item| match item {
-            ParsedAndOr::And(command) | ParsedAndOr::Or(command) => {
-                parsed_listable_command_is_safe(command)
+fn walk_tree(node: Node<'_>, source: &[u8], cursor: &mut TreeCursor<'_>) -> bool {
+    if node.is_error() || node.is_missing() {
+        return false;
+    }
+
+    if node.is_named() && !named_node_is_safe(node, source) {
+        return false;
+    }
+
+    if cursor.goto_first_child() {
+        loop {
+            let child = cursor.node();
+            if !walk_tree(child, source, cursor) {
+                cursor.goto_parent();
+                return false;
             }
-        })
-}
 
-fn parsed_listable_command_is_safe(command: &ParsedListableCommand) -> bool {
-    match command {
-        ParsedListableCommandKind::Single(pipeable) => parsed_pipeable_command_is_safe(pipeable),
-        ParsedListableCommandKind::Pipe(_, _) => false,
-    }
-}
-
-fn parsed_pipeable_command_is_safe(command: &ParsedPipeableCommand) -> bool {
-    match command {
-        ParsedPipeableCommandKind::Simple(simple) => parsed_simple_command_is_safe(simple),
-        ParsedPipeableCommandKind::Compound(_) | ParsedPipeableCommandKind::FunctionDef(_, _) => {
-            false
-        }
-    }
-}
-
-fn parsed_simple_command_is_safe(command: &ParsedSimpleCommand) -> bool {
-    command
-        .redirects_or_env_vars
-        .iter()
-        .all(|entry| match entry {
-            ParsedRedirectOrEnvVar::EnvVar(_, word) => {
-                word.as_ref().is_none_or(parsed_top_level_word_is_safe)
+            if !cursor.goto_next_sibling() {
+                break;
             }
-            ParsedRedirectOrEnvVar::Redirect(_) => false,
+        }
+        cursor.goto_parent();
+    }
+
+    true
+}
+
+fn named_node_is_safe(node: Node<'_>, source: &[u8]) -> bool {
+    match node.kind() {
+        "program"
+        | "list"
+        | "command"
+        | "word"
+        | "string"
+        | "raw_string"
+        | "concatenation"
+        | "variable_assignment"
+        | "simple_expansion"
+        | "expansion"
+        | "special_variable_name"
+        | "variable_name"
+        | "file_descriptor"
+        | "number" => true,
+        "command_name" => command_name_is_safe(node, source),
+        "pipeline"
+        | "redirected_statement"
+        | "file_redirect"
+        | "herestring_redirect"
+        | "heredoc_redirect"
+        | "subshell"
+        | "process_substitution"
+        | "command_substitution"
+        | "arithmetic_expansion"
+        | "function_definition"
+        | "compound_statement"
+        | "brace_expression"
+        | "subscript"
+        | "array"
+        | "binary_expression"
+        | "unary_expression"
+        | "postfix_expression"
+        | "parenthesized_expression"
+        | "for_statement"
+        | "c_style_for_statement"
+        | "while_statement"
+        | "if_statement"
+        | "elif_clause"
+        | "else_clause"
+        | "case_statement"
+        | "case_item"
+        | "test_command"
+        | "declaration_command"
+        | "unset_command"
+        | "negated_command"
+        | "coproc"
+        | "comment" => false,
+        _ => true,
+    }
+}
+
+fn command_name_is_safe(node: Node<'_>, source: &[u8]) -> bool {
+    node.utf8_text(source)
+        .map(|text| {
+            !matches!(
+                text,
+                "function" | "declare" | "local" | "readonly" | "typeset"
+            )
         })
-        && command
-            .redirects_or_cmd_words
-            .iter()
-            .all(|entry| match entry {
-                ParsedRedirectOrCmdWord::CmdWord(word) => parsed_top_level_word_is_safe(word),
-                ParsedRedirectOrCmdWord::Redirect(_) => false,
-            })
+        .unwrap_or(false)
 }
 
-fn parsed_top_level_word_is_safe(word: &ParsedTopLevelWord<String>) -> bool {
-    match &word.0 {
-        ParsedComplexWord::Concat(parts) => parts.iter().all(parsed_word_is_safe),
-        ParsedComplexWord::Single(part) => parsed_word_is_safe(part),
+#[cfg(test)]
+mod tests {
+    use super::parser_allows_rewrite_shape;
+
+    #[test]
+    fn parser_allows_safe_compound_list() {
+        assert!(parser_allows_rewrite_shape(
+            "git log --grep 'feat|fix' && cargo test"
+        ));
     }
-}
 
-fn parsed_word_is_safe(word: &ParsedWord) -> bool {
-    match word {
-        ParsedWordKind::Simple(simple) => parsed_simple_word_is_safe(simple),
-        ParsedWordKind::DoubleQuoted(words) => words.iter().all(parsed_simple_word_is_safe),
-        ParsedWordKind::SingleQuoted(_) => true,
+    #[test]
+    fn parser_rejects_redirects_and_shell_grouping() {
+        assert!(!parser_allows_rewrite_shape("git status > out.txt"));
+        assert!(!parser_allows_rewrite_shape(
+            "git status && (cargo test; git status)"
+        ));
+        assert!(!parser_allows_rewrite_shape("{ git status; cargo test; }"));
     }
-}
 
-fn parsed_simple_word_is_safe(word: &ParsedSimpleWord) -> bool {
-    match word {
-        ParsedSimpleWordKind::Literal(_)
-        | ParsedSimpleWordKind::Escaped(_)
-        | ParsedSimpleWordKind::Param(_)
-        | ParsedSimpleWordKind::Star
-        | ParsedSimpleWordKind::Question
-        | ParsedSimpleWordKind::SquareOpen
-        | ParsedSimpleWordKind::SquareClose
-        | ParsedSimpleWordKind::Tilde
-        | ParsedSimpleWordKind::Colon => true,
-        ParsedSimpleWordKind::Subst(subst) => parsed_parameter_substitution_is_safe(subst),
-    }
-}
-
-fn parsed_parameter_substitution_is_safe(subst: &ParsedParameterSubstitution) -> bool {
-    match subst {
-        ParsedParameterSubstitutionKind::Command(_) | ParsedParameterSubstitutionKind::Arith(_) => {
-            false
-        }
-        ParsedParameterSubstitutionKind::Len(_) => true,
-        ParsedParameterSubstitutionKind::Default(_, _, word)
-        | ParsedParameterSubstitutionKind::Assign(_, _, word)
-        | ParsedParameterSubstitutionKind::Error(_, _, word)
-        | ParsedParameterSubstitutionKind::Alternative(_, _, word)
-        | ParsedParameterSubstitutionKind::RemoveSmallestSuffix(_, word)
-        | ParsedParameterSubstitutionKind::RemoveLargestSuffix(_, word)
-        | ParsedParameterSubstitutionKind::RemoveSmallestPrefix(_, word)
-        | ParsedParameterSubstitutionKind::RemoveLargestPrefix(_, word) => {
-            word.as_ref().is_none_or(parsed_top_level_word_is_safe)
-        }
+    #[test]
+    fn parser_rejects_substitutions_and_extended_forms() {
+        assert!(!parser_allows_rewrite_shape(
+            "echo $(git status && cargo test)"
+        ));
+        assert!(!parser_allows_rewrite_shape("git status <<< foo"));
+        assert!(!parser_allows_rewrite_shape(
+            "git diff <(cat old) <(cat new)"
+        ));
+        assert!(!parser_allows_rewrite_shape(r"rg $'foo\nbar' src"));
     }
 }

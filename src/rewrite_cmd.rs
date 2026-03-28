@@ -111,7 +111,7 @@ fn resolve_with_inputs(
         };
     }
 
-    if let Some(rewritten) = corrections_store::apply_correction(&input, &user_corrections) {
+    if let Some(rewritten) = corrections_store::apply_correction(&input, user_corrections) {
         return RewriteResolution {
             input,
             rewritten: Some(rewritten),
@@ -121,14 +121,14 @@ fn resolve_with_inputs(
         };
     }
 
-    if let Some(rewritten) = registry::rewrite_command(&input, &excluded) {
+    if let Some(rewritten) = registry::rewrite_command(&input, excluded) {
         let source = if rewritten == input {
             RewriteSource::Passthrough
         } else {
             RewriteSource::BuiltInRegistry
         };
-        let reason = explain_registry_match(&input, &excluded, source);
-        let estimated_savings_pct = registry_estimated_savings(&input, &excluded, source);
+        let reason = explain_registry_match(&input, excluded, source);
+        let estimated_savings_pct = registry_estimated_savings(&input, excluded, source);
         return RewriteResolution {
             input,
             rewritten: Some(rewritten),
@@ -142,7 +142,7 @@ fn resolve_with_inputs(
         input: input.clone(),
         rewritten: None,
         source: RewriteSource::NoRewrite,
-        reason: explain_no_rewrite(&input, &excluded),
+        reason: explain_no_rewrite(&input, excluded),
         estimated_savings_pct: None,
     }
 }
