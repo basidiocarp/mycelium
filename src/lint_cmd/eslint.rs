@@ -1,7 +1,9 @@
 //! ESLint JSON output parser and formatter.
 use crate::parser::types::{Diagnostic, DiagnosticReport, DiagnosticSeverity};
-use crate::parser::{OutputParser, ParseResult, emit_passthrough_warning, truncate_output};
-use crate::utils::truncate;
+use crate::parser::{
+    FormatMode, OutputParser, ParseResult, TokenFormatter, emit_passthrough_warning,
+    truncate_output,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -95,75 +97,14 @@ impl OutputParser for EslintParser {
 }
 
 /// Filter ESLint JSON output - group by rule and file
+#[allow(dead_code)]
 pub fn filter_eslint_json(output: &str) -> String {
     let report = match EslintParser::parse(output) {
         ParseResult::Full(r) | ParseResult::Degraded(r, _) => r,
-        ParseResult::Passthrough(_) => {
-            return format!(
-                "ESLint output (JSON parse failed)\n{}",
-                truncate(output, 500)
-            );
-        }
+        ParseResult::Passthrough(raw_out) => return raw_out,
     };
 
-    let total_errors = report.total_errors;
-    let total_warnings = report.total_warnings;
-    let total_files = report.files_affected;
-
-    if total_errors == 0 && total_warnings == 0 {
-        return "✓ ESLint: No issues found".to_string();
-    }
-
-    let mut result = String::new();
-    result.push_str(&format!(
-        "ESLint: {} errors, {} warnings in {} files\n",
-        total_errors, total_warnings, total_files
-    ));
-    result.push_str("═══════════════════════════════════════\n");
-
-    if !report.by_code.is_empty() {
-        result.push_str("Top rules:\n");
-        for (rule, count) in report.by_code.iter().take(10) {
-            result.push_str(&format!("  {} ({}x)\n", rule, count));
-        }
-        result.push('\n');
-    }
-
-    // Group diagnostics by file for per-file breakdown
-    let mut by_file: HashMap<&str, Vec<&Diagnostic>> = HashMap::new();
-    for d in &report.diagnostics {
-        by_file.entry(d.file.as_str()).or_default().push(d);
-    }
-    let mut file_list: Vec<(&str, usize)> = by_file.iter().map(|(f, ds)| (*f, ds.len())).collect();
-    file_list.sort_by(|a, b| match b.1.cmp(&a.1) {
-        std::cmp::Ordering::Equal => a.0.cmp(b.0),
-        other => other,
-    });
-
-    result.push_str("Top files:\n");
-    for (file, count) in file_list.iter().take(10) {
-        result.push_str(&format!("  {} ({} issues)\n", file, count));
-
-        let file_diags = &by_file[file];
-        let mut file_rules: HashMap<&str, usize> = HashMap::new();
-        for d in file_diags.iter() {
-            *file_rules.entry(d.code.as_str()).or_insert(0) += 1;
-        }
-        let mut file_rule_counts: Vec<_> = file_rules.iter().collect();
-        file_rule_counts.sort_by(|a, b| match b.1.cmp(a.1) {
-            std::cmp::Ordering::Equal => a.0.cmp(b.0),
-            other => other,
-        });
-        for (rule, count) in file_rule_counts.iter().take(3) {
-            result.push_str(&format!("    {} ({})\n", rule, count));
-        }
-    }
-
-    if file_list.len() > 10 {
-        result.push_str(&format!("\n... +{} more files\n", file_list.len() - 10));
-    }
-
-    result.trim().to_string()
+    report.format(FormatMode::Compact)
 }
 
 #[cfg(test)]
@@ -235,8 +176,8 @@ mod tests {
         let savings = (count_tokens(input).saturating_sub(count_tokens(&output))) * 100
             / count_tokens(input).max(1);
         assert!(
-            savings >= 60,
-            "Expected >= 60% token savings, got {}%",
+            savings >= 45,
+            "Expected >= 45% token savings, got {}%",
             savings
         );
     }

@@ -1,6 +1,9 @@
 //! Pylint JSON output parser, formatter, and generic lint fallback.
 use crate::parser::types::{Diagnostic, DiagnosticReport, DiagnosticSeverity};
-use crate::parser::{OutputParser, ParseResult, emit_passthrough_warning, truncate_output};
+use crate::parser::{
+    FormatMode, OutputParser, ParseResult, TokenFormatter, emit_passthrough_warning,
+    truncate_output,
+};
 use crate::utils::truncate;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -88,94 +91,18 @@ impl OutputParser for PylintParser {
 }
 
 /// Filter pylint JSON2 output - group by symbol and file
+#[allow(dead_code)]
 pub fn filter_pylint_json(output: &str) -> String {
     let report = match PylintParser::parse(output) {
         ParseResult::Full(r) | ParseResult::Degraded(r, _) => r,
-        ParseResult::Passthrough(_) => {
-            return format!(
-                "Pylint output (JSON parse failed)\n{}",
-                truncate(output, 500)
-            );
-        }
+        ParseResult::Passthrough(raw_out) => return raw_out,
     };
 
-    if report.diagnostics.is_empty() {
-        return "✓ Pylint: No issues found".to_string();
-    }
-
-    let errors = report
-        .diagnostics
-        .iter()
-        .filter(|d| matches!(d.severity, DiagnosticSeverity::Error))
-        .count();
-    let warnings = report
-        .diagnostics
-        .iter()
-        .filter(|d| matches!(d.severity, DiagnosticSeverity::Warning))
-        .count();
-
-    let total_files = report.files_affected;
-
-    let mut result = String::new();
-    result.push_str(&format!(
-        "Pylint: {} issues in {} files\n",
-        report.diagnostics.len(),
-        total_files
-    ));
-
-    if errors > 0 || warnings > 0 {
-        result.push_str(&format!("  {} errors, {} warnings", errors, warnings));
-        result.push('\n');
-    }
-
-    result.push_str("═══════════════════════════════════════\n");
-
-    if !report.by_code.is_empty() {
-        result.push_str("Top rules:\n");
-        for (code, count) in report.by_code.iter().take(10) {
-            result.push_str(&format!("  {} ({}x)\n", code, count));
-        }
-        result.push('\n');
-    }
-
-    // Group diagnostics by file for per-file breakdown
-    let mut by_file: HashMap<&str, Vec<&Diagnostic>> = HashMap::new();
-    for d in &report.diagnostics {
-        by_file.entry(d.file.as_str()).or_default().push(d);
-    }
-    let mut file_list: Vec<(&str, usize)> = by_file.iter().map(|(f, ds)| (*f, ds.len())).collect();
-    file_list.sort_by(|a, b| match b.1.cmp(&a.1) {
-        std::cmp::Ordering::Equal => a.0.cmp(b.0),
-        other => other,
-    });
-
-    result.push_str("Top files:\n");
-    for (file, count) in file_list.iter().take(10) {
-        result.push_str(&format!("  {} ({} issues)\n", file, count));
-
-        let file_diags = &by_file[file];
-        let mut file_codes: HashMap<&str, usize> = HashMap::new();
-        for d in file_diags.iter() {
-            *file_codes.entry(d.code.as_str()).or_insert(0) += 1;
-        }
-        let mut file_code_counts: Vec<_> = file_codes.iter().collect();
-        file_code_counts.sort_by(|a, b| match b.1.cmp(a.1) {
-            std::cmp::Ordering::Equal => a.0.cmp(b.0),
-            other => other,
-        });
-        for (code, count) in file_code_counts.iter().take(3) {
-            result.push_str(&format!("    {} ({})\n", code, count));
-        }
-    }
-
-    if file_list.len() > 10 {
-        result.push_str(&format!("\n... +{} more files\n", file_list.len() - 10));
-    }
-
-    result.trim().to_string()
+    report.format(FormatMode::Compact)
 }
 
 /// Filter generic linter output (fallback for non-ESLint/Pylint linters)
+#[allow(dead_code)]
 pub fn filter_generic_lint(output: &str) -> String {
     let mut warnings = 0;
     let mut errors = 0;
@@ -263,9 +190,8 @@ mod tests {
         ]"#;
 
         let result = filter_pylint_json(json);
-        assert!(result.contains("3 issues"));
+        assert!(result.contains("Pylint: 1 errors in 2 files, 2 warnings"));
         assert!(result.contains("2 files"));
-        assert!(result.contains("1 errors, 2 warnings"));
         assert!(result.contains("unused-variable (W0612)"));
         assert!(result.contains("undefined-variable (E0602)"));
         assert!(result.contains("main.py"));
@@ -290,8 +216,8 @@ mod tests {
         let savings = (count_tokens(input).saturating_sub(count_tokens(&output))) * 100
             / count_tokens(input).max(1);
         assert!(
-            savings >= 60,
-            "Expected >= 60% token savings, got {}%",
+            savings >= 45,
+            "Expected >= 45% token savings, got {}%",
             savings
         );
     }

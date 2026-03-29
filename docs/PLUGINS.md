@@ -273,7 +273,20 @@ $EDITOR ~/.config/mycelium/plugins/somecommand.sh
 chmod 755 ~/.config/mycelium/plugins/somecommand.sh
 ```
 
-The filename must match the wrapped command. For example, `somecommand.sh` handles `somecommand ...`.
+The filename must match the wrapped command. Supported plugin names are:
+- Unix: `somecommand.sh` or a bare executable named `somecommand`
+- Windows: `somecommand.ps1`, `somecommand.cmd`, `somecommand.bat`, or a bare executable named `somecommand`
+
+Examples:
+
+```powershell
+New-Item -ItemType Directory -Force "$HOME\\AppData\\Roaming\\mycelium\\plugins" | Out-Null
+$path = Join-Path $HOME "AppData\\Roaming\\mycelium\\plugins\\somecommand.ps1"
+Set-Content -Path $path -Value @'
+param()
+$input | Out-String
+'@
+```
 
 **Verify installation**:
 ```bash

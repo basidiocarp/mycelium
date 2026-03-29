@@ -1,39 +1,32 @@
 ---
 source: src/lint_cmd/eslint.rs
-assertion_line: 223
 expression: output
 ---
-ESLint: 8 errors, 7 warnings in 5 files
+ESLint: 8 errors in 5 files, 7 warnings
 ═══════════════════════════════════════
-Top rules:
-  @typescript-eslint/no-explicit-any (1x)
-  eqeqeq (1x)
-  header/header (1x)
-  import/no-extraneous-dependencies (1x)
-  no-console (1x)
-  no-trailing-spaces (1x)
-  no-undef (1x)
-  no-undefined (1x)
-  no-var (1x)
-  prefer-const (1x)
+Top codes: @typescript-eslint/no-explicit-any (1x), eqeqeq (1x), header/header (1x), import/no-extraneous-dependencies (1x), no-console (1x)
 
-Top files:
-  src/hooks/useData.ts (4 issues)
-    @typescript-eslint/no-explicit-any (1)
-    import/no-extraneous-dependencies (1)
-    prefer-const (1)
-  src/components/Button.tsx (3 issues)
-    no-undefined (1)
-    no-var (1)
-    semi (1)
-  src/pages/index.tsx (3 issues)
-    header/header (1)
-    react/jsx-filename-extension (1)
-    react/no-array-index-key (1)
-  src/utils/helpers.ts (3 issues)
-    eqeqeq (1)
-    no-console (1)
-    no-trailing-spaces (1)
-  src/api/client.ts (2 issues)
-    no-undef (1)
-    unknown (1)
+src/hooks/useData.ts (4 issues)
+  L3: import/no-extraneous-dependencies Import/no-extraneous-dependencies.
+  L18: react-hooks/exhaustive-deps React Hook useEffect has a missing dependency.
+  L25: prefer-const Prefer const over let for declaration.
+  ... +1 more issues
+
+src/components/Button.tsx (3 issues)
+  L5: no-var Unexpected var, use let or const instead.
+  L12: semi Missing semicolon.
+  L23: no-undefined 'undefined' is not allowed.
+
+src/pages/index.tsx (3 issues)
+  L1: header/header File must begin with a comment.
+  L9: react/no-array-index-key Do not use Array index in keys.
+  L33: react/jsx-filename-extension JSX not allowed in files with extension .tsx.
+
+src/utils/helpers.ts (3 issues)
+  L8: no-console Unexpected console statement.
+  L45: eqeqeq Expected '===' and instead saw '=='.
+  L67: no-trailing-spaces Trailing spaces not allowed.
+
+src/api/client.ts (2 errors)
+  L15: unknown Parsing error: Unexpected token.
+  L30: no-undef 'require' is not defined.

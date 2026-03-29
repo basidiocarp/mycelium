@@ -362,13 +362,17 @@ pub(crate) fn show_projects_table(tracker: &Tracker) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn show_failures(tracker: &Tracker) -> Result<()> {
+pub(crate) fn show_failures(tracker: &Tracker, project_scope: Option<&str>) -> Result<()> {
     let summary = tracker
-        .get_parse_failure_summary()
+        .get_parse_failure_summary_filtered(project_scope)
         .context("Failed to load parse failure data")?;
 
     if summary.total == 0 {
-        println!("No parse failures recorded.");
+        if let Some(scope) = project_scope {
+            println!("No parse failures recorded for project scope: {scope}");
+        } else {
+            println!("No parse failures recorded.");
+        }
         println!("This means all commands parsed successfully (or fallback hasn't triggered yet).");
         return Ok(());
     }
@@ -376,6 +380,10 @@ pub(crate) fn show_failures(tracker: &Tracker) -> Result<()> {
     println!("{}", styled("Mycelium Parse Failures", true));
     println!("{}", "═".repeat(60));
     println!();
+    if let Some(scope) = project_scope {
+        println!("Project scope: {scope}");
+        println!();
+    }
 
     print_kpi("Total failures", summary.total.to_string());
     print_kpi("Recovery rate", format!("{:.1}%", summary.recovery_rate));

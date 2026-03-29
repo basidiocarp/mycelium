@@ -481,14 +481,17 @@ impl Tracker {
         error_message: &str,
         fallback_succeeded: bool,
     ) -> Result<()> {
+        let project_path = current_project_path_string();
+
         self.conn.execute(
-            "INSERT INTO parse_failures (timestamp, raw_command, error_message, fallback_succeeded)
-             VALUES (?1, ?2, ?3, ?4)",
+            "INSERT INTO parse_failures (timestamp, raw_command, error_message, fallback_succeeded, project_path)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
             params![
                 Timestamp::now().to_string(),
                 raw_command,
                 error_message,
                 fallback_succeeded as i32,
+                project_path,
             ],
         )?;
         self.cleanup_old()?;
@@ -496,14 +499,32 @@ impl Tracker {
     }
 
     /// Get parse failure summary for `mycelium gain --failures`.
+    #[allow(dead_code)]
     pub fn get_parse_failure_summary(&self) -> Result<ParseFailureSummary> {
-        let total: i64 = self
-            .conn
-            .query_row("SELECT COUNT(*) FROM parse_failures", [], |row| row.get(0))?;
+        self.get_parse_failure_summary_filtered(None)
+    }
+
+    /// Get parse failure summary filtered by project path.
+    pub fn get_parse_failure_summary_filtered(
+        &self,
+        project_path: Option<&str>,
+    ) -> Result<ParseFailureSummary> {
+        let (project_exact, project_glob) = project_filter_params(project_path);
+
+        let total: i64 = self.conn.query_row(
+            "SELECT COUNT(*)
+             FROM parse_failures
+             WHERE (?1 IS NULL OR project_path = ?1 OR project_path GLOB ?2)",
+            params![project_exact, project_glob],
+            |row| row.get(0),
+        )?;
 
         let succeeded: i64 = self.conn.query_row(
-            "SELECT COUNT(*) FROM parse_failures WHERE fallback_succeeded = 1",
-            [],
+            "SELECT COUNT(*)
+             FROM parse_failures
+             WHERE fallback_succeeded = 1
+               AND (?1 IS NULL OR project_path = ?1 OR project_path GLOB ?2)",
+            params![project_exact, project_glob],
             |row| row.get(0),
         )?;
 
@@ -517,12 +538,13 @@ impl Tracker {
         let mut stmt = self.conn.prepare(
             "SELECT raw_command, COUNT(*) as cnt
              FROM parse_failures
+             WHERE (?1 IS NULL OR project_path = ?1 OR project_path GLOB ?2)
              GROUP BY raw_command
              ORDER BY cnt DESC
              LIMIT 10",
         )?;
         let top_commands = stmt
-            .query_map([], |row| {
+            .query_map(params![project_exact, project_glob], |row| {
                 Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)? as usize))
             })?
             .collect::<Result<Vec<_>, _>>()?;
@@ -531,11 +553,12 @@ impl Tracker {
         let mut stmt = self.conn.prepare(
             "SELECT timestamp, raw_command, error_message, fallback_succeeded
              FROM parse_failures
+             WHERE (?1 IS NULL OR project_path = ?1 OR project_path GLOB ?2)
              ORDER BY timestamp DESC
              LIMIT 10",
         )?;
         let recent = stmt
-            .query_map([], |row| {
+            .query_map(params![project_exact, project_glob], |row| {
                 Ok(ParseFailureRecord {
                     timestamp: row.get(0)?,
                     raw_command: row.get(1)?,

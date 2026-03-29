@@ -288,7 +288,10 @@ impl TokenFormatter for DiagnosticReport {
             usize::MAX
         };
         let mut files_sorted: Vec<_> = by_file.iter().collect();
-        files_sorted.sort_by(|a, b| b.1.len().cmp(&a.1.len()));
+        files_sorted.sort_by(|a, b| match b.1.len().cmp(&a.1.len()) {
+            std::cmp::Ordering::Equal => a.0.cmp(b.0),
+            other => other,
+        });
 
         for (file, diags) in &files_sorted {
             let error_count = diags
@@ -354,7 +357,10 @@ impl TokenFormatter for DiagnosticReport {
             by_file.entry(d.file.as_str()).or_default().push(d);
         }
         let mut files_sorted: Vec<_> = by_file.iter().collect();
-        files_sorted.sort_by(|a, b| b.1.len().cmp(&a.1.len()));
+        files_sorted.sort_by(|a, b| match b.1.len().cmp(&a.1.len()) {
+            std::cmp::Ordering::Equal => a.0.cmp(b.0),
+            other => other,
+        });
 
         for (file, diags) in &files_sorted {
             lines.push(format!("{} ({} issues)", file, diags.len()));

@@ -10,9 +10,6 @@ use crate::utils::package_manager_exec;
 use anyhow::{Context, Result};
 use std::process::Command;
 
-pub use eslint::filter_eslint_json;
-pub use pylint::{filter_generic_lint, filter_pylint_json};
-
 struct LintAnalysis {
     filtered: String,
     parse_tier: u8,
@@ -240,16 +237,16 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
 fn analyze_lint_output(linter: &str, stdout: &str, raw: &str) -> LintAnalysis {
     match linter {
         "eslint" => match eslint::EslintParser::parse(stdout) {
-            ParseResult::Full(_) => LintAnalysis {
-                filtered: filter_eslint_json(stdout),
+            ParseResult::Full(report) => LintAnalysis {
+                filtered: report.format(FormatMode::Compact),
                 parse_tier: 1,
             },
-            ParseResult::Degraded(_, _) => LintAnalysis {
-                filtered: filter_eslint_json(stdout),
+            ParseResult::Degraded(report, _) => LintAnalysis {
+                filtered: report.format(FormatMode::Compact),
                 parse_tier: 2,
             },
-            ParseResult::Passthrough(_) => LintAnalysis {
-                filtered: filter_eslint_json(stdout),
+            ParseResult::Passthrough(raw_out) => LintAnalysis {
+                filtered: raw_out,
                 parse_tier: 3,
             },
         },
@@ -268,16 +265,16 @@ fn analyze_lint_output(linter: &str, stdout: &str, raw: &str) -> LintAnalysis {
             },
         },
         "pylint" => match pylint::PylintParser::parse(stdout) {
-            ParseResult::Full(_) => LintAnalysis {
-                filtered: filter_pylint_json(stdout),
+            ParseResult::Full(report) => LintAnalysis {
+                filtered: report.format(FormatMode::Compact),
                 parse_tier: 1,
             },
-            ParseResult::Degraded(_, _) => LintAnalysis {
-                filtered: filter_pylint_json(stdout),
+            ParseResult::Degraded(report, _) => LintAnalysis {
+                filtered: report.format(FormatMode::Compact),
                 parse_tier: 2,
             },
-            ParseResult::Passthrough(_) => LintAnalysis {
-                filtered: filter_pylint_json(stdout),
+            ParseResult::Passthrough(raw_out) => LintAnalysis {
+                filtered: raw_out,
                 parse_tier: 3,
             },
         },
@@ -296,12 +293,12 @@ fn analyze_lint_output(linter: &str, stdout: &str, raw: &str) -> LintAnalysis {
             },
         },
         _ => match GenericLintParser::parse(raw) {
-            ParseResult::Full(_) => LintAnalysis {
-                filtered: filter_generic_lint(raw),
+            ParseResult::Full(report) => LintAnalysis {
+                filtered: report.format(FormatMode::Compact),
                 parse_tier: 1,
             },
-            ParseResult::Degraded(_, _) => LintAnalysis {
-                filtered: filter_generic_lint(raw),
+            ParseResult::Degraded(report, _) => LintAnalysis {
+                filtered: report.format(FormatMode::Compact),
                 parse_tier: 2,
             },
             ParseResult::Passthrough(raw_out) => LintAnalysis {
@@ -502,7 +499,11 @@ mod tests {
             "src/app.ts:1:1 error: unexpected thing\nsrc/app.ts:2:1 warning: style",
         );
         assert_eq!(analysis.parse_tier, 2);
-        assert!(analysis.filtered.contains("Lint: 1 errors, 1 warnings"));
+        assert!(
+            analysis
+                .filtered
+                .contains("Lint: 1 errors in 1 files, 1 warnings")
+        );
     }
 
     #[test]

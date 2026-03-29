@@ -39,11 +39,27 @@ pub struct DbPathInfo {
 
 /// Get the canonical project path string for the current working directory.
 pub(super) fn current_project_path_string() -> String {
+    if let Ok(path) = std::env::var("MYCELIUM_PROJECT_PATH")
+        && !path.trim().is_empty()
+    {
+        return canonicalize_project_path(path);
+    }
+
     std::env::current_dir()
         .ok()
-        .and_then(|p| p.canonicalize().ok())
+        .map(canonicalize_pathbuf)
         .map(|p| p.to_string_lossy().to_string())
         .unwrap_or_default()
+}
+
+fn canonicalize_project_path(path: String) -> String {
+    canonicalize_pathbuf(PathBuf::from(path))
+        .to_string_lossy()
+        .to_string()
+}
+
+fn canonicalize_pathbuf(path: PathBuf) -> PathBuf {
+    path.canonicalize().unwrap_or(path)
 }
 
 /// Resolve the SQLite database path.

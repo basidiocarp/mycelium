@@ -2,6 +2,7 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 fn default_true() -> bool {
     true
@@ -68,6 +69,25 @@ pub fn find_plugin(command: &str) -> Option<PathBuf> {
     find_plugin_in_dir_with_config(&config, command)
 }
 
+fn candidate_plugin_paths(dir: &Path, command: &str) -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+
+    #[cfg(target_os = "windows")]
+    {
+        candidates.push(dir.join(format!("{command}.ps1")));
+        candidates.push(dir.join(format!("{command}.cmd")));
+        candidates.push(dir.join(format!("{command}.bat")));
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        candidates.push(dir.join(format!("{command}.sh")));
+    }
+
+    candidates.push(dir.join(command));
+    candidates
+}
+
 fn find_plugin_in_dir_with_config(config: &PluginConfig, command: &str) -> Option<PathBuf> {
     if !config.enabled {
         return None;
@@ -78,16 +98,9 @@ fn find_plugin_in_dir_with_config(config: &PluginConfig, command: &str) -> Optio
         return None;
     }
 
-    // .sh extension takes priority over bare name
-    let candidates = [dir.join(format!("{}.sh", command)), dir.join(command)];
-
-    for candidate in &candidates {
-        if candidate.exists() && is_executable(candidate) && is_secure(candidate) {
-            return Some(candidate.clone());
-        }
-    }
-
-    None
+    candidate_plugin_paths(dir, command)
+        .into_iter()
+        .find(|candidate| candidate.exists() && is_executable(candidate) && is_secure(candidate))
 }
 
 /// Execute a plugin, piping `raw_output` to its stdin.
@@ -98,11 +111,12 @@ fn find_plugin_in_dir_with_config(config: &PluginConfig, command: &str) -> Optio
 /// A 10-second timeout kills the plugin process if it hangs.
 pub fn run_plugin(plugin_path: &Path, raw_output: &str) -> Result<String> {
     use std::io::Write;
-    use std::process::{Command, Stdio};
+    use std::process::Stdio;
     use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, Ordering};
 
-    let mut child = Command::new(plugin_path)
+    let mut command = plugin_command(plugin_path);
+    let mut child = command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
@@ -140,6 +154,47 @@ pub fn run_plugin(plugin_path: &Path, raw_output: &str) -> Result<String> {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     } else {
         anyhow::bail!("Plugin exited with non-zero status: {}", output.status)
+    }
+}
+
+fn plugin_command(plugin_path: &Path) -> Command {
+    #[cfg(target_os = "windows")]
+    {
+        match plugin_path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .map(|ext| ext.to_ascii_lowercase())
+            .as_deref()
+        {
+            Some("ps1") => {
+                let shell = if crate::platform::command_on_path("pwsh") {
+                    "pwsh"
+                } else {
+                    "powershell"
+                };
+                let mut command = Command::new(shell);
+                command.args([
+                    "-NoLogo",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                ]);
+                command.arg(plugin_path);
+                command
+            }
+            Some("cmd") | Some("bat") => {
+                let mut command = Command::new("cmd");
+                command.arg("/C").arg(plugin_path);
+                command
+            }
+            _ => Command::new(plugin_path),
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Command::new(plugin_path)
     }
 }
 
@@ -243,6 +298,36 @@ mod tests {
             directory: dir.path().to_path_buf(),
         };
         assert!(find_plugin_in_dir_with_config(&config, "mycommand").is_none());
+    }
+
+    #[test]
+    #[cfg(not(target_os = "windows"))]
+    fn test_candidate_plugin_paths_prefers_shell_script_then_bare() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let candidates = candidate_plugin_paths(dir.path(), "terraform");
+        assert_eq!(
+            candidates,
+            vec![
+                dir.path().join("terraform.sh"),
+                dir.path().join("terraform")
+            ]
+        );
+    }
+
+    #[test]
+    #[cfg(target_os = "windows")]
+    fn test_candidate_plugin_paths_include_windows_script_types() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let candidates = candidate_plugin_paths(dir.path(), "terraform");
+        assert_eq!(
+            candidates,
+            vec![
+                dir.path().join("terraform.ps1"),
+                dir.path().join("terraform.cmd"),
+                dir.path().join("terraform.bat"),
+                dir.path().join("terraform"),
+            ]
+        );
     }
 
     #[test]

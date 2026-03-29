@@ -153,7 +153,10 @@ fn load_config() -> PluginConfig {
 fn is_installed(name: &str) -> bool {
     let config = load_config();
     let dir = &config.directory;
-    dir.join(format!("{name}.sh")).exists() || dir.join(name).exists()
+    [".sh", ".ps1", ".cmd", ".bat", ""]
+        .iter()
+        .map(|suffix| dir.join(format!("{name}{suffix}")))
+        .any(|path| path.exists())
 }
 
 fn discover_user_plugins(dir: &std::path::Path) -> Vec<String> {
@@ -165,18 +168,36 @@ fn discover_user_plugins(dir: &std::path::Path) -> Vec<String> {
         .filter_map(|e| e.ok())
         .filter(|e| {
             let path = e.path();
-            path.is_file()
-                && (path.extension().is_some_and(|ext| ext == "sh") || is_executable_file(&path))
+            path.is_file() && is_plugin_file(&path)
         })
         .map(|e| {
             let name = e.file_name().to_string_lossy().to_string();
-            name.strip_suffix(".sh").unwrap_or(&name).to_string()
+            strip_plugin_suffix(&name).to_string()
         })
         .collect();
 
     names.sort();
     names.dedup();
     names
+}
+
+fn strip_plugin_suffix(name: &str) -> &str {
+    [".sh", ".ps1", ".cmd", ".bat"]
+        .iter()
+        .find_map(|suffix| name.strip_suffix(suffix))
+        .unwrap_or(name)
+}
+
+fn is_plugin_file(path: &std::path::Path) -> bool {
+    path.extension()
+        .and_then(|ext| ext.to_str())
+        .is_some_and(|ext| {
+            matches!(
+                ext.to_ascii_lowercase().as_str(),
+                "sh" | "ps1" | "cmd" | "bat"
+            )
+        })
+        || is_executable_file(path)
 }
 
 #[cfg(unix)]
@@ -223,5 +244,14 @@ mod tests {
     fn test_discover_user_plugins_nonexistent_dir() {
         let plugins = discover_user_plugins(std::path::Path::new("/tmp/mycelium-nonexistent-xyz"));
         assert!(plugins.is_empty());
+    }
+
+    #[test]
+    fn test_strip_plugin_suffix_supports_cross_platform_names() {
+        assert_eq!(strip_plugin_suffix("terraform.sh"), "terraform");
+        assert_eq!(strip_plugin_suffix("terraform.ps1"), "terraform");
+        assert_eq!(strip_plugin_suffix("terraform.cmd"), "terraform");
+        assert_eq!(strip_plugin_suffix("terraform.bat"), "terraform");
+        assert_eq!(strip_plugin_suffix("terraform"), "terraform");
     }
 }

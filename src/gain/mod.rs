@@ -50,7 +50,7 @@ pub fn run(
     let project_scope = helpers::resolve_project_scope(project, project_path)?;
 
     if failures {
-        return display::show_failures(&tracker);
+        return display::show_failures(&tracker, project_scope.as_deref());
     }
 
     if diagnostics {

@@ -365,6 +365,76 @@ fn test_parse_failure_recovery_rate() {
     });
 }
 
+#[test]
+fn test_parse_failure_summary_filtered_respects_project_scope() {
+    with_test_db(
+        "test_parse_failure_summary_filtered_respects_project_scope",
+        |db_path| {
+            let tracker =
+                Tracker::new_with_override(Some(db_path)).expect("Failed to create tracker");
+
+            tracker
+                .conn
+                .execute(
+                    "INSERT INTO parse_failures (timestamp, raw_command, error_message, fallback_succeeded, project_path)
+                     VALUES (?1, ?2, ?3, ?4, ?5)",
+                    rusqlite::params![
+                        "2026-03-28T12:00:00Z",
+                        "gh issue list",
+                        "json parse failed",
+                        1_i32,
+                        "/tmp/project-a",
+                    ],
+                )
+                .expect("Failed to insert project a parse failure");
+
+            tracker
+                .conn
+                .execute(
+                    "INSERT INTO parse_failures (timestamp, raw_command, error_message, fallback_succeeded, project_path)
+                     VALUES (?1, ?2, ?3, ?4, ?5)",
+                    rusqlite::params![
+                        "2026-03-28T12:05:00Z",
+                        "gh repo view",
+                        "json parse failed",
+                        0_i32,
+                        "/tmp/project-b",
+                    ],
+                )
+                .expect("Failed to insert project b parse failure");
+
+            let summary = tracker
+                .get_parse_failure_summary_filtered(Some("/tmp/project-a"))
+                .expect("Failed to load scoped parse failures");
+
+            assert_eq!(summary.total, 1);
+            assert_eq!(summary.top_commands, vec![("gh issue list".to_string(), 1)]);
+            assert_eq!(summary.recent.len(), 1);
+            assert_eq!(summary.recent[0].raw_command, "gh issue list");
+        },
+    );
+}
+
+#[test]
+fn test_current_project_path_string_honors_env_override() {
+    let _guard = tracking_test_lock()
+        .lock()
+        .expect("tracking test lock poisoned");
+    let dir = tempdir().expect("temp dir");
+    let path = dir.path().join("project");
+    std::fs::create_dir_all(&path).expect("create project dir");
+    let expected = path.canonicalize().expect("canonical path");
+
+    // SAFETY: tracking tests serialize access with a global mutex, so process-wide
+    // environment mutation is isolated to this test.
+    unsafe { std::env::set_var("MYCELIUM_PROJECT_PATH", &path) };
+    let actual = super::utils::current_project_path_string();
+    // SAFETY: paired with set_var above.
+    unsafe { std::env::remove_var("MYCELIUM_PROJECT_PATH") };
+
+    assert_eq!(PathBuf::from(actual), expected);
+}
+
 // 14. get_by_project groups by project_path and returns sorted results
 #[test]
 fn test_get_by_project() {

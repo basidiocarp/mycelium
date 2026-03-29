@@ -5,6 +5,7 @@ use crate::tracking;
 use anyhow::{Context, Result};
 use std::process::Command;
 
+use super::has_json_flag;
 use super::parsers::{GhIssueListParser, GhIssueViewParser};
 use super::passthrough::{run_passthrough, run_passthrough_with_extra};
 
@@ -24,14 +25,11 @@ pub(super) fn dispatch_issue(args: &[String], verbose: u8, ultra_compact: bool) 
 }
 
 pub fn should_passthrough_issue_list(args: &[String]) -> bool {
-    args.iter()
-        .any(|a| a == "--json" || a == "--jq" || a == "--template" || a == "--web")
+    has_json_flag(args)
 }
 
 pub fn should_passthrough_issue_view(extra_args: &[String]) -> bool {
-    extra_args.iter().any(|a| {
-        a == "--comments" || a == "--json" || a == "--jq" || a == "--template" || a == "--web"
-    })
+    extra_args.iter().any(|a| a == "--comments") || has_json_flag(extra_args)
 }
 
 fn list_issues(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()> {
@@ -181,12 +179,19 @@ mod tests {
     fn test_should_passthrough_issue_list_json_template_web() {
         assert!(should_passthrough_issue_list(&["--json".into()]));
         assert!(should_passthrough_issue_list(&[
+            "--json=number,title".into()
+        ]));
+        assert!(should_passthrough_issue_list(&[
             "--jq".into(),
             ".title".into()
         ]));
+        assert!(should_passthrough_issue_list(&["--jq=.title".into()]));
         assert!(should_passthrough_issue_list(&[
             "--template".into(),
             "{{.title}}".into()
+        ]));
+        assert!(should_passthrough_issue_list(&[
+            "--template={{.title}}".into()
         ]));
         assert!(should_passthrough_issue_list(&["--web".into()]));
     }
@@ -195,13 +200,18 @@ mod tests {
     fn test_should_passthrough_issue_view_comments_and_formatting() {
         assert!(should_passthrough_issue_view(&["--comments".into()]));
         assert!(should_passthrough_issue_view(&["--json".into()]));
+        assert!(should_passthrough_issue_view(&["--json=body".into()]));
         assert!(should_passthrough_issue_view(&[
             "--jq".into(),
             ".body".into()
         ]));
+        assert!(should_passthrough_issue_view(&["--jq=.body".into()]));
         assert!(should_passthrough_issue_view(&[
             "--template".into(),
             "{{.body}}".into()
+        ]));
+        assert!(should_passthrough_issue_view(&[
+            "--template={{.body}}".into()
         ]));
         assert!(should_passthrough_issue_view(&["--web".into()]));
     }

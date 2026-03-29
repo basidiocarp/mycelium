@@ -5,12 +5,12 @@ use crate::tracking;
 use anyhow::{Context, Result};
 use std::process::Command;
 
+use super::has_json_flag;
 use super::parsers::GhRepoViewParser;
 use super::passthrough::{run_passthrough, run_passthrough_with_extra};
 
 fn should_passthrough_repo_view(args: &[String]) -> bool {
-    args.iter()
-        .any(|a| a == "--json" || a == "--jq" || a == "--template" || a == "--web")
+    has_json_flag(args)
 }
 
 pub(super) fn dispatch_repo(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()> {
@@ -111,13 +111,18 @@ mod tests {
     #[test]
     fn test_should_passthrough_repo_view_json_template_web() {
         assert!(should_passthrough_repo_view(&["--json".into()]));
+        assert!(should_passthrough_repo_view(&["--json=name".into()]));
         assert!(should_passthrough_repo_view(&[
             "--jq".into(),
             ".name".into()
         ]));
+        assert!(should_passthrough_repo_view(&["--jq=.name".into()]));
         assert!(should_passthrough_repo_view(&[
             "--template".into(),
             "{{.name}}".into()
+        ]));
+        assert!(should_passthrough_repo_view(&[
+            "--template={{.name}}".into()
         ]));
         assert!(should_passthrough_repo_view(&["--web".into()]));
     }

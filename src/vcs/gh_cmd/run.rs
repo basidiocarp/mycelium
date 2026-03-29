@@ -7,6 +7,7 @@ use crate::tracking;
 use anyhow::{Context, Result};
 use std::process::Command;
 
+use super::has_json_flag;
 use super::parsers::{GhRunListParser, GhRunViewParser};
 use super::passthrough::{run_passthrough, run_passthrough_with_extra};
 
@@ -26,16 +27,7 @@ pub(super) fn run_workflow(args: &[String], verbose: u8, ultra_compact: bool) ->
 }
 
 fn should_passthrough_run_list(args: &[String]) -> bool {
-    args.iter().any(|arg| is_structured_output_flag(arg))
-}
-
-fn is_structured_output_flag(arg: &str) -> bool {
-    arg == "--json"
-        || arg == "--jq"
-        || arg == "--template"
-        || arg.starts_with("--json=")
-        || arg.starts_with("--jq=")
-        || arg.starts_with("--template=")
+    has_json_flag(args)
 }
 
 fn list_runs(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()> {
@@ -148,9 +140,10 @@ fn filter_run_view_output(raw: &str, run_id: Option<&str>) -> RunViewAnalysis {
 /// Flags like --log-failed, --log, and --json produce output that the filter
 /// would incorrectly strip.
 fn should_passthrough_run_view(extra_args: &[String]) -> bool {
-    extra_args.iter().any(|a| {
-        a == "--log-failed" || a == "--log" || is_structured_output_flag(a) || a == "--web"
-    })
+    extra_args
+        .iter()
+        .any(|a| a == "--log-failed" || a == "--log")
+        || has_json_flag(extra_args)
 }
 
 fn view_run(args: &[String], _verbose: u8) -> Result<()> {

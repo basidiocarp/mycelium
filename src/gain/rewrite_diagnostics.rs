@@ -13,7 +13,7 @@ pub(crate) fn show_rewrite_diagnostics(
 ) -> Result<()> {
     let audit_summary = hook_audit::load_summary(DEFAULT_AUDIT_DAYS)?;
     let passthrough = tracker.get_passthrough_summary_filtered(project_scope)?;
-    let parse_failures = tracker.get_parse_failure_summary()?;
+    let parse_failures = tracker.get_parse_failure_summary_filtered(project_scope)?;
     let quality_score = compute_quality_score(audit_summary.as_ref(), parse_failures.recovery_rate);
 
     println!("Rewrite Diagnostics");

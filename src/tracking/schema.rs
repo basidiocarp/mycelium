@@ -99,17 +99,32 @@ pub(super) fn init_schema(conn: &Connection) -> Result<()> {
             timestamp TEXT NOT NULL,
             raw_command TEXT NOT NULL,
             error_message TEXT NOT NULL,
-            fallback_succeeded INTEGER NOT NULL DEFAULT 0
+            fallback_succeeded INTEGER NOT NULL DEFAULT 0,
+            project_path TEXT DEFAULT ''
         )",
         [],
     )
     .context("Failed to create parse_failures table")?;
+
+    let _ = conn.execute(
+        "ALTER TABLE parse_failures ADD COLUMN project_path TEXT DEFAULT ''",
+        [],
+    );
+    let _ = conn.execute(
+        "UPDATE parse_failures SET project_path = '' WHERE project_path IS NULL",
+        [],
+    );
 
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_pf_timestamp ON parse_failures(timestamp)",
         [],
     )
     .context("Failed to create idx_pf_timestamp")?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_pf_project_path_timestamp ON parse_failures(project_path, timestamp)",
+        [],
+    )
+    .context("Failed to create idx_pf_project_path_timestamp")?;
 
     Ok(())
 }

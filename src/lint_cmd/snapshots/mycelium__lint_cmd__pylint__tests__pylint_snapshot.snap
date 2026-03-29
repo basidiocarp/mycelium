@@ -1,38 +1,29 @@
 ---
 source: src/lint_cmd/pylint.rs
-assertion_line: 278
 expression: output
 ---
-Pylint: 12 issues in 5 files
-  4 errors, 8 warnings
+Pylint: 4 errors in 5 files, 8 warnings
 ═══════════════════════════════════════
-Top rules:
-  bare-except (W0702) (1x)
-  broad-except (W0703) (1x)
-  import-error (E0401) (1x)
-  invalid-name (C0103) (1x)
-  missing-function-docstring (C0111) (1x)
-  missing-module-docstring (C0114) (1x)
-  no-init (W0232) (1x)
-  no-member (E1101) (1x)
-  redefined-builtin (W0622) (1x)
-  too-many-branches (R0912) (1x)
+Top codes: bare-except (W0702) (1x), broad-except (W0703) (1x), import-error (E0401) (1x), invalid-name (C0103) (1x), missing-function-docstring (C0111) (1x)
 
-Top files:
-  auth.py (3 issues)
-    broad-except (W0703) (1)
-    import-error (E0401) (1)
-    invalid-name (C0103) (1)
-  helpers.py (3 issues)
-    missing-function-docstring (C0111) (1)
-    missing-module-docstring (C0114) (1)
-    too-many-branches (R0912) (1)
-  client.py (2 issues)
-    no-member (E1101) (1)
-    undefined-variable (E0602) (1)
-  config.py (2 issues)
-    bare-except (W0702) (1)
-    wildcard-import (W0401) (1)
-  user.py (2 issues)
-    no-init (W0232) (1)
-    redefined-builtin (W0622) (1)
+auth.py (3 issues)
+  L12: import-error (E0401) Unable to import 'jwt'
+  L67: broad-except (W0703) Catching too general exception Exception
+  L89: invalid-name (C0103) Variable name 't' doesn't conform to snake_case naming style
+
+helpers.py (3 warnings)
+  L1: missing-module-docstring (C0114) Missing module docstring
+  L15: missing-function-docstring (C0111) Missing function or method docstring
+  L34: too-many-branches (R0912) Too many branches (15/12)
+
+client.py (2 errors)
+  L45: undefined-variable (E0602) Undefined variable 'user_id'
+  L78: no-member (E1101) Instance of 'NoneType' has no 'connect' member
+
+config.py (2 issues)
+  L5: wildcard-import (W0401) Wildcard import os.path
+  L28: bare-except (W0702) No exception type(s) specified
+
+user.py (2 warnings)
+  L23: no-init (W0232) Class 'User' has no '__init__' method
+  L56: redefined-builtin (W0622) Redefining built-in 'type'

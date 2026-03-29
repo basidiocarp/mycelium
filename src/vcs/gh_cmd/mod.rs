@@ -16,19 +16,28 @@ pub use parsers::{GhIssueListParser, GhIssueViewParser, GhRepoViewParser, GhRunL
 pub use passthrough::run_passthrough_gh;
 pub(crate) use passthrough::{run_passthrough_fn, run_passthrough_with_extra};
 
-/// Check if args contain --json flag (user wants specific JSON fields, not Mycelium filtering)
-fn has_json_flag_impl<S: AsRef<str>>(args: &[S]) -> bool {
-    args.iter().any(|a| a.as_ref() == "--json")
+/// Check if args request structured gh output that Mycelium should not rewrite.
+fn has_structured_output_flag_impl<S: AsRef<str>>(args: &[S]) -> bool {
+    args.iter().any(|arg| {
+        let arg = arg.as_ref();
+        arg == "--json"
+            || arg == "--jq"
+            || arg == "--template"
+            || arg == "--web"
+            || arg.starts_with("--json=")
+            || arg.starts_with("--jq=")
+            || arg.starts_with("--template=")
+    })
 }
 
 /// Check if args contain --json flag for owned String slices.
 pub(crate) fn has_json_flag(args: &[String]) -> bool {
-    has_json_flag_impl(args)
+    has_structured_output_flag_impl(args)
 }
 
 /// Check if args contain --json flag for borrowed string slices.
 fn has_json_flag_str(args: &[&str]) -> bool {
-    has_json_flag_impl(args)
+    has_structured_output_flag_impl(args)
 }
 
 /// Extract a positional identifier (PR/issue number) from args, returning it
