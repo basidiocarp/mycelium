@@ -9,24 +9,17 @@ use std::fs;
 use std::path::PathBuf;
 
 pub use json_patch::PatchMode;
-#[cfg(unix)]
-pub use json_patch::PatchResult;
 
 use claude_md::{
-    MYCELIUM_INSTRUCTIONS, MyceliumBlockUpsert, resolve_claude_dir, upsert_mycelium_block,
+    MYCELIUM_INSTRUCTIONS, MyceliumBlockUpsert, remove_mycelium_block, resolve_claude_dir,
+    upsert_mycelium_block,
 };
-#[cfg(unix)]
 use claude_md::{MYCELIUM_SLIM, patch_claude_md};
 #[cfg(unix)]
 use hook::{extract_hook_version, extract_quoted_assignment};
 #[cfg(unix)]
 use hook::{prepare_hook_paths, write_if_changed};
-#[cfg(unix)]
-use json_patch::patch_settings_json;
 use json_patch::{clean_double_blanks, hook_already_present, remove_hook_from_settings};
-
-#[cfg(unix)]
-use hook::ensure_hook_installed;
 
 /// Main entry point for `mycelium init`
 pub fn run(
@@ -80,26 +73,46 @@ pub fn uninstall(global: bool, verbose: u8) -> Result<()> {
         removed.push(format!("MYCELIUM.md: {}", mycelium_md_path.display()));
     }
 
-    // 3. Remove @MYCELIUM.md reference from CLAUDE.md
+    // 3. Remove @MYCELIUM.md reference or legacy instructions block from CLAUDE.md
     let claude_md_path = claude_dir.join("CLAUDE.md");
     if claude_md_path.exists() {
         let content = fs::read_to_string(&claude_md_path)
             .with_context(|| format!("Failed to read CLAUDE.md: {}", claude_md_path.display()))?;
 
+        let (without_legacy_block, removed_legacy_block) =
+            if content.contains("<!-- mycelium-instructions") {
+                remove_mycelium_block(&content)
+            } else {
+                (content.clone(), false)
+            };
+
+        let mut removed_anything = false;
+        let mut new_content = without_legacy_block;
+
         if content.contains("@MYCELIUM.md") {
-            let new_content = content
+            new_content = new_content
                 .lines()
                 .filter(|line| !line.trim().starts_with("@MYCELIUM.md"))
                 .collect::<Vec<_>>()
                 .join("\n");
+            removed_anything = true;
+        }
 
-            // Clean up double blanks
+        if removed_legacy_block {
+            removed_anything = true;
+        }
+
+        if removed_anything {
             let cleaned = clean_double_blanks(&new_content);
-
             fs::write(&claude_md_path, cleaned).with_context(|| {
                 format!("Failed to write CLAUDE.md: {}", claude_md_path.display())
             })?;
-            removed.push("CLAUDE.md: removed @MYCELIUM.md reference".to_string());
+            if content.contains("@MYCELIUM.md") {
+                removed.push("CLAUDE.md: removed @MYCELIUM.md reference".to_string());
+            }
+            if removed_legacy_block {
+                removed.push("CLAUDE.md: removed legacy Mycelium instructions".to_string());
+            }
         }
     }
 
@@ -124,6 +137,7 @@ pub fn uninstall(global: bool, verbose: u8) -> Result<()> {
 
 /// Show current mycelium configuration
 pub fn show_config() -> Result<()> {
+    let claude_capabilities = host_status::claude_code_capabilities();
     let claude_dir = resolve_claude_dir()?;
     let hook_path = claude_dir.join("hooks").join("mycelium-rewrite.sh");
     let mycelium_md_path = claude_dir.join("MYCELIUM.md");
@@ -131,9 +145,29 @@ pub fn show_config() -> Result<()> {
     let local_claude_md = PathBuf::from("CLAUDE.md");
 
     println!("mycelium Configuration:\n");
+    println!("Host capabilities:");
+    println!(
+        "  Claude hook adapter: {}",
+        claude_capabilities.hook_adapter.detail
+    );
+    println!(
+        "  Claude settings patch: {}",
+        claude_capabilities.settings_patch.detail
+    );
+    println!(
+        "  Claude global slim setup: {}",
+        claude_capabilities.slim_global_setup.detail
+    );
+    println!(
+        "  Claude CLAUDE.md mode: {}",
+        claude_capabilities.legacy_claude_md.detail
+    );
+    println!();
 
     // Check hook
-    if hook_path.exists() {
+    if !claude_capabilities.hook_adapter.supported {
+        println!("- Hook: unsupported on this platform");
+    } else if hook_path.exists() {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
@@ -271,31 +305,35 @@ pub fn show_config() -> Result<()> {
     }
 
     // Check MYCELIUM.md
-    if mycelium_md_path.exists() {
+    if !claude_capabilities.slim_global_setup.supported {
+        println!("- MYCELIUM.md: not used by the docs-only setup on this platform");
+    } else if mycelium_md_path.exists() {
         println!("ok MYCELIUM.md: {} (slim mode)", mycelium_md_path.display());
     } else {
         println!("- MYCELIUM.md: not found");
     }
 
     // Check hook integrity
-    match crate::integrity::verify_hook_at(&hook_path) {
-        Ok(crate::integrity::IntegrityStatus::Verified) => {
-            println!("ok Integrity: hook hash verified");
-        }
-        Ok(crate::integrity::IntegrityStatus::Tampered { .. }) => {
-            println!(
-                "error: Integrity: hook modified outside mycelium init (run: mycelium verify)"
-            );
-        }
-        Ok(crate::integrity::IntegrityStatus::NoBaseline) => {
-            println!("[!] Integrity: no baseline hash (run: mycelium init -g to establish)");
-        }
-        Ok(crate::integrity::IntegrityStatus::NotInstalled)
-        | Ok(crate::integrity::IntegrityStatus::OrphanedHash) => {
-            // Don't show integrity line if hook isn't installed
-        }
-        Err(_) => {
-            println!("[!] Integrity: check failed");
+    if claude_capabilities.hook_adapter.supported {
+        match crate::integrity::verify_hook_at(&hook_path) {
+            Ok(crate::integrity::IntegrityStatus::Verified) => {
+                println!("ok Integrity: hook hash verified");
+            }
+            Ok(crate::integrity::IntegrityStatus::Tampered { .. }) => {
+                println!(
+                    "error: Integrity: hook modified outside mycelium init (run: mycelium verify)"
+                );
+            }
+            Ok(crate::integrity::IntegrityStatus::NoBaseline) => {
+                println!("[!] Integrity: no baseline hash (run: mycelium init -g to establish)");
+            }
+            Ok(crate::integrity::IntegrityStatus::NotInstalled)
+            | Ok(crate::integrity::IntegrityStatus::OrphanedHash) => {
+                // Don't show integrity line if hook isn't installed
+            }
+            Err(_) => {
+                println!("[!] Integrity: check failed");
+            }
         }
     }
 
@@ -305,9 +343,15 @@ pub fn show_config() -> Result<()> {
         if content.contains("@MYCELIUM.md") {
             println!("ok Global (~/.claude/CLAUDE.md): @MYCELIUM.md reference");
         } else if content.contains("<!-- mycelium-instructions") {
-            println!(
-                "[!] Global (~/.claude/CLAUDE.md): old Mycelium block (run: mycelium init -g to migrate)"
-            );
+            if claude_capabilities.slim_global_setup.supported {
+                println!(
+                    "[!] Global (~/.claude/CLAUDE.md): old Mycelium block (run: mycelium init -g to migrate)"
+                );
+            } else {
+                println!(
+                    "ok Global (~/.claude/CLAUDE.md): legacy Mycelium instructions (docs-only mode)"
+                );
+            }
         } else {
             println!("- Global (~/.claude/CLAUDE.md): exists but mycelium not configured");
         }
@@ -329,7 +373,9 @@ pub fn show_config() -> Result<()> {
 
     // Check settings.json
     let settings_path = claude_dir.join("settings.json");
-    if settings_path.exists() {
+    if !claude_capabilities.settings_patch.supported {
+        println!("- settings.json: not managed by Mycelium on this platform");
+    } else if settings_path.exists() {
         let content = fs::read_to_string(&settings_path)?;
         if !content.trim().is_empty() {
             if let Ok(root) = serde_json::from_str::<serde_json::Value>(&content) {
@@ -365,56 +411,44 @@ pub fn show_config() -> Result<()> {
     }
 
     println!("\nUsage:");
-    println!("  mycelium init              # Full injection into local CLAUDE.md");
-    println!(
-        "  mycelium init -g           # Claude adapter hook + MYCELIUM.md + @MYCELIUM.md + settings.json"
-    );
-    println!("  mycelium init -g --auto-patch    # Same as above but no prompt");
-    println!("  mycelium init -g --no-patch      # Skip settings.json (manual setup)");
+    println!("  mycelium init              # Local CLAUDE.md instructions");
+    if claude_capabilities.hook_adapter.supported {
+        println!(
+            "  mycelium init -g           # Claude adapter hook + MYCELIUM.md + @MYCELIUM.md + settings.json"
+        );
+        println!("  mycelium init -g --auto-patch    # Same as above but no prompt");
+        println!("  mycelium init -g --no-patch      # Skip settings.json (manual setup)");
+        println!("  mycelium init -g --hook-only     # Hook only, no MYCELIUM.md");
+    } else {
+        println!("  mycelium init -g --claude-md     # Docs-only global setup on this platform");
+    }
     println!("  mycelium init -g --uninstall     # Remove all Mycelium artifacts");
     println!(
         "  mycelium init -g --claude-md     # Legacy: full injection into ~/.claude/CLAUDE.md"
     );
-    println!("  mycelium init -g --hook-only     # Hook only, no MYCELIUM.md");
     println!(
-        "  {}                 # Preferred first-time host setup / repair flow",
+        "  {}                 # Preferred first-time host setup / repair flow where supported",
         host_status::operator_setup_hint()
     );
 
     Ok(())
 }
 
-/// Default mode: hook + slim MYCELIUM.md + @MYCELIUM.md reference
-#[cfg(not(unix))]
-fn run_default_mode(_global: bool, _patch_mode: PatchMode, _verbose: u8) -> Result<()> {
-    eprintln!("[!] Claude hook mode requires Unix (macOS/Linux).");
-    eprintln!("    Windows: use --claude-md mode for CLAUDE.md-only setup.");
-    eprintln!("    Falling back to --claude-md mode.");
-    run_claude_md_mode(_global, _verbose)
-}
-
 #[cfg(unix)]
-fn run_default_mode(global: bool, patch_mode: PatchMode, verbose: u8) -> Result<()> {
-    if !global {
-        // Local init: unchanged behavior (full injection into ./CLAUDE.md)
-        return run_claude_md_mode(false, verbose);
-    }
+fn install_claude_code_adapter(patch_mode: PatchMode, verbose: u8) -> Result<()> {
+    use crate::init::json_patch::patch_settings_json;
+    use hook::ensure_hook_installed;
 
     let claude_dir = resolve_claude_dir()?;
     let mycelium_md_path = claude_dir.join("MYCELIUM.md");
     let claude_md_path = claude_dir.join("CLAUDE.md");
 
-    // 1. Prepare hook directory and install hook
     let (_hook_dir, hook_path) = prepare_hook_paths()?;
     let hook_changed = ensure_hook_installed(&hook_path, verbose)?;
 
-    // 2. Write MYCELIUM.md
     write_if_changed(&mycelium_md_path, MYCELIUM_SLIM, "MYCELIUM.md", verbose)?;
-
-    // 3. Patch CLAUDE.md (add @MYCELIUM.md, migrate if needed)
     let migrated = patch_claude_md(&claude_md_path, verbose)?;
 
-    // 4. Print success message
     let hook_status = if hook_changed {
         "installed/updated"
     } else {
@@ -433,43 +467,23 @@ fn run_default_mode(global: bool, patch_mode: PatchMode, verbose: u8) -> Result<
         println!("              replaced with @MYCELIUM.md (10 lines)");
     }
 
-    // 5. Patch settings.json
     let patch_result = patch_settings_json(&hook_path, patch_mode, verbose)?;
-
-    // Report result
-    match patch_result {
-        PatchResult::Patched => {
-            // Already printed by patch_settings_json
-        }
-        PatchResult::AlreadyPresent => {
-            println!("\n  settings.json: Claude hook already present");
-            println!("  Restart Claude Code. Test with: git status");
-        }
-        PatchResult::Declined | PatchResult::Skipped => {
-            // Manual instructions already printed by patch_settings_json
-        }
-    }
-
-    println!(); // Final newline
+    report_settings_patch_result(patch_result);
+    println!();
 
     Ok(())
 }
 
-/// Hook-only mode: just the hook, no MYCELIUM.md
 #[cfg(not(unix))]
-fn run_hook_only_mode(_global: bool, _patch_mode: PatchMode, _verbose: u8) -> Result<()> {
-    anyhow::bail!("Hook install requires Unix (macOS/Linux). Use WSL or --claude-md mode.")
+fn install_claude_code_adapter(_patch_mode: PatchMode, _verbose: u8) -> Result<()> {
+    unreachable!("Claude Code hook adapter should be gated by host capabilities")
 }
 
 #[cfg(unix)]
-fn run_hook_only_mode(global: bool, patch_mode: PatchMode, verbose: u8) -> Result<()> {
-    if !global {
-        eprintln!("[!] Warning: --hook-only only makes sense with --global");
-        eprintln!("    For local projects, use default mode or --claude-md");
-        return Ok(());
-    }
+fn install_claude_hook_only(patch_mode: PatchMode, verbose: u8) -> Result<()> {
+    use crate::init::json_patch::patch_settings_json;
+    use hook::ensure_hook_installed;
 
-    // Prepare and install hook
     let (_hook_dir, hook_path) = prepare_hook_paths()?;
     let hook_changed = ensure_hook_installed(&hook_path, verbose)?;
 
@@ -484,26 +498,70 @@ fn run_hook_only_mode(global: bool, patch_mode: PatchMode, verbose: u8) -> Resul
         "  Note: No MYCELIUM.md created. Claude Code will not see Mycelium meta commands (gain, discover, proxy, invoke)."
     );
 
-    // Patch settings.json
     let patch_result = patch_settings_json(&hook_path, patch_mode, verbose)?;
+    report_settings_patch_result(patch_result);
+    println!();
 
-    // Report result
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn install_claude_hook_only(_patch_mode: PatchMode, _verbose: u8) -> Result<()> {
+    unreachable!("Claude Code hook adapter should be gated by host capabilities")
+}
+
+#[cfg(unix)]
+fn report_settings_patch_result(patch_result: crate::init::json_patch::PatchResult) {
+    use crate::init::json_patch::PatchResult;
+
     match patch_result {
-        PatchResult::Patched => {
-            // Already printed by patch_settings_json
-        }
+        PatchResult::Patched => {}
         PatchResult::AlreadyPresent => {
             println!("\n  settings.json: Claude hook already present");
             println!("  Restart Claude Code. Test with: git status");
         }
-        PatchResult::Declined | PatchResult::Skipped => {
-            // Manual instructions already printed by patch_settings_json
-        }
+        PatchResult::Declined | PatchResult::Skipped => {}
+    }
+}
+
+#[cfg(not(unix))]
+fn report_settings_patch_result(_patch_result: crate::init::json_patch::PatchResult) {}
+
+/// Default mode: hook + slim MYCELIUM.md + @MYCELIUM.md reference where supported.
+fn run_default_mode(global: bool, patch_mode: PatchMode, verbose: u8) -> Result<()> {
+    if !global {
+        // Local init: unchanged behavior (full injection into ./CLAUDE.md)
+        return run_claude_md_mode(false, verbose);
     }
 
-    println!(); // Final newline
+    let capabilities = host_status::claude_code_capabilities();
+    if !capabilities.hook_adapter.supported {
+        eprintln!("[!] Claude Code hook adapter is unsupported on this platform.");
+        eprintln!("    {}", capabilities.hook_adapter.detail);
+        eprintln!("    Falling back to docs-only global CLAUDE.md setup.");
+        return run_claude_md_mode(true, verbose);
+    }
 
-    Ok(())
+    install_claude_code_adapter(patch_mode, verbose)
+}
+
+/// Hook-only mode: just the hook, no MYCELIUM.md, where supported.
+fn run_hook_only_mode(global: bool, patch_mode: PatchMode, verbose: u8) -> Result<()> {
+    if !global {
+        eprintln!("[!] Warning: --hook-only only makes sense with --global");
+        eprintln!("    For local projects, use default mode or --claude-md");
+        return Ok(());
+    }
+
+    let capabilities = host_status::claude_code_capabilities();
+    if !capabilities.hook_adapter.supported {
+        anyhow::bail!(
+            "Claude Code hook adapter is unsupported on this platform. {}",
+            capabilities.hook_adapter.detail
+        );
+    }
+
+    install_claude_hook_only(patch_mode, verbose)
 }
 
 /// Legacy mode: full 137-line injection into CLAUDE.md

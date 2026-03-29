@@ -17,6 +17,7 @@ pub fn run() -> Result<()> {
     check_version();
     check_hook();
     check_settings_json();
+    check_claude_md_fallback();
     check_codex_cli();
     check_config();
     check_tracking_db();
@@ -55,6 +56,12 @@ fn check_version() {
 }
 
 fn check_hook() {
+    let capabilities = host_status::claude_code_capabilities();
+    if !capabilities.hook_adapter.supported {
+        warn("Claude Code hook", capabilities.hook_adapter.detail);
+        return;
+    }
+
     match integrity::verify_hook() {
         Ok(integrity::IntegrityStatus::Verified) => {
             pass("Claude Code hook", "installed and verified");
@@ -142,6 +149,12 @@ fn check_tracking_db() {
 }
 
 fn check_settings_json() {
+    let capabilities = host_status::claude_code_capabilities();
+    if !capabilities.settings_patch.supported {
+        warn("claude settings", capabilities.settings_patch.detail);
+        return;
+    }
+
     let settings_path = match crate::platform::claude_settings_path() {
         Some(path) => path,
         None => {
@@ -195,6 +208,27 @@ fn check_codex_cli() {
         );
     } else {
         warn("Codex CLI", &status.detail);
+    }
+}
+
+fn check_claude_md_fallback() {
+    let capabilities = host_status::claude_code_capabilities();
+    if capabilities.hook_adapter.supported {
+        return;
+    }
+
+    let status = host_status::global_claude_md_status();
+    if status.configured {
+        pass("Claude docs mode", &status.detail);
+    } else {
+        warn(
+            "Claude docs mode",
+            &format!(
+                "{} — run `{}`",
+                status.detail,
+                host_status::claude_setup_hint()
+            ),
+        );
     }
 }
 

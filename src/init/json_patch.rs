@@ -15,8 +15,7 @@ pub enum PatchMode {
     Skip, // --no-patch: manual instructions
 }
 
-/// Result of settings.json patching operation — Unix-only (hook install is Unix-only)
-#[cfg(unix)]
+/// Result of settings.json patching operation.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PatchResult {
     Patched,        // Hook was added successfully

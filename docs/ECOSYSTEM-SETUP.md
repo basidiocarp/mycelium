@@ -43,9 +43,9 @@ If the `claude` CLI is in your PATH, Mycelium registers MCP servers and installs
 
 #### Hooks
 
-Mycelium installs these into `~/.claude/hooks/` and registers them in `~/.claude/settings.json`:
+Mycelium's own Claude Code hook adapter is currently a macOS/Linux flow. It installs into `~/.claude/hooks/` and registers in `~/.claude/settings.json`:
 
-1. **mycelium-rewrite.sh** (PreToolUse) — Rewrites commands to use `mycelium` for 60-90% token savings. Auto-detected on Bash, zsh, PowerShell.
+1. **mycelium-rewrite.sh** (PreToolUse) — Rewrites commands to use `mycelium` for 60-90% token savings through the Bash thin delegator used by Claude Code on macOS/Linux.
 
 2. **session-summary.sh** (Stop) — Captures session metrics (duration, tokens used, errors) and stores them in Hyphae when the Claude Code session ends.
 
@@ -54,6 +54,8 @@ Mycelium installs these into `~/.claude/hooks/` and registers them in `~/.claude
 4. **capture-corrections.js** (PostToolUse, Write/Edit) — Captures code corrections and file edits and stores them in Hyphae as learnings.
 
 5. **capture-code-changes.js** (PostToolUse, Write/Edit/Bash) — Captures all code changes (new files, edits, deletions) and tracks them as memoirs in Hyphae.
+
+On Windows, use `mycelium init -g --claude-md` for the global Claude Code docs-only fallback instead of the Bash hook adapter. Use `mycelium init --claude-md` only when you want a project-local `CLAUDE.md`.
 
 #### Hyphae Database Initialization
 
@@ -71,12 +73,14 @@ This creates the SQLite database at:
 
 #### CLAUDE.md Configuration
 
-Mycelium patches your `~/.claude/CLAUDE.md` (or creates it) with:
+When the hook adapter flow is supported, Mycelium patches your `~/.claude/CLAUDE.md` (or creates it) with:
 
 - A reference to `@MYCELIUM.md` (a slim 10-line file with golden rules)
 - Information about token savings and Hyphae/Rhizome integration
 
 If an old 137-line Mycelium block is present, it's replaced with the new slim reference.
+
+On platforms where the Bash hook adapter is not supported, `--claude-md` remains available as the docs-only fallback.
 
 ### 3. Configures Other MCP Clients
 

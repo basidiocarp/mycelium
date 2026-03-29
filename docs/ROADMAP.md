@@ -51,7 +51,7 @@
 
 ### Codebase Health
 - Splitting large files (>400 lines) into focused modules (see `.plans/split-large-files-v2.md`)
-- Parser migration: finish normalizing the remaining mixed parser paths in lint and `gh` so parser-heavy commands consistently use shared `OutputParser` types and formatters
+- Keep tightening parser-backed consistency where older formatter logic or bespoke output shaping still bypasses shared `OutputParser` types and formatters
 
 ### Portability and Runtime
 - Finish removing residual Unix-shaped runtime behavior from less common command paths
@@ -62,12 +62,12 @@
 ## Planned
 
 ### Tool Coverage
-- Decide whether alias-backed coverage is sufficient for `bun`, `podman`, `diffsitter`, and `rg`, or whether any of them need first-class commands beyond the current rewrite mappings
-- Add dedicated `diffsitter` formatting only if plain diff-style output is not good enough in practice
-- Add dedicated `rg` formatting only if grep-style grouping proves materially worse than real ripgrep semantics
+- Keep `rg` alias-backed through `mycelium grep`; only add a separate first-class `rg` command if grouped grep output proves materially worse than true ripgrep semantics in practice
+- Keep supported `bun run ...` / `bunx ...` wrappers and `podman` alias-backed unless their output diverges enough from the current rewrite targets to justify dedicated built-in commands
+- Keep `diffsitter` alias-backed to `mycelium diff` for now; only add dedicated semantic-diff handling if real usage shows plain diff-style condensation is not good enough
 
 ### Analytics
-- Per-project tracking isolation
+- Extend per-project tracking beyond the current rewrite and parse-failure diagnostics so more analytics views can be scoped cleanly by workspace
 - Feed Mycelium diagnostics and trend views into `cap` instead of maintaining a separate local dashboard
 
 ### Developer Experience

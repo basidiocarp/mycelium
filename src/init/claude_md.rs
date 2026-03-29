@@ -1,13 +1,10 @@
 //! Manages the Mycelium instructions block inside CLAUDE.md files.
 use anyhow::{Context, Result};
-#[cfg_attr(not(unix), allow(unused_imports))]
 use std::fs;
-#[cfg(unix)]
 use std::path::Path;
 use std::path::PathBuf;
 
-// Embedded slim Mycelium awareness instructions — Unix-only (referenced by the bash hook)
-#[cfg(unix)]
+// Embedded slim Mycelium awareness instructions used by the Claude Code hook-based adapter.
 pub(crate) const MYCELIUM_SLIM: &str = include_str!("../../hooks/mycelium-awareness.md");
 
 // Legacy full instructions for backward compatibility (--claude-md mode)
@@ -210,8 +207,7 @@ pub(crate) fn upsert_mycelium_block(content: &str, block: &str) -> (String, Myce
     }
 }
 
-/// Patch CLAUDE.md: add @MYCELIUM.md, migrate if old block exists — Unix-only
-#[cfg(unix)]
+/// Patch CLAUDE.md: add @MYCELIUM.md, migrate if old block exists.
 pub(crate) fn patch_claude_md(path: &Path, verbose: u8) -> Result<bool> {
     let mut content = if path.exists() {
         fs::read_to_string(path)?
@@ -260,8 +256,7 @@ pub(crate) fn patch_claude_md(path: &Path, verbose: u8) -> Result<bool> {
     Ok(migrated)
 }
 
-/// Remove old Mycelium block from CLAUDE.md (migration helper) — Unix-only
-#[cfg(unix)]
+/// Remove old Mycelium block from CLAUDE.md (migration helper).
 pub(crate) fn remove_mycelium_block(content: &str) -> (String, bool) {
     if let (Some(start), Some(end)) = (
         content.find("<!-- mycelium-instructions"),

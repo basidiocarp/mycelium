@@ -1,8 +1,45 @@
 //! Shared host-adapter status helpers for `init --show` and `doctor`.
 use std::path::Path;
 
+use super::claude_md::resolve_claude_dir;
 use crate::integrity::IntegrityStatus;
 use spore::editors::{self, Editor};
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct HostCapability {
+    pub supported: bool,
+    pub detail: &'static str,
+}
+
+impl HostCapability {
+    const fn supported(detail: &'static str) -> Self {
+        Self {
+            supported: true,
+            detail,
+        }
+    }
+
+    const fn unsupported(detail: &'static str) -> Self {
+        Self {
+            supported: false,
+            detail,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ClaudeCodeCapabilities {
+    pub hook_adapter: HostCapability,
+    pub settings_patch: HostCapability,
+    pub slim_global_setup: HostCapability,
+    pub legacy_claude_md: HostCapability,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ClaudeMdStatus {
+    pub configured: bool,
+    pub detail: String,
+}
 
 #[derive(Debug, Clone)]
 pub(crate) struct HostAdapterStatus {
@@ -12,11 +49,46 @@ pub(crate) struct HostAdapterStatus {
     pub detail: String,
 }
 
+pub(crate) fn claude_code_capabilities() -> ClaudeCodeCapabilities {
+    if cfg!(unix) {
+        ClaudeCodeCapabilities {
+            hook_adapter: HostCapability::supported(
+                "supported: Mycelium can install the Claude Code Bash hook adapter on this platform",
+            ),
+            settings_patch: HostCapability::supported(
+                "supported: Mycelium can patch Claude settings.json for the hook adapter on this platform",
+            ),
+            slim_global_setup: HostCapability::supported(
+                "supported: global MYCELIUM.md + @MYCELIUM.md slim setup can be managed alongside the hook adapter",
+            ),
+            legacy_claude_md: HostCapability::supported(
+                "supported: legacy CLAUDE.md-only injection is available",
+            ),
+        }
+    } else {
+        ClaudeCodeCapabilities {
+            hook_adapter: HostCapability::unsupported(
+                "unsupported on this platform: the Claude Code hook adapter currently depends on the Bash thin delegator used on macOS/Linux; use `mycelium init -g --claude-md` for docs-only global setup",
+            ),
+            settings_patch: HostCapability::unsupported(
+                "unsupported on this platform: settings.json patching is tied to the Bash hook adapter flow",
+            ),
+            slim_global_setup: HostCapability::unsupported(
+                "unsupported on this platform: the global MYCELIUM.md + @MYCELIUM.md slim setup is bundled with the Bash hook adapter flow; use `mycelium init -g --claude-md` for docs-only global setup",
+            ),
+            legacy_claude_md: HostCapability::supported(
+                "supported: legacy CLAUDE.md-only injection is available",
+            ),
+        }
+    }
+}
+
 pub(crate) fn collect_host_adapter_statuses() -> Vec<HostAdapterStatus> {
     vec![claude_code_status(), codex_cli_status()]
 }
 
 fn claude_code_status() -> HostAdapterStatus {
+    let capabilities = claude_code_capabilities();
     let hook_status = crate::integrity::verify_hook().unwrap_or(IntegrityStatus::NotInstalled);
     let settings_path = crate::platform::claude_settings_path();
     let settings_registered = settings_path
@@ -25,6 +97,23 @@ fn claude_code_status() -> HostAdapterStatus {
         .is_some_and(|content| claude_settings_registers_mycelium(&content));
     let detected = crate::utils::which_command("claude").is_some()
         || editors::detect().contains(&Editor::ClaudeCode);
+
+    if !capabilities.hook_adapter.supported {
+        let docs_status = global_claude_md_status();
+        return HostAdapterStatus {
+            name: "Claude Code",
+            detected,
+            configured: docs_status.configured,
+            detail: if docs_status.configured {
+                docs_status.detail
+            } else {
+                format!(
+                    "{}; {}",
+                    capabilities.hook_adapter.detail, docs_status.detail
+                )
+            },
+        };
+    }
 
     let detail = match (&hook_status, settings_path.as_ref(), settings_registered) {
         (IntegrityStatus::Verified, Some(path), true) => {
@@ -151,7 +240,52 @@ fn claude_adapter_configured(hook_status: &IntegrityStatus, settings_registered:
     matches!(hook_status, IntegrityStatus::Verified) && settings_registered
 }
 
+pub(crate) fn global_claude_md_status() -> ClaudeMdStatus {
+    let path = match resolve_claude_dir() {
+        Ok(dir) => dir.join("CLAUDE.md"),
+        Err(_) => {
+            return ClaudeMdStatus {
+                configured: false,
+                detail: "Claude home directory is not available".to_string(),
+            };
+        }
+    };
+
+    if !path.exists() {
+        return ClaudeMdStatus {
+            configured: false,
+            detail: format!("docs-only fallback not configured in {}", path.display()),
+        };
+    }
+
+    match std::fs::read_to_string(&path) {
+        Ok(content) if content.contains("@MYCELIUM.md") => ClaudeMdStatus {
+            configured: true,
+            detail: format!("slim global setup configured in {}", path.display()),
+        },
+        Ok(content) if content.contains("<!-- mycelium-instructions") => ClaudeMdStatus {
+            configured: true,
+            detail: format!("legacy docs-only fallback configured in {}", path.display()),
+        },
+        Ok(_) => ClaudeMdStatus {
+            configured: false,
+            detail: format!(
+                "CLAUDE.md exists at {} but Mycelium is not configured",
+                path.display()
+            ),
+        },
+        Err(error) => ClaudeMdStatus {
+            configured: false,
+            detail: format!("cannot read {}: {error}", path.display()),
+        },
+    }
+}
+
 pub(crate) fn claude_setup_hint() -> &'static str {
+    let capabilities = claude_code_capabilities();
+    if !capabilities.hook_adapter.supported {
+        return "mycelium init -g --claude-md";
+    }
     if crate::utils::which_command("stipe").is_some() {
         "stipe init"
     } else {
@@ -219,5 +353,19 @@ mod tests {
             &IntegrityStatus::Verified,
             false
         ));
+    }
+
+    #[test]
+    fn test_legacy_claude_md_mode_is_always_supported() {
+        let capabilities = claude_code_capabilities();
+        assert!(capabilities.legacy_claude_md.supported);
+    }
+
+    #[test]
+    fn test_global_claude_md_status_reports_missing_file() {
+        let status = global_claude_md_status();
+        if !status.configured {
+            assert!(!status.detail.is_empty());
+        }
     }
 }

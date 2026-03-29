@@ -116,6 +116,8 @@ This will:
 4. Update hook scripts if they're outdated
 5. Initialize any new databases or features
 
+If you're on a platform where the Mycelium Claude Code Bash hook adapter is not supported, use `mycelium init -g --claude-md` for the global Claude Code docs-only fallback instead of expecting the hook flow to be repaired locally. Use `mycelium init --claude-md` only for project-local instructions.
+
 Example output:
 
 ```
@@ -217,7 +219,7 @@ cargo install --locked --git https://github.com/basidiocarp/rhizome rhizome-cli
 
 ### Hooks broken after update
 
-If Claude Code stops filtering commands after an update:
+If Claude Code stops filtering commands after an update on macOS/Linux:
 
 1. Check that hooks still exist:
 
@@ -244,6 +246,14 @@ jq .hooks.PreToolUse ~/.claude/settings.json | grep mycelium-rewrite
 ```
 
 5. Restart Claude Code
+
+If you're on Windows or another non-Unix environment, skip the `chmod` and hook-file checks above. Use the docs-only fallback instead:
+
+```bash
+mycelium init -g --claude-md
+# or, for project-local instructions only
+mycelium init --claude-md
+```
 
 ### Database schema changes
 

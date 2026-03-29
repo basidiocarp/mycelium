@@ -610,7 +610,7 @@ pub enum Commands {
     /// Initialize Mycelium host adapters and CLAUDE.md instructions
     #[command(display_order = 110)]
     Init {
-        /// Add to global ~/.claude/CLAUDE.md instead of local
+        /// Use global ~/.claude integration instead of local CLAUDE.md
         #[arg(short, long)]
         global: bool,
 
@@ -618,11 +618,11 @@ pub enum Commands {
         #[arg(long)]
         show: bool,
 
-        /// Inject full instructions into CLAUDE.md (legacy mode)
+        /// Inject full instructions into CLAUDE.md (legacy/docs-only mode)
         #[arg(long = "claude-md", group = "mode")]
         claude_md: bool,
 
-        /// Hook only, no Mycelium.md
+        /// Hook only, no Mycelium.md (Claude Code Bash hook adapter; macOS/Linux only)
         #[arg(long = "hook-only", group = "mode")]
         hook_only: bool,
 
@@ -638,11 +638,11 @@ pub enum Commands {
         #[arg(long)]
         client: Option<String>,
 
-        /// Auto-patch settings.json without prompting
+        /// Auto-patch settings.json without prompting (hook adapter mode)
         #[arg(long = "auto-patch", group = "patch")]
         auto_patch: bool,
 
-        /// Skip settings.json patching (print manual instructions)
+        /// Skip settings.json patching and print manual instructions (hook adapter mode)
         #[arg(long = "no-patch", group = "patch")]
         no_patch: bool,
 
