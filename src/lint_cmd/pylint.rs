@@ -76,6 +76,7 @@ impl OutputParser for PylintParser {
                     files_affected,
                     diagnostics,
                     by_code,
+                    global_messages: Vec::new(),
                 })
             }
             Err(e) => {

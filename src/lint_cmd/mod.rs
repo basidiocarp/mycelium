@@ -2,7 +2,7 @@
 pub mod eslint;
 pub mod pylint;
 
-use crate::parser::{OutputParser, ParseResult, truncate_output};
+use crate::parser::{FormatMode, OutputParser, ParseResult, TokenFormatter, truncate_output};
 use crate::python::mypy as mypy_cmd;
 use crate::python::ruff as ruff_cmd;
 use crate::tracking;
@@ -253,17 +253,20 @@ fn analyze_lint_output(linter: &str, stdout: &str, raw: &str) -> LintAnalysis {
                 parse_tier: 3,
             },
         },
-        "ruff" => {
-            let filtered = if !stdout.trim().is_empty() {
-                ruff_cmd::filter_ruff_check_json(stdout)
-            } else {
-                "✓ Ruff: No issues found".to_string()
-            };
-            LintAnalysis {
-                filtered,
+        "ruff" => match ruff_cmd::RuffCheckParser::parse(stdout) {
+            ParseResult::Full(report) => LintAnalysis {
+                filtered: report.format(FormatMode::Compact),
                 parse_tier: 1,
-            }
-        }
+            },
+            ParseResult::Degraded(report, _) => LintAnalysis {
+                filtered: report.format(FormatMode::Compact),
+                parse_tier: 2,
+            },
+            ParseResult::Passthrough(_) => LintAnalysis {
+                filtered: ruff_cmd::filter_ruff_check_json(stdout),
+                parse_tier: 3,
+            },
+        },
         "pylint" => match pylint::PylintParser::parse(stdout) {
             ParseResult::Full(_) => LintAnalysis {
                 filtered: filter_pylint_json(stdout),
@@ -278,9 +281,19 @@ fn analyze_lint_output(linter: &str, stdout: &str, raw: &str) -> LintAnalysis {
                 parse_tier: 3,
             },
         },
-        "mypy" => LintAnalysis {
-            filtered: mypy_cmd::filter_mypy_output(raw),
-            parse_tier: 2,
+        "mypy" => match mypy_cmd::MypyParser::parse(raw) {
+            ParseResult::Full(report) => LintAnalysis {
+                filtered: report.format(FormatMode::Compact),
+                parse_tier: 1,
+            },
+            ParseResult::Degraded(report, _) => LintAnalysis {
+                filtered: report.format(FormatMode::Compact),
+                parse_tier: 2,
+            },
+            ParseResult::Passthrough(raw_out) => LintAnalysis {
+                filtered: raw_out,
+                parse_tier: 3,
+            },
         },
         _ => match GenericLintParser::parse(raw) {
             ParseResult::Full(_) => LintAnalysis {
@@ -351,6 +364,7 @@ impl OutputParser for GenericLintParser {
                     files_affected: 0,
                     diagnostics: Vec::new(),
                     by_code: Vec::new(),
+                    global_messages: Vec::new(),
                 });
             }
 
@@ -365,6 +379,7 @@ impl OutputParser for GenericLintParser {
                 files_affected: 1,
                 diagnostics,
                 by_code: vec![("generic".to_string(), errors + warnings)],
+                global_messages: Vec::new(),
             },
             vec!["generic heuristic lint parser".to_string()],
         )

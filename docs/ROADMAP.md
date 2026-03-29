@@ -8,7 +8,7 @@
 - **JavaScript/TypeScript**: vitest, playwright, tsc, eslint, biome, prettier, next.js, prisma, pnpm, npm, npx
 - **Python**: ruff check/format, pytest, pip/uv, mypy
 - **Go**: go test/build/vet, golangci-lint
-- **Infrastructure**: docker, kubectl, aws (sts/s3/ec2/ecs/rds/cloudformation), terraform (plan/apply/init)
+- **Infrastructure**: docker, kubectl, aws (sts/s3/ec2/ecs/rds/cloudformation), terraform (plan/apply/init), atmos (terraform/describe/validate/workflow/version)
 - **Databases & APIs**: psql, curl (auto-JSON + schema), wget
 - **General**: ls, tree, read, peek, find, grep, diff, json, log, err, summary, env, deps, wc, format
 
@@ -51,7 +51,7 @@
 
 ### Codebase Health
 - Splitting large files (>400 lines) into focused modules (see `.plans/split-large-files-v2.md`)
-- Parser migration: remaining filters to OutputParser trait (tsc, lint, gh)
+- Parser migration: finish normalizing the remaining mixed parser paths in lint and `gh` so parser-heavy commands consistently use shared `OutputParser` types and formatters
 
 ### Portability and Runtime
 - Finish removing residual Unix-shaped runtime behavior from less common command paths
@@ -61,20 +61,18 @@
 
 ## Planned
 
-### New Filters
-- diffsitter (AST-aware diffs)
-- ripgrep (rg) dedicated filter
-- bun package manager support
-- podman container support
+### Tool Coverage
+- Decide whether alias-backed coverage is sufficient for `bun`, `podman`, `diffsitter`, and `rg`, or whether any of them need first-class commands beyond the current rewrite mappings
+- Add dedicated `diffsitter` formatting only if plain diff-style output is not good enough in practice
+- Add dedicated `rg` formatting only if grep-style grouping proves materially worse than real ripgrep semantics
 
 ### Analytics
 - Per-project tracking isolation
-- Web dashboard (localhost) for visualizing trends
-- Prometheus/OpenMetrics export format
-- Explain mode that shows why a command was rewritten and what savings were achieved
+- Feed Mycelium diagnostics and trend views into `cap` instead of maintaining a separate local dashboard
 
 ### Developer Experience
-- Plugin system for user-defined filters
+- Plugin system for user-defined filters and experimental adapters
+- Keep the plugin system as a custom fallback layer, not the primary implementation path for built-in integrations
 - Config-driven filter customization
 - Better error messages and diagnostics
 - Deeper host-neutral runtime integration so Claude, Codex, and future hosts map cleanly into the same measurement model

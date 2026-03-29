@@ -160,6 +160,7 @@ impl OutputParser for TscParser {
                 files_affected: 0,
                 diagnostics: Vec::new(),
                 by_code: Vec::new(),
+                global_messages: Vec::new(),
             });
         }
 
@@ -195,6 +196,7 @@ impl OutputParser for TscParser {
             files_affected,
             diagnostics,
             by_code,
+            global_messages: Vec::new(),
         };
 
         if unmatched_nonempty > 0 {
@@ -300,7 +302,7 @@ src/app.tsx(20,5): error TS2345: Argument of type 'number' is not assignable to 
     fn test_filter_no_errors() {
         let output = "Found 0 errors. Watching for file changes.";
         let result = filter_tsc_output(output);
-        assert!(result.contains("No errors found"));
+        assert!(result.contains("No issues found"));
     }
 
     #[test]

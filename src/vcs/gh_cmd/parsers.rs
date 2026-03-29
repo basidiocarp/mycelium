@@ -2,7 +2,7 @@
 
 use super::markdown::filter_markdown_body;
 use crate::parser::types::{
-    GhIssueDetail, GhIssueItem, GhIssueList, GhRepoDetail, GhRunItem, GhRunList,
+    GhIssueDetail, GhIssueItem, GhIssueList, GhRepoDetail, GhRunItem, GhRunList, GhRunViewSummary,
 };
 use crate::parser::{OutputParser, ParseResult};
 
@@ -130,6 +130,61 @@ impl OutputParser for GhRunListParser {
             }),
             Err(_) => ParseResult::Passthrough(crate::parser::truncate_output(input, 2000)),
         }
+    }
+}
+
+/// Parser for `gh run view` text output.
+pub struct GhRunViewParser;
+
+impl OutputParser for GhRunViewParser {
+    type Output = GhRunViewSummary;
+
+    fn parse(input: &str) -> ParseResult<GhRunViewSummary> {
+        let mut status = None;
+        let mut conclusion = None;
+        let mut failed_jobs = Vec::new();
+        let mut in_jobs = false;
+        let mut saw_useful_line = false;
+
+        for line in input.lines() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+
+            if let Some(value) = trimmed.strip_prefix("Status:") {
+                status = Some(value.trim().to_string());
+                saw_useful_line = true;
+                continue;
+            }
+            if let Some(value) = trimmed.strip_prefix("Conclusion:") {
+                conclusion = Some(value.trim().to_string());
+                saw_useful_line = true;
+                continue;
+            }
+            if trimmed == "JOBS" {
+                in_jobs = true;
+                saw_useful_line = true;
+                continue;
+            }
+            if in_jobs
+                && (trimmed.contains('✗') || trimmed.contains('X') || trimmed.contains("fail"))
+            {
+                failed_jobs.push(trimmed.to_string());
+                saw_useful_line = true;
+            }
+        }
+
+        if !saw_useful_line {
+            return ParseResult::Passthrough(crate::parser::truncate_output(input, 2000));
+        }
+
+        ParseResult::Full(GhRunViewSummary {
+            run_id: None,
+            status,
+            conclusion,
+            failed_jobs,
+        })
     }
 }
 

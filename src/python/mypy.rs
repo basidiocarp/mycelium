@@ -1,4 +1,6 @@
 //! Mypy type checker filter that groups errors by file and error code.
+use crate::parser::types::{Diagnostic, DiagnosticReport, DiagnosticSeverity};
+use crate::parser::{FormatMode, OutputParser, ParseResult, TokenFormatter, truncate_output};
 use crate::utils::{truncate, which_command};
 use anyhow::Result;
 use regex::Regex;
@@ -30,6 +32,8 @@ struct MypyError {
     context_lines: Vec<String>,
 }
 
+pub struct MypyParser;
+
 /// Filter mypy output to group errors by file with error code summaries.
 fn mypy_diag() -> &'static Regex {
     static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
@@ -39,169 +43,164 @@ fn mypy_diag() -> &'static Regex {
     })
 }
 
-pub fn filter_mypy_output(output: &str) -> String {
-    let lines: Vec<&str> = output.lines().collect();
-    let mut errors: Vec<MypyError> = Vec::new();
-    let mut fileless_lines: Vec<String> = Vec::new();
-    let mut i = 0;
+fn compact_path(path: &str) -> String {
+    let path = path.replace('\\', "/");
 
-    while i < lines.len() {
-        let line = lines[i];
+    if let Some(pos) = path.rfind("/src/") {
+        format!("src/{}", &path[pos + 5..])
+    } else if let Some(pos) = path.rfind("/lib/") {
+        format!("lib/{}", &path[pos + 5..])
+    } else if let Some(pos) = path.rfind("/tests/") {
+        format!("tests/{}", &path[pos + 7..])
+    } else if let Some(pos) = path.rfind('/') {
+        path[pos + 1..].to_string()
+    } else {
+        path
+    }
+}
 
-        // Skip mypy's own summary line
-        if line.starts_with("Found ") && line.contains(" error") {
-            i += 1;
-            continue;
-        }
-        // Skip "Success: no issues found"
-        if line.starts_with("Success:") {
-            i += 1;
-            continue;
-        }
+impl OutputParser for MypyParser {
+    type Output = DiagnosticReport;
 
-        if let Some(caps) = mypy_diag().captures(line) {
-            let severity = &caps[3];
-            let file = caps[1].to_string();
-            let line_num: usize = caps[2].parse().unwrap_or(0);
-            let message = caps[4].to_string();
-            let code = caps
-                .get(5)
-                .map(|m| m.as_str().to_string())
-                .unwrap_or_default();
+    fn parse(output: &str) -> ParseResult<DiagnosticReport> {
+        let lines: Vec<&str> = output.lines().collect();
+        let mut errors: Vec<MypyError> = Vec::new();
+        let mut fileless_lines: Vec<String> = Vec::new();
+        let mut i = 0;
 
-            if severity == "note" {
-                // Attach note to preceding error if same file and line
-                if let Some(last) = errors.last_mut()
-                    && last.file == file
-                {
-                    last.context_lines.push(message);
-                    i += 1;
-                    continue;
-                }
-                // Standalone note with no parent -- display as fileless
-                fileless_lines.push(line.to_string());
+        while i < lines.len() {
+            let line = lines[i];
+
+            if line.starts_with("Found ") && line.contains(" error") {
+                i += 1;
+                continue;
+            }
+            if line.starts_with("Success:") {
                 i += 1;
                 continue;
             }
 
-            let mut err = MypyError {
-                file,
-                line: line_num,
-                code,
-                message,
-                context_lines: Vec::new(),
-            };
+            if let Some(caps) = mypy_diag().captures(line) {
+                let severity = &caps[3];
+                let file = compact_path(&caps[1]);
+                let line_num: usize = caps[2].parse().unwrap_or(0);
+                let message = caps[4].to_string();
+                let code = caps
+                    .get(5)
+                    .map(|m| m.as_str().to_string())
+                    .unwrap_or_default();
 
-            // Capture continuation note lines
-            i += 1;
-            while i < lines.len() {
-                if let Some(next_caps) = mypy_diag().captures(lines[i])
-                    && &next_caps[3] == "note"
-                    && next_caps[1] == err.file
-                {
-                    let note_msg = next_caps[4].to_string();
-                    err.context_lines.push(note_msg);
+                if severity == "note" {
+                    if let Some(last) = errors.last_mut()
+                        && last.file == file
+                    {
+                        last.context_lines.push(message);
+                        i += 1;
+                        continue;
+                    }
+                    fileless_lines.push(line.to_string());
                     i += 1;
                     continue;
                 }
-                break;
+
+                let mut err = MypyError {
+                    file,
+                    line: line_num,
+                    code,
+                    message,
+                    context_lines: Vec::new(),
+                };
+
+                i += 1;
+                while i < lines.len() {
+                    if let Some(next_caps) = mypy_diag().captures(lines[i])
+                        && &next_caps[3] == "note"
+                        && compact_path(&next_caps[1]) == err.file
+                    {
+                        let note_msg = next_caps[4].to_string();
+                        err.context_lines.push(note_msg);
+                        i += 1;
+                        continue;
+                    }
+                    break;
+                }
+
+                errors.push(err);
+            } else if line.contains("error:") && !line.trim().is_empty() {
+                fileless_lines.push(line.to_string());
+                i += 1;
+            } else {
+                i += 1;
+            }
+        }
+
+        if errors.is_empty() && fileless_lines.is_empty() {
+            if output.contains("Success: no issues found") || output.contains("no issues found") {
+                return ParseResult::Full(DiagnosticReport {
+                    tool: "mypy".to_string(),
+                    total_errors: 0,
+                    total_warnings: 0,
+                    files_affected: 0,
+                    diagnostics: Vec::new(),
+                    by_code: Vec::new(),
+                    global_messages: Vec::new(),
+                });
             }
 
-            errors.push(err);
-        } else if line.contains("error:") && !line.trim().is_empty() {
-            // File-less error (config errors, import errors)
-            fileless_lines.push(line.to_string());
-            i += 1;
-        } else {
-            i += 1;
-        }
-    }
-
-    // No errors at all
-    if errors.is_empty() && fileless_lines.is_empty() {
-        if output.contains("Success: no issues found") || output.contains("no issues found") {
-            return "mypy: No issues found".to_string();
-        }
-        return "mypy: No issues found".to_string();
-    }
-
-    // Group by file
-    let mut by_file: HashMap<String, Vec<&MypyError>> = HashMap::new();
-    for err in &errors {
-        by_file.entry(err.file.clone()).or_default().push(err);
-    }
-
-    // Count by error code
-    let mut by_code: HashMap<String, usize> = HashMap::new();
-    for err in &errors {
-        if !err.code.is_empty() {
-            *by_code.entry(err.code.clone()).or_insert(0) += 1;
-        }
-    }
-
-    let mut result = String::new();
-
-    // File-less errors first
-    for line in &fileless_lines {
-        result.push_str(line);
-        result.push('\n');
-    }
-    if !fileless_lines.is_empty() && !errors.is_empty() {
-        result.push('\n');
-    }
-
-    if !errors.is_empty() {
-        result.push_str(&format!(
-            "mypy: {} errors in {} files\n",
-            errors.len(),
-            by_file.len()
-        ));
-        result.push_str("═══════════════════════════════════════\n");
-
-        // Top error codes summary (only when 2+ distinct codes)
-        let mut code_counts: Vec<_> = by_code.iter().collect();
-        code_counts.sort_by(|a, b| b.1.cmp(a.1));
-
-        if code_counts.len() > 1 {
-            let codes_str: Vec<String> = code_counts
-                .iter()
-                .take(5)
-                .map(|(code, count)| format!("{} ({}x)", code, count))
-                .collect();
-            result.push_str(&format!("Top codes: {}\n\n", codes_str.join(", ")));
+            return ParseResult::Passthrough(truncate_output(output, 2000));
         }
 
-        // Files sorted by error count (most errors first)
-        let mut files_sorted: Vec<_> = by_file.iter().collect();
-        files_sorted.sort_by(|a, b| b.1.len().cmp(&a.1.len()));
-
-        for (file, file_errors) in &files_sorted {
-            result.push_str(&format!("{} ({} errors)\n", file, file_errors.len()));
-
-            for err in *file_errors {
-                if err.code.is_empty() {
-                    result.push_str(&format!(
-                        "  L{}: {}\n",
-                        err.line,
-                        truncate(&err.message, 120)
-                    ));
+        let diagnostics: Vec<Diagnostic> = errors
+            .iter()
+            .map(|err| Diagnostic {
+                file: err.file.clone(),
+                line: err.line,
+                column: 0,
+                severity: DiagnosticSeverity::Error,
+                code: if err.code.is_empty() {
+                    "mypy".to_string()
                 } else {
-                    result.push_str(&format!(
-                        "  L{}: [{}] {}\n",
-                        err.line,
-                        err.code,
-                        truncate(&err.message, 120)
-                    ));
-                }
-                for ctx in &err.context_lines {
-                    result.push_str(&format!("    {}\n", truncate(ctx, 120)));
-                }
-            }
-            result.push('\n');
-        }
-    }
+                    format!("[{}]", err.code)
+                },
+                message: truncate(&err.message, 120),
+                context: err
+                    .context_lines
+                    .iter()
+                    .map(|line| truncate(line, 120))
+                    .collect(),
+            })
+            .collect();
 
-    result.trim().to_string()
+        let mut by_code: HashMap<String, usize> = HashMap::new();
+        let mut files: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        for err in &errors {
+            if !err.code.is_empty() {
+                *by_code.entry(err.code.clone()).or_insert(0) += 1;
+            }
+            files.insert(err.file.as_str());
+        }
+        let mut by_code: Vec<(String, usize)> = by_code.into_iter().collect();
+        by_code.sort_by(|a, b| b.1.cmp(&a.1));
+
+        ParseResult::Full(DiagnosticReport {
+            tool: "mypy".to_string(),
+            total_errors: diagnostics.len() + fileless_lines.len(),
+            total_warnings: 0,
+            files_affected: files.len(),
+            diagnostics,
+            by_code,
+            global_messages: fileless_lines,
+        })
+    }
+}
+
+pub fn filter_mypy_output(output: &str) -> String {
+    match MypyParser::parse(output) {
+        ParseResult::Full(report) | ParseResult::Degraded(report, _) => {
+            report.format(FormatMode::Compact)
+        }
+        ParseResult::Passthrough(raw) => raw,
+    }
 }
 
 #[cfg(test)]
@@ -329,7 +328,7 @@ Found 1 error in 1 file
     fn test_filter_mypy_no_errors() {
         let output = "Success: no issues found in 5 source files\n";
         let result = filter_mypy_output(output);
-        assert_eq!(result, "mypy: No issues found");
+        assert_eq!(result, "✓ mypy: No issues found");
     }
 
     #[test]

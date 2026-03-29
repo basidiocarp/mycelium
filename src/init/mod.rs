@@ -18,7 +18,7 @@ use claude_md::{
 #[cfg(unix)]
 use claude_md::{MYCELIUM_SLIM, patch_claude_md};
 #[cfg(unix)]
-use hook::{command_on_path, extract_hook_version, extract_quoted_assignment};
+use hook::{extract_hook_version, extract_quoted_assignment};
 #[cfg(unix)]
 use hook::{prepare_hook_paths, write_if_changed};
 #[cfg(unix)]
@@ -198,8 +198,8 @@ pub fn show_config() -> Result<()> {
                     extract_quoted_assignment(&hook_content, "MYCELIUM_BIN").unwrap_or_default();
                 let jq_embedded =
                     extract_quoted_assignment(&hook_content, "JQ_BIN").unwrap_or_default();
-                let mycelium_on_path = command_on_path("mycelium");
-                let jq_on_path = command_on_path("jq");
+                let mycelium_on_path = crate::platform::command_on_path("mycelium");
+                let jq_on_path = crate::platform::command_on_path("jq");
 
                 if mycelium_embedded.is_empty() {
                     println!(

@@ -26,6 +26,14 @@ pub fn claude_hooks_dir() -> Option<PathBuf> {
     claude_dir().map(|dir| dir.join("hooks"))
 }
 
+pub fn command_path(command: &str) -> Option<PathBuf> {
+    which::which(command).ok()
+}
+
+pub fn command_on_path(command: &str) -> bool {
+    command_path(command).is_some()
+}
+
 fn preferred_shell_program() -> String {
     if cfg!(target_os = "windows") {
         std::env::var("COMSPEC").unwrap_or_else(|_| "cmd".to_string())
@@ -106,6 +114,7 @@ pub fn split_env_paths(value: &str) -> Vec<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::TempDir;
 
     #[test]
     fn test_mycelium_config_dir_shape() {
@@ -138,6 +147,39 @@ mod tests {
         let joined = joined.to_string_lossy().to_string();
         let parts = split_env_paths(&joined);
         assert_eq!(parts, vec![PathBuf::from("one"), PathBuf::from("two")]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_command_path_finds_executable_on_path() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let temp = TempDir::new().expect("tempdir");
+        let bin_path = temp.path().join("mycelium-platform-test-bin");
+        std::fs::write(&bin_path, "#!/bin/sh\nexit 0\n").expect("write bin");
+        std::fs::set_permissions(&bin_path, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+
+        let original_path = std::env::var_os("PATH");
+        let prefixed = match original_path.as_ref() {
+            Some(existing) => std::env::join_paths(
+                std::iter::once(temp.path().to_path_buf()).chain(std::env::split_paths(existing)),
+            )
+            .expect("joined path"),
+            None => std::env::join_paths([temp.path().to_path_buf()]).expect("joined path"),
+        };
+
+        unsafe {
+            std::env::set_var("PATH", &prefixed);
+        }
+
+        let resolved = command_path("mycelium-platform-test-bin").expect("command path");
+        assert_eq!(resolved, bin_path);
+        assert!(command_on_path("mycelium-platform-test-bin"));
+
+        match original_path {
+            Some(path) => unsafe { std::env::set_var("PATH", path) },
+            None => unsafe { std::env::remove_var("PATH") },
+        }
     }
 
     #[test]

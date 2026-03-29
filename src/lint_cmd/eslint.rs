@@ -83,6 +83,7 @@ impl OutputParser for EslintParser {
                     files_affected,
                     diagnostics,
                     by_code,
+                    global_messages: Vec::new(),
                 })
             }
             Err(e) => {

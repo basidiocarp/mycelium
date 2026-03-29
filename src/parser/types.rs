@@ -69,6 +69,8 @@ pub struct DiagnosticReport {
     pub files_affected: usize,
     pub diagnostics: Vec<Diagnostic>,
     pub by_code: Vec<(String, usize)>, // sorted desc by count
+    #[serde(default)]
+    pub global_messages: Vec<String>,
 }
 
 // ── GitHub CLI types ────────────────────────────────────────────────────────
@@ -112,6 +114,17 @@ pub struct GhRunItem {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GhRunList {
     pub runs: Vec<GhRunItem>,
+}
+
+/// A workflow run summary from `gh run view`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GhRunViewSummary {
+    #[serde(default)]
+    pub run_id: Option<String>,
+    pub status: Option<String>,
+    pub conclusion: Option<String>,
+    #[serde(default)]
+    pub failed_jobs: Vec<String>,
 }
 
 /// GitHub repository details.

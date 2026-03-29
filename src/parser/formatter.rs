@@ -1,7 +1,7 @@
 //! Token-efficient formatting trait and modes for canonical output types.
 use super::types::{
     DependencyState, Diagnostic, DiagnosticReport, GhIssueDetail, GhIssueList, GhRepoDetail,
-    GhRunList, TestResult,
+    GhRunList, GhRunViewSummary, TestResult,
 };
 
 /// Output formatting modes
@@ -242,14 +242,19 @@ impl TokenFormatter for DependencyState {
 
 impl TokenFormatter for DiagnosticReport {
     fn format_compact(&self) -> String {
-        if self.total_errors == 0 && self.total_warnings == 0 {
-            return format!("✓ {}: No errors found", self.tool);
+        if self.total_errors == 0 && self.total_warnings == 0 && self.global_messages.is_empty() {
+            return format!("✓ {}: No issues found", self.tool);
         }
 
-        let mut lines = vec![format!(
+        let mut headline = format!(
             "{}: {} errors in {} files",
             self.tool, self.total_errors, self.files_affected
-        )];
+        );
+        if self.total_warnings > 0 {
+            headline.push_str(&format!(", {} warnings", self.total_warnings));
+        }
+
+        let mut lines = vec![headline];
         lines.push("═══════════════════════════════════════".to_string());
 
         // Top error codes summary
@@ -264,24 +269,60 @@ impl TokenFormatter for DiagnosticReport {
             lines.push(String::new());
         }
 
+        for message in &self.global_messages {
+            lines.push(message.clone());
+        }
+        if !self.global_messages.is_empty() && !self.diagnostics.is_empty() {
+            lines.push(String::new());
+        }
+
         // Group by file
         let mut by_file: std::collections::HashMap<&str, Vec<&Diagnostic>> =
             std::collections::HashMap::new();
         for d in &self.diagnostics {
             by_file.entry(d.file.as_str()).or_default().push(d);
         }
+        let per_file_limit = if self.diagnostics.len() > 10 {
+            3
+        } else {
+            usize::MAX
+        };
         let mut files_sorted: Vec<_> = by_file.iter().collect();
         files_sorted.sort_by(|a, b| b.1.len().cmp(&a.1.len()));
 
         for (file, diags) in &files_sorted {
-            lines.push(format!("{} ({} errors)", file, diags.len()));
-            for d in *diags {
+            let error_count = diags
+                .iter()
+                .filter(|d| matches!(d.severity, super::types::DiagnosticSeverity::Error))
+                .count();
+            let warning_count = diags.len() - error_count;
+            let label = if warning_count == 0 {
+                if diags.len() == 1 { "error" } else { "errors" }
+            } else if error_count == 0 {
+                if diags.len() == 1 {
+                    "warning"
+                } else {
+                    "warnings"
+                }
+            } else if diags.len() == 1 {
+                "issue"
+            } else {
+                "issues"
+            };
+            lines.push(format!("{} ({} {})", file, diags.len(), label));
+            for d in diags.iter().take(per_file_limit) {
                 let msg: String = d.message.chars().take(120).collect();
                 lines.push(format!("  L{}: {} {}", d.line, d.code, msg));
                 for ctx in &d.context {
                     let ctx_short: String = ctx.chars().take(120).collect();
                     lines.push(format!("    {}", ctx_short));
                 }
+            }
+            if diags.len() > per_file_limit {
+                lines.push(format!(
+                    "  ... +{} more issues",
+                    diags.len() - per_file_limit
+                ));
             }
             lines.push(String::new());
         }
@@ -290,8 +331,8 @@ impl TokenFormatter for DiagnosticReport {
     }
 
     fn format_verbose(&self) -> String {
-        if self.total_errors == 0 && self.total_warnings == 0 {
-            return format!("✓ {}: No errors found", self.tool);
+        if self.total_errors == 0 && self.total_warnings == 0 && self.global_messages.is_empty() {
+            return format!("✓ {}: No issues found", self.tool);
         }
 
         let mut lines = vec![format!(
@@ -299,6 +340,13 @@ impl TokenFormatter for DiagnosticReport {
             self.tool, self.total_errors, self.total_warnings, self.files_affected
         )];
         lines.push("═══════════════════════════════════════".to_string());
+
+        for message in &self.global_messages {
+            lines.push(message.clone());
+        }
+        if !self.global_messages.is_empty() && !self.diagnostics.is_empty() {
+            lines.push(String::new());
+        }
 
         let mut by_file: std::collections::HashMap<&str, Vec<&Diagnostic>> =
             std::collections::HashMap::new();
@@ -455,6 +503,47 @@ impl TokenFormatter for GhRunList {
             passed,
             failed,
             self.runs.len()
+        )
+    }
+}
+
+impl TokenFormatter for GhRunViewSummary {
+    fn format_compact(&self) -> String {
+        let mut lines = vec![format!(
+            "Workflow Run{}",
+            self.run_id
+                .as_deref()
+                .map(|id| format!(" #{}", id))
+                .unwrap_or_default()
+        )];
+
+        if let Some(status) = &self.status {
+            lines.push(format!("  Status: {}", status));
+        }
+        if let Some(conclusion) = &self.conclusion {
+            lines.push(format!("  Conclusion: {}", conclusion));
+        }
+        for failed_job in &self.failed_jobs {
+            lines.push(format!("  FAIL: {}", failed_job));
+        }
+
+        lines.join("\n")
+    }
+
+    fn format_verbose(&self) -> String {
+        self.format_compact()
+    }
+
+    fn format_ultra(&self) -> String {
+        format!(
+            "Run{} {} {} fail:{}",
+            self.run_id
+                .as_deref()
+                .map(|id| format!("#{}", id))
+                .unwrap_or_default(),
+            self.status.as_deref().unwrap_or("-"),
+            self.conclusion.as_deref().unwrap_or("-"),
+            self.failed_jobs.len()
         )
     }
 }

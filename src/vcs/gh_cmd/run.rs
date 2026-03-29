@@ -2,13 +2,12 @@
 
 use crate::parser::{
     FormatMode, OutputParser, ParseResult, TokenFormatter, emit_passthrough_warning,
-    truncate_output,
 };
 use crate::tracking;
 use anyhow::{Context, Result};
 use std::process::Command;
 
-use super::parsers::GhRunListParser;
+use super::parsers::{GhRunListParser, GhRunViewParser};
 use super::passthrough::{run_passthrough, run_passthrough_with_extra};
 
 pub(super) fn run_workflow(args: &[String], verbose: u8, ultra_compact: bool) -> Result<()> {
@@ -118,92 +117,30 @@ struct RunViewAnalysis {
     parse_tier: u8,
 }
 
-#[derive(Debug)]
-struct GhRunViewSummary {
-    status: Option<String>,
-    conclusion: Option<String>,
-    failed_jobs: Vec<String>,
-}
-
-struct GhRunViewParser;
-
-impl OutputParser for GhRunViewParser {
-    type Output = GhRunViewSummary;
-
-    fn parse(input: &str) -> ParseResult<Self::Output> {
-        let mut status = None;
-        let mut conclusion = None;
-        let mut failed_jobs = Vec::new();
-        let mut in_jobs = false;
-        let mut saw_useful_line = false;
-
-        for line in input.lines() {
-            let trimmed = line.trim();
-            if trimmed.is_empty() {
-                continue;
-            }
-
-            if let Some(value) = trimmed.strip_prefix("Status:") {
-                status = Some(value.trim().to_string());
-                saw_useful_line = true;
-                continue;
-            }
-            if let Some(value) = trimmed.strip_prefix("Conclusion:") {
-                conclusion = Some(value.trim().to_string());
-                saw_useful_line = true;
-                continue;
-            }
-            if trimmed == "JOBS" {
-                in_jobs = true;
-                saw_useful_line = true;
-                continue;
-            }
-            if in_jobs
-                && (trimmed.contains('✗') || trimmed.contains('X') || trimmed.contains("fail"))
-            {
-                failed_jobs.push(trimmed.to_string());
-                saw_useful_line = true;
-            }
-        }
-
-        if !saw_useful_line {
-            emit_passthrough_warning("gh run view", "No parseable summary lines found");
-            return ParseResult::Passthrough(truncate_output(input, 2000));
-        }
-
-        ParseResult::Full(GhRunViewSummary {
-            status,
-            conclusion,
-            failed_jobs,
-        })
-    }
-}
-
 fn filter_run_view_output(raw: &str, run_id: Option<&str>) -> RunViewAnalysis {
     match GhRunViewParser::parse(raw) {
-        ParseResult::Full(summary) | ParseResult::Degraded(summary, _) => {
-            let mut filtered = format!(
-                "Workflow Run{}\n",
-                run_id.map(|id| format!(" #{}", id)).unwrap_or_default()
-            );
-            if let Some(status) = summary.status {
-                filtered.push_str(&format!("  Status: {}\n", status));
-            }
-            if let Some(conclusion) = summary.conclusion {
-                filtered.push_str(&format!("  Conclusion: {}\n", conclusion));
-            }
-            for failed_job in summary.failed_jobs {
-                filtered.push_str(&format!("  FAIL: {}\n", failed_job));
-            }
+        ParseResult::Full(mut summary) => {
+            summary.run_id = run_id.map(ToOwned::to_owned);
             RunViewAnalysis {
-                filtered,
+                filtered: summary.format_compact(),
                 parse_tier: 1,
             }
         }
-        ParseResult::Passthrough(raw_out) => RunViewAnalysis {
-            filtered: raw_out,
-            parse_tier: 3,
-        },
+        ParseResult::Degraded(mut summary, warnings) => {
+            summary.run_id = run_id.map(ToOwned::to_owned);
+            emit_passthrough_warning("gh run view", &warnings.join(", "));
+            RunViewAnalysis {
+                filtered: summary.format_compact(),
+                parse_tier: 2,
+            }
+        }
+        ParseResult::Passthrough(raw_out) => {
+            emit_passthrough_warning("gh run view", "No parseable summary lines found");
+            RunViewAnalysis {
+                filtered: raw_out,
+                parse_tier: 3,
+            }
+        }
     }
 }
 

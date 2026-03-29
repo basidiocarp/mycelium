@@ -24,7 +24,7 @@ use crate::filter;
   \x1b[1mTest:\x1b[0m               test, vitest, playwright, pytest
   \x1b[1mPackage Managers:\x1b[0m   pnpm, pip, npm, npx
   \x1b[1mDatabases & APIs:\x1b[0m   psql, prisma, curl, wget
-  \x1b[1mInfrastructure:\x1b[0m     docker, kubectl, terraform, aws
+  \x1b[1mInfrastructure:\x1b[0m     docker, kubectl, terraform, aws, atmos
   \x1b[1mLogs & Data:\x1b[0m        json, log, err, summary, env, deps
   \x1b[1mAnalytics:\x1b[0m          gain, discover, learn, economics
   \x1b[1mSetup:\x1b[0m              init, config, doctor, verify, self-update, completions, proxy, invoke, benchmark, plugin
@@ -410,6 +410,13 @@ pub enum Commands {
         command: AwsCommands,
     },
 
+    /// Atmos orchestration with compact output for common flows
+    #[command(display_order = 84)]
+    Atmos {
+        #[command(subcommand)]
+        command: AtmosCommands,
+    },
+
     // ── Logs & Data ──────────────────────────────────────────────────────────
     /// Show JSON structure without values
     #[command(display_order = 90)]
@@ -775,9 +782,9 @@ pub enum Commands {
 pub enum PluginCommands {
     /// List available and installed plugins
     List,
-    /// Install a shipped plugin to the plugin directory
+    /// Install a shipped plugin to the plugin directory, if this release includes any
     Install {
-        /// Plugin name (e.g. "atmos") or "--all" to install all
+        /// Plugin name or "--all" to install all shipped plugins
         name: String,
         /// Overwrite existing plugin without prompting
         #[arg(long)]
@@ -1296,6 +1303,39 @@ pub enum TerraformCommands {
         args: Vec<String>,
     },
     /// Passthrough: runs any unsupported terraform subcommand directly
+    #[command(external_subcommand)]
+    Other(Vec<OsString>),
+}
+
+/// Atmos subcommands
+#[derive(Subcommand, Debug)]
+pub enum AtmosCommands {
+    /// `atmos terraform ...` with compact plan/apply/init output
+    Terraform {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+    /// `atmos describe ...` with truncated structured output
+    Describe {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+    /// `atmos validate ...` with filtered validation issues
+    Validate {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+    /// `atmos workflow ...` with truncated structured output
+    Workflow {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+    /// `atmos version`
+    Version {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+    /// Passthrough: runs any unsupported atmos subcommand directly
     #[command(external_subcommand)]
     Other(Vec<OsString>),
 }

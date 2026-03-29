@@ -161,7 +161,7 @@ fi
 
 ### Pattern: Terraform-style filter
 
-For commands that wrap Terraform (e.g., atmos, terragrunt):
+For commands that wrap Terraform:
 
 ```bash
 #!/usr/bin/env bash
@@ -261,57 +261,23 @@ enabled = true
 directory = "~/.config/mycelium/plugins"
 ```
 
-## Shipped Plugins
+## Custom Plugins
 
-Mycelium ships example plugins in the `plugins/` directory of the repository. These are reference implementations you can install directly.
+Mycelium keeps the plugin directory for user-defined and experimental filters. Core integrations should prefer built-in Rust commands, such as `mycelium atmos`, instead of shipped shell plugins.
 
-| Plugin | Command | What it filters |
-|--------|---------|-----------------|
-| `atmos.sh` | `atmos` | Terraform plan/apply output, `describe` JSON/YAML, validation errors |
-
-### Real-world example: atmos
-
-`plugins/atmos.sh` filters output from [atmos](https://atmos.tools/) — Cloud Posse's infrastructure orchestration tool that wraps Terraform with stacks and components.
-
-It routes output by type:
-- **`terraform plan`** output → extracts resource change lines (`# module.x`) and the summary (`Plan: N to add`)
-- **`terraform apply`** output → extracts completion messages (`Apply complete!`, `Creation complete`)
-- **`describe stacks/component`** output → extracts JSON/YAML keys with `jq` or truncates to 50 lines
-- **`validate`** output → shows only errors and warnings, suppresses success lines
-- **Other commands** → passes through unchanged
-
-Install and test:
-```bash
-./scripts/install-plugin.sh atmos
-
-# Test with sample plan output
-echo "Plan: 3 to add, 1 to change, 0 to destroy." | ~/.config/mycelium/plugins/atmos.sh
-```
-
-## Installing Shipped Plugins
-
-Use `scripts/install-plugin.sh` to copy plugins from the repo to your plugin directory:
+To add a custom plugin:
 
 ```bash
-# List available plugins
-./scripts/install-plugin.sh --list
-
-# Install a specific plugin
-./scripts/install-plugin.sh atmos
-
-# Install all shipped plugins
-./scripts/install-plugin.sh --all
-
-# Force overwrite if already installed
-./scripts/install-plugin.sh --force atmos
+mkdir -p ~/.config/mycelium/plugins
+$EDITOR ~/.config/mycelium/plugins/somecommand.sh
+chmod 755 ~/.config/mycelium/plugins/somecommand.sh
 ```
 
-The script creates `~/.config/mycelium/plugins/` if it doesn't exist and sets `chmod 755` on installed plugins.
+The filename must match the wrapped command. For example, `somecommand.sh` handles `somecommand ...`.
 
 **Verify installation**:
 ```bash
 ls -la ~/.config/mycelium/plugins/
-# -rwxr-xr-x  atmos.sh
 ```
 
 ## See Also

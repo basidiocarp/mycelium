@@ -41,31 +41,6 @@ fn shell_single_quote(value: &str) -> String {
 }
 
 #[cfg(unix)]
-fn resolve_path_on_path(command: &str) -> Option<PathBuf> {
-    use std::os::unix::fs::PermissionsExt;
-
-    let path_var = std::env::var_os("PATH")?;
-    for dir in std::env::split_paths(&path_var) {
-        let candidate = dir.join(command);
-        let metadata = match fs::metadata(&candidate) {
-            Ok(metadata) => metadata,
-            Err(_) => continue,
-        };
-
-        if metadata.is_file() && metadata.permissions().mode() & 0o111 != 0 {
-            return Some(candidate);
-        }
-    }
-
-    None
-}
-
-#[cfg(unix)]
-pub(crate) fn command_on_path(command: &str) -> bool {
-    resolve_path_on_path(command).is_some()
-}
-
-#[cfg(unix)]
 pub(crate) fn extract_quoted_assignment(content: &str, name: &str) -> Option<String> {
     let prefix = format!("{name}=");
     let value = content
@@ -127,7 +102,7 @@ pub(crate) fn render_rewrite_hook(mycelium_bin: Option<&Path>, jq_bin: Option<&P
 #[cfg(unix)]
 fn resolve_hook_dependencies() -> (Option<PathBuf>, Option<PathBuf>) {
     let mycelium_bin = std::env::current_exe().ok();
-    let jq_bin = resolve_path_on_path("jq");
+    let jq_bin = crate::platform::command_path("jq");
     (mycelium_bin, jq_bin)
 }
 

@@ -223,7 +223,7 @@ pub fn detect_package_manager() -> &'static str {
 /// Build a Command using the detected package manager's exec mechanism.
 /// Returns a Command ready to have tool-specific args appended.
 pub fn package_manager_exec(tool: &str) -> Command {
-    let tool_exists = which::which(tool).is_ok();
+    let tool_exists = crate::platform::command_on_path(tool);
 
     if tool_exists {
         Command::new(tool)
@@ -256,8 +256,7 @@ pub fn package_manager_exec(tool: &str) -> Command {
 
 /// Check if a command exists in PATH. Returns the full path if found.
 pub fn which_command(cmd: &str) -> Option<String> {
-    which::which(cmd)
-        .ok()
+    crate::platform::command_path(cmd)
         .map(|path| path.to_string_lossy().trim().to_string())
         .filter(|path| !path.is_empty())
 }

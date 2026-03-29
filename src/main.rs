@@ -1,4 +1,5 @@
 //! Mycelium CLI entry point — parses arguments and dispatches to command handlers.
+mod atmos_cmd;
 mod aws_cmd;
 mod benchmark_cmd;
 mod cargo_cmd;
@@ -233,6 +234,20 @@ mod tests {
     fn test_try_parse_valid_git_status() {
         let result = Cli::try_parse_from(["mycelium", "git", "status"]);
         assert!(result.is_ok(), "git status should parse successfully");
+    }
+
+    #[test]
+    fn test_try_parse_atmos_terraform_plan() {
+        let cli = Cli::try_parse_from(["mycelium", "atmos", "terraform", "plan", "--stack", "dev"])
+            .unwrap();
+        match cli.command {
+            Commands::Atmos {
+                command: AtmosCommands::Terraform { args },
+            } => {
+                assert_eq!(args, vec!["plan", "--stack", "dev"]);
+            }
+            _ => panic!("Expected Atmos Terraform command"),
+        }
     }
 
     #[test]

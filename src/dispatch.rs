@@ -4,9 +4,9 @@ use std::path::Path;
 
 use crate::commands::*;
 use crate::{
-    aws_cmd, cargo_cmd, cc_economics, completions_cmd, config, container_cmd, curl_cmd, deps,
-    diff_cmd, discover, env_cmd, find_cmd, format_cmd, gain, gh_cmd, git, go_eco, grep_cmd, gt_cmd,
-    hook_audit_cmd, init, integrity, js, json_cmd, json_output, learn, lint_cmd, local_llm,
+    atmos_cmd, aws_cmd, cargo_cmd, cc_economics, completions_cmd, config, container_cmd, curl_cmd,
+    deps, diff_cmd, discover, env_cmd, find_cmd, format_cmd, gain, gh_cmd, git, go_eco, grep_cmd,
+    gt_cmd, hook_audit_cmd, init, integrity, js, json_cmd, json_output, learn, lint_cmd, local_llm,
     log_cmd, ls_cmd, parse_health_cmd, psql_cmd, python, read_cmd, rewrite_cmd, runner_cmd,
     self_update_cmd, summary_cmd, terraform_cmd, tracking, tree_cmd, utils, wc_cmd, wget_cmd,
 };
@@ -204,6 +204,10 @@ pub fn dispatch(cli: Cli) -> Result<()> {
                 aws_cmd::run_generic(&service, &args, cli.verbose)?;
             }
         },
+
+        Commands::Atmos { command } => {
+            dispatch_atmos_commands(command, cli.verbose)?;
+        }
 
         Commands::Psql { args } => {
             psql_cmd::run(&args, cli.verbose)?;
@@ -1120,6 +1124,37 @@ fn dispatch_terraform_commands(command: TerraformCommands, verbose: u8) -> Resul
         }
         TerraformCommands::Other(args) => {
             terraform_cmd::run_passthrough(
+                &args
+                    .iter()
+                    .map(|s| s.to_string_lossy().to_string())
+                    .collect::<Vec<_>>(),
+                verbose,
+            )?;
+        }
+    }
+
+    Ok(())
+}
+
+fn dispatch_atmos_commands(command: AtmosCommands, verbose: u8) -> Result<()> {
+    match command {
+        AtmosCommands::Terraform { args } => {
+            atmos_cmd::run_terraform(&args, verbose)?;
+        }
+        AtmosCommands::Describe { args } => {
+            atmos_cmd::run_describe(&args, verbose)?;
+        }
+        AtmosCommands::Validate { args } => {
+            atmos_cmd::run_validate(&args, verbose)?;
+        }
+        AtmosCommands::Workflow { args } => {
+            atmos_cmd::run_workflow(&args, verbose)?;
+        }
+        AtmosCommands::Version { args } => {
+            atmos_cmd::run_version(&args, verbose)?;
+        }
+        AtmosCommands::Other(args) => {
+            atmos_cmd::run_passthrough(
                 &args
                     .iter()
                     .map(|s| s.to_string_lossy().to_string())

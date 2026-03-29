@@ -1,8 +1,8 @@
 //! `mycelium plugin` — manage user-defined filter plugins.
 //!
-//! Replaces `scripts/install-plugin.sh` with a built-in command. Shipped plugin
-//! templates are embedded in the binary via `include_str!`, so users don't need
-//! to clone the repo.
+//! Mycelium no longer ships built-in plugin templates for core integrations.
+//! The plugin directory remains available for user-defined and experimental
+//! filters.
 
 use anyhow::{Context, Result};
 use colored::Colorize;
@@ -17,11 +17,7 @@ struct ShippedPlugin {
     content: &'static str,
 }
 
-const SHIPPED_PLUGINS: &[ShippedPlugin] = &[ShippedPlugin {
-    name: "atmos",
-    description: "Atmos infrastructure orchestration (terraform, describe, validate)",
-    content: include_str!("../plugins/atmos.sh"),
-}];
+const SHIPPED_PLUGINS: &[ShippedPlugin] = &[];
 
 // ── Public API ───────────────────────────────────────────────────────────────
 
@@ -31,19 +27,26 @@ pub fn run_list() -> Result<()> {
 
     // Shipped plugins (built into binary)
     println!("  {}", "Shipped:".dimmed());
-    for plugin in SHIPPED_PLUGINS {
-        let installed = is_installed(plugin.name);
-        let icon = if installed {
-            "✓".green().to_string()
-        } else {
-            " ".to_string()
-        };
+    if SHIPPED_PLUGINS.is_empty() {
         println!(
-            "  {} {:<16} {}",
-            icon,
-            plugin.name,
-            plugin.description.dimmed()
+            "    {}",
+            "No built-in plugins ship with this release.".dimmed()
         );
+    } else {
+        for plugin in SHIPPED_PLUGINS {
+            let installed = is_installed(plugin.name);
+            let icon = if installed {
+                "✓".green().to_string()
+            } else {
+                " ".to_string()
+            };
+            println!(
+                "  {} {:<16} {}",
+                icon,
+                plugin.name,
+                plugin.description.dimmed()
+            );
+        }
     }
 
     // User plugins (already installed)
@@ -78,6 +81,12 @@ pub fn run_list() -> Result<()> {
 }
 
 pub fn run_install(name: &str, force: bool) -> Result<()> {
+    if SHIPPED_PLUGINS.is_empty() {
+        anyhow::bail!(
+            "No shipped plugins are available in this release. Install custom plugins by placing executable filters in the plugin directory."
+        );
+    }
+
     let plugin = SHIPPED_PLUGINS
         .iter()
         .find(|p| p.name == name)
@@ -188,8 +197,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_shipped_plugins_not_empty() {
-        assert!(!SHIPPED_PLUGINS.is_empty());
+    fn test_shipped_plugins_array_is_valid() {
+        assert!(SHIPPED_PLUGINS.iter().all(|plugin| !plugin.name.is_empty()));
     }
 
     #[test]
