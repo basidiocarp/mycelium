@@ -2,6 +2,19 @@
 
 All notable changes to Mycelium are documented in this file.
 
+## v0.7.4 - 2026-03-28
+
+### Changed
+
+- **Claude host capability model**: `mycelium init`, `mycelium doctor`, and related setup paths now use an explicit supported-vs-unsupported Claude capability boundary instead of scattering Unix-only behavior through the entry points.
+- **Cleaner unsupported-host fallback**: Non-Unix environments now report the Claude Code Bash hook adapter as unsupported while treating `mycelium init -g --claude-md` as the supported global docs-only fallback.
+- **More accurate setup guidance**: CLI help, ecosystem setup docs, and update docs now distinguish hook-adapter setup from docs-only `CLAUDE.md` setup and call out the correct global-vs-local scope.
+
+### Fixed
+
+- **Docs-only uninstall gap**: `mycelium init -g --uninstall` now removes legacy global `CLAUDE.md` Mycelium instructions in addition to hook-based artifacts.
+- **Doctor fallback visibility**: `mycelium doctor` now has a healthy path for the supported global docs-only Claude fallback instead of reporting unsupported hosts as uniformly broken.
+
 ## v0.7.3 - 2026-03-28
 
 ### Changed
