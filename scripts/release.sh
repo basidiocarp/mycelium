@@ -88,11 +88,14 @@ CHANGELOG=""
 add_section() {
     local title="$1" prefix="$2"
     local commits
-    commits=$(git log "$RANGE" --pretty=format:"%s|%h" --no-merges | grep -E "^${prefix}" | while IFS='|' read -r msg hash; do
-        # Strip type prefix for cleaner display
-        desc=$(echo "$msg" | sed -E "s/^${prefix}:?\s*//")
-        echo "- ${desc} (\`${hash}\`)"
-    done)
+    # Use awk instead of grep so "no matches" produces empty output instead of
+    # aborting the script under `set -euo pipefail`.
+    commits=$(git log "$RANGE" --pretty=format:"%s|%h" --no-merges | awk -F'|' -v prefix="$prefix" '
+        $1 ~ ("^" prefix ":?[[:space:]]*") {
+            sub("^" prefix ":?[[:space:]]*", "", $1)
+            printf "- %s (`%s`)\n", $1, $2
+        }
+    ')
     if [ -n "$commits" ]; then
         CHANGELOG="${CHANGELOG}### ${title}\n${commits}\n\n"
     fi
@@ -108,9 +111,11 @@ add_section "Chores" "chore"
 add_section "CI" "ci"
 
 # Catch any commits that don't match conventional format
-OTHER=$(git log "$RANGE" --pretty=format:"%s|%h" --no-merges | grep -vE "^(feat|fix|perf|refactor|docs|test|chore|ci)" | while IFS='|' read -r msg hash; do
-    echo "- ${msg} (\`${hash}\`)"
-done)
+OTHER=$(git log "$RANGE" --pretty=format:"%s|%h" --no-merges | awk -F'|' '
+    $1 !~ /^(feat|fix|perf|refactor|docs|test|chore|ci):?[[:space:]]*/ {
+        printf "- %s (`%s`)\n", $1, $2
+    }
+')
 if [ -n "$OTHER" ]; then
     CHANGELOG="${CHANGELOG}### Other\n${OTHER}\n\n"
 fi
