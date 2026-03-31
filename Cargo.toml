@@ -33,7 +33,7 @@ rusqlite = { version = "0.39", features = ["bundled"] }
 toml = "1"
 jiff = "0.2"
 tempfile = "3"
-sha2 = "0.10"
+sha2 = "0.11"
 ureq = "3"
 strip-ansi-escapes = "0.2"
 spore = { git = "https://github.com/basidiocarp/spore", tag = "v0.4.6" }
