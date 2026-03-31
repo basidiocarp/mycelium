@@ -145,7 +145,7 @@ mod tests {
     }
 
     fn count_tokens(text: &str) -> usize {
-        text.split_whitespace().count()
+        crate::tracking::estimate_tokens(text)
     }
 
     #[test]

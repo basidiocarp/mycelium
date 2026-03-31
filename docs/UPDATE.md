@@ -101,22 +101,28 @@ npm run dev:all
 
 ## After Updating
 
-After updating any tool, re-run `stipe init` to refresh onboarding and repair flows. If you changed hooks or client wiring, follow it with `mycelium init --ecosystem` to re-apply the lower-level integration:
+After updating any ecosystem tool, re-run:
 
 ```bash
 stipe init
-mycelium init --ecosystem
 ```
 
 This will:
 
 1. Detect the new versions
 2. Repair onboarding state if needed
-3. Re-register MCP servers if the lower-level integration changed
-4. Update hook scripts if they're outdated
-5. Initialize any new databases or features
+3. Re-register MCP servers if needed
+4. Repair shared ecosystem integration managed by Stipe
 
-If you're on a platform where the Mycelium Claude Code Bash hook adapter is not supported, use `mycelium init -g --claude-md` for the global Claude Code docs-only fallback instead of expecting the hook flow to be repaired locally. Use `mycelium init --claude-md` only for project-local instructions.
+If you want to refresh Mycelium-owned Claude surfaces specifically, use the retained Mycelium init modes:
+
+```bash
+mycelium init -g
+mycelium init -g --claude-md
+mycelium init --claude-md
+```
+
+Use `mycelium init -g` to repair the hook adapter on supported platforms, the docs-only global form for user-wide guidance, and the local form for a project `CLAUDE.md`.
 
 Example output:
 
@@ -129,17 +135,17 @@ Basidiocarp Ecosystem Status
   rhizome       v0.4.1       ✓ installed (new)
   cap           v1.2.1       ✓ installed (new)
 
-Configuring Claude Code...
+Repairing ecosystem setup...
 
   ✓ Configured:
-    - hyphae MCP (already registered)
-    - rhizome MCP (already registered)
-    - mycelium hooks + CLAUDE.md
+    - hyphae MCP
+    - rhizome MCP
+    - shared setup and client wiring
 ```
 
 ## Restarting Claude Code
 
-After updating Mycelium hooks or re-running `mycelium init --ecosystem`, restart Claude Code to pick up changes:
+After updating Mycelium or refreshing Mycelium-managed Claude Code setup, restart Claude Code to pick up changes:
 
 1. Close Claude Code entirely
 2. Wait 2 seconds
@@ -227,10 +233,10 @@ If Claude Code stops filtering commands after an update on macOS/Linux:
 ls -la ~/.claude/hooks/mycelium-rewrite.sh
 ```
 
-2. Re-run `stipe init` to repair onboarding state:
+2. Re-run `mycelium init -g` to repair the Claude hook adapter:
 
 ```bash
-stipe init
+mycelium init -g
 ```
 
 3. Check hook is executable:
@@ -267,42 +273,25 @@ hyphae stats     # Usually auto-migrates on first run
 
 Check Hyphae release notes at https://github.com/basidiocarp/hyphae/releases for migration steps.
 
-### MCP server registration fails
+### Setup still looks wrong after update
 
-If MCP registration fails after update:
+If the issue is onboarding, shared repair, or MCP registration, run:
 
 ```bash
-mycelium init --ecosystem
-# ! Failed to register hyphae MCP
+stipe init
 ```
 
-**Solution**:
-
-1. Check the tool is actually installed:
+If the issue is only Mycelium guidance files, refresh them directly:
 
 ```bash
-hyphae serve --help
-rhizome serve --help
+mycelium init -g --claude-md
+mycelium init --claude-md
 ```
 
-2. Check Claude Code CLI is working:
+Inspect the current Mycelium state with:
 
 ```bash
-claude --version
-claude mcp list
-```
-
-3. Try manual registration:
-
-```bash
-claude mcp add --scope user hyphae -- hyphae serve
-claude mcp add --scope user rhizome -- rhizome serve --expanded
-```
-
-4. Check Claude Code settings.json for syntax errors:
-
-```bash
-jq . ~/.claude/settings.json > /dev/null && echo "Valid JSON" || echo "Invalid JSON"
+mycelium config
 ```
 
 ## Checking for Updates
@@ -338,7 +327,7 @@ hyphae --check-updates
 - MYCELIUM.md now in `~/.claude/` instead of `./`
 - `@MYCELIUM.md` references replace 137-line blocks in CLAUDE.md
 
-**Action**: Run `mycelium init -g` to migrate automatically. Old configs are backed up.
+**Action**: Run `mycelium init -g --claude-md` to refresh the global Mycelium guidance files. Old configs are backed up.
 
 ### From Hyphae 0.2.x to 0.3.x
 
@@ -367,14 +356,14 @@ cargo install --locked --git https://github.com/basidiocarp/hyphae hyphae-cli@0.
 Then re-run:
 
 ```bash
-mycelium init --ecosystem
+stipe init
 ```
 
 Report the issue on GitHub so it can be fixed.
 
 ## What to Expect After Update
 
-After updating and re-running `mycelium init --ecosystem`, you should see:
+After updating and re-running `stipe init` plus any needed Mycelium hook refresh, you should see:
 
 1. **Improved token savings** — New filter logic usually means better compression
 2. **New Hyphae features** — Latest memory recall features, better full-text search
@@ -384,7 +373,7 @@ After updating and re-running `mycelium init --ecosystem`, you should see:
 If you notice degraded performance or missing features, check GitHub issues or run:
 
 ```bash
-mycelium init --ecosystem -vv   # Verbose output
+mycelium config
 ```
 
 And report what you find.

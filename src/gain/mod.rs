@@ -19,6 +19,7 @@ pub fn run(
     explain: bool,
     graph: bool,
     history: bool,
+    limit: usize,
     quota: bool,
     tier: &str,
     daily: bool,
@@ -71,6 +72,8 @@ pub fn run(
                 weekly,
                 monthly,
                 all,
+                history,
+                limit,
                 project_scope.as_deref(),
             );
         }
@@ -94,6 +97,7 @@ pub fn run(
             project_scope.as_deref(),
             graph,
             history,
+            limit,
             quota,
             tier,
         );

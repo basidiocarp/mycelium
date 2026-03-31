@@ -354,7 +354,7 @@ ___
         let result = filter_markdown_body(input);
 
         fn count_tokens(text: &str) -> usize {
-            text.split_whitespace().count()
+            crate::tracking::estimate_tokens(text)
         }
 
         let input_tokens = count_tokens(input);

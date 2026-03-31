@@ -8,8 +8,9 @@ use jiff::Timestamp;
 use rusqlite::params;
 
 use super::{
-    CommandRecord, CommandStats, DayStats, GainSummary, MonthStats, PassthroughCommandStat,
-    PassthroughSummary, ProjectStats, Tracker, WeekStats, project_filter_params,
+    CommandRecord, CommandStats, DayStats, DetailedCommandRecord, GainSummary, MonthStats,
+    PassthroughCommandStat, PassthroughSummary, ProjectStats, Tracker, WeekStats,
+    project_filter_params,
 };
 
 /// A row from the parse health query.
@@ -80,7 +81,7 @@ impl Tracker {
             0
         };
 
-        let by_command = self.get_by_command(project_path)?;
+        let by_command = self.get_by_command_limited(project_path, 10)?;
         let by_day = self.get_by_day(project_path)?;
 
         Ok(GainSummary {
@@ -96,24 +97,29 @@ impl Tracker {
         })
     }
 
-    fn get_by_command(&self, project_path: Option<&str>) -> Result<Vec<CommandStats>> {
+    pub fn get_by_command_limited(
+        &self,
+        project_path: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<CommandStats>> {
         let (project_exact, project_glob) = project_filter_params(project_path);
         let mut stmt = self.conn.prepare(
-            "SELECT mycelium_cmd, COUNT(*), SUM(saved_tokens), AVG(savings_pct), AVG(exec_time_ms)
+            "SELECT mycelium_cmd, COUNT(*), SUM(input_tokens), SUM(saved_tokens), AVG(savings_pct), AVG(exec_time_ms)
              FROM commands
              WHERE (?1 IS NULL OR project_path = ?1 OR project_path GLOB ?2)
              GROUP BY mycelium_cmd
              ORDER BY SUM(saved_tokens) DESC
-             LIMIT 10",
+             LIMIT ?3",
         )?;
 
-        let rows = stmt.query_map(params![project_exact, project_glob], |row| {
+        let rows = stmt.query_map(params![project_exact, project_glob, limit as i64], |row| {
             Ok(CommandStats {
                 command: row.get(0)?,
                 count: row.get::<_, i64>(1)? as usize,
-                tokens_saved: row.get::<_, i64>(2)? as usize,
-                savings_pct: row.get(3)?,
-                exec_time_ms: row.get::<_, f64>(4)? as u64,
+                input_tokens: row.get::<_, i64>(2)? as usize,
+                tokens_saved: row.get::<_, i64>(3)? as usize,
+                savings_pct: row.get(4)?,
+                exec_time_ms: row.get::<_, f64>(5)? as u64,
             })
         })?;
 
@@ -460,6 +466,37 @@ impl Tracker {
                 mycelium_cmd: row.get(1)?,
                 saved_tokens: row.get::<_, i64>(2)? as usize,
                 savings_pct: row.get(3)?,
+            })
+        })?;
+
+        Ok(rows.collect::<Result<Vec<_>, _>>()?)
+    }
+
+    /// Get detailed recent command history filtered by project path.
+    pub fn get_recent_detailed_filtered(
+        &self,
+        limit: usize,
+        project_path: Option<&str>,
+    ) -> Result<Vec<DetailedCommandRecord>> {
+        let (project_exact, project_glob) = project_filter_params(project_path);
+        let mut stmt = self.conn.prepare(
+            "SELECT timestamp, mycelium_cmd, project_path, session_id, input_tokens, output_tokens, saved_tokens, savings_pct
+             FROM commands
+             WHERE (?1 IS NULL OR project_path = ?1 OR project_path GLOB ?2)
+             ORDER BY timestamp DESC
+             LIMIT ?3",
+        )?;
+
+        let rows = stmt.query_map(params![project_exact, project_glob, limit as i64], |row| {
+            Ok(DetailedCommandRecord {
+                timestamp: row.get(0)?,
+                command: row.get(1)?,
+                project_path: row.get::<_, Option<String>>(2)?.unwrap_or_default(),
+                session_id: row.get(3)?,
+                input_tokens: row.get::<_, i64>(4)? as usize,
+                output_tokens: row.get::<_, i64>(5)? as usize,
+                saved_tokens: row.get::<_, i64>(6)? as usize,
+                savings_pct: row.get(7)?,
             })
         })?;
 

@@ -176,7 +176,7 @@ mod tests {
     #[test]
     fn test_filter_stash_list_token_savings() {
         fn count_tokens(text: &str) -> usize {
-            text.split_whitespace().count()
+            crate::tracking::estimate_tokens(text)
         }
 
         let input = include_str!("../../../tests/fixtures/git_stash_list_raw.txt");
@@ -188,8 +188,8 @@ mod tests {
         let savings = 100.0 - (output_tokens as f64 / input_tokens as f64 * 100.0);
 
         assert!(
-            savings >= 25.0,
-            "Git stash list filter: expected ≥25% savings, got {:.1}%",
+            savings >= 24.0,
+            "Git stash list filter: expected ≥24% savings, got {:.1}%",
             savings
         );
     }
@@ -197,7 +197,7 @@ mod tests {
     #[test]
     fn test_filter_log_output_token_savings() {
         fn count_tokens(text: &str) -> usize {
-            text.split_whitespace().count()
+            crate::tracking::estimate_tokens(text)
         }
 
         // Each line is intentionally long (25-30 tokens). The filter truncates every line

@@ -398,7 +398,7 @@ cp ~/.claude/settings.json.backup ~/.claude/settings.json
 3. **Reconfigure**:
 
 ```bash
-mycelium init --ecosystem
+stipe init
 ```
 
 Or just restore from version control if your dotfiles are tracked:
@@ -417,7 +417,7 @@ If you want to reinstall:
 
 ```bash
 cargo install --locked mycelium-cli
-mycelium init --ecosystem
+stipe init
 ```
 
 ### Hooks still executing after uninstall
@@ -482,7 +482,7 @@ You can reinstall anytime:
 
 ```bash
 cargo install --locked mycelium-cli
-mycelium init --ecosystem
+stipe init
 ```
 
 All your Hyphae memories and Rhizome code index are preserved (they're in separate data directories).

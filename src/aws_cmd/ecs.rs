@@ -151,7 +151,7 @@ mod tests {
     #[test]
     fn test_filter_ecs_list_services_token_savings() {
         fn count_tokens(text: &str) -> usize {
-            text.split_whitespace().count()
+            crate::tracking::estimate_tokens(text)
         }
 
         // Real AWS CLI JSON responses include ResponseMetadata, nextToken, and other verbose
@@ -192,7 +192,7 @@ mod tests {
     #[test]
     fn test_filter_ecs_describe_services_token_savings() {
         fn count_tokens(text: &str) -> usize {
-            text.split_whitespace().count()
+            crate::tracking::estimate_tokens(text)
         }
 
         let input = r#"{

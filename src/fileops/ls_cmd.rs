@@ -315,7 +315,7 @@ mod tests {
     #[test]
     fn test_ls_token_savings() {
         fn count_tokens(text: &str) -> usize {
-            text.split_whitespace().count()
+            crate::tracking::estimate_tokens(text)
         }
 
         let input = include_str!("../../tests/fixtures/ls_lah_output_raw.txt");

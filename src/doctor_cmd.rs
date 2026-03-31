@@ -327,7 +327,7 @@ fn check_binary_collision() {
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 fn config_path_best_effort() -> Option<PathBuf> {
-    dirs::config_dir().map(|d| d.join("mycelium").join("config.toml"))
+    Some(spore::paths::config_path("mycelium"))
 }
 
 #[cfg(test)]

@@ -259,7 +259,7 @@ mod tests {
     #[test]
     fn test_filter_golangci_token_savings() {
         fn count_tokens(text: &str) -> usize {
-            text.split_whitespace().count()
+            crate::tracking::estimate_tokens(text)
         }
 
         // Real golangci-lint JSON output includes SourceLines, Replacement, and other verbose

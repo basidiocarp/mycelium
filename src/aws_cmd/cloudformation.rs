@@ -186,7 +186,7 @@ mod tests {
     #[test]
     fn test_filter_cfn_list_stacks_token_savings() {
         fn count_tokens(text: &str) -> usize {
-            text.split_whitespace().count()
+            crate::tracking::estimate_tokens(text)
         }
 
         let input = r#"{
@@ -223,7 +223,7 @@ mod tests {
     #[test]
     fn test_filter_cfn_describe_stacks_token_savings() {
         fn count_tokens(text: &str) -> usize {
-            text.split_whitespace().count()
+            crate::tracking::estimate_tokens(text)
         }
 
         let input = r#"{

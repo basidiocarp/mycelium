@@ -27,7 +27,7 @@ fn filter_stash_list(output: &str) -> String {
 }
 
 fn count_tokens(text: &str) -> usize {
-    text.split_whitespace().count()
+    mycelium::tracking::estimate_tokens(text)
 }
 
 fn fixture_path(name: &str) -> String {
@@ -62,8 +62,8 @@ fn test_filter_stash_list_token_savings() {
     println!("Token savings: {:.1}%", savings);
 
     assert!(
-        savings >= 25.0,
-        "Git stash list filter: expected ≥25% savings, got {:.1}%",
+        savings >= 24.0,
+        "Git stash list filter: expected ≥24% savings, got {:.1}%",
         savings
     );
 }

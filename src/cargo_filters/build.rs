@@ -254,7 +254,7 @@ warning: `mycelium` (bin) generated 2 warnings
     }
 
     fn count_tokens(text: &str) -> usize {
-        text.split_whitespace().count()
+        crate::tracking::estimate_tokens(text)
     }
 
     #[test]

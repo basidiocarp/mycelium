@@ -1,175 +1,62 @@
 # Ecosystem Setup
 
-`stipe init` owns onboarding and repair for the ecosystem. This document describes the lower-level integration work that `mycelium init --ecosystem` performs once the tools are already installed.
+`stipe init` owns ecosystem onboarding, shared repair, and MCP registration.
+
+This document covers the remaining Mycelium-specific setup surfaces:
+- Claude Code docs-only setup
+- configuration inspection
+- uninstall and cleanup
 
 ## Overview
 
-`mycelium init --ecosystem` detects which Basidiocarp tools you have installed and configures the integration pieces they need across your AI coding clients (Claude Code, Cursor, Windsurf, Cline, Continue, Claude Desktop).
-
-It's idempotent — you can run it multiple times without problems, and it's safe to re-run after installing new tools.
-
-## What It Does
-
-### 1. Detects Installed Tools
-
-Mycelium checks which tools are available in your PATH:
-
-```
-mycelium (already running this, so it's always installed)
-hyphae   — persistent agent memory system
-rhizome  — code intelligence (tree-sitter + LSP)
-cap      — optional web dashboard for memory browser + analytics
-```
-
-Example output:
-```
-Basidiocarp Ecosystem Status
-───────────────────────────────────────────────────────────────────────────
-
-  mycelium      v0.5.2       ✓ installed
-  hyphae        v0.3.0       ✓ installed
-  rhizome       v0.4.0       ✓ installed
-  cap           ─            ✗ not installed
-```
-
-### 2. Configures Claude Code (If Installed)
-
-If the `claude` CLI is in your PATH, Mycelium registers MCP servers and installs hooks:
-
-#### MCP Servers
-
-- **Hyphae MCP** — Registers `hyphae serve` so Claude Code can access your agent memories, retrieve command outputs, and search the knowledge graph.
-- **Rhizome MCP** — Registers `rhizome serve --expanded` so Claude Code can query code symbols, get LSP completions, and browse the codebase structure.
-
-#### Hooks
-
-Mycelium's own Claude Code hook adapter is currently a macOS/Linux flow. It installs into `~/.claude/hooks/` and registers in `~/.claude/settings.json`:
-
-1. **mycelium-rewrite.sh** (PreToolUse) — Rewrites commands to use `mycelium` for 60-90% token savings through the Bash thin delegator used by Claude Code on macOS/Linux.
-
-2. **session-summary.sh** (Stop) — Captures session metrics (duration, tokens used, errors) and stores them in Hyphae when the Claude Code session ends.
-
-3. **capture-errors.js** (PostToolUse, Bash) — Captures error messages from failed commands and stores them in Hyphae for later analysis.
-
-4. **capture-corrections.js** (PostToolUse, Write/Edit) — Captures code corrections and file edits and stores them in Hyphae as learnings.
-
-5. **capture-code-changes.js** (PostToolUse, Write/Edit/Bash) — Captures all code changes (new files, edits, deletions) and tracks them as memoirs in Hyphae.
-
-On Windows, use `mycelium init -g --claude-md` for the global Claude Code docs-only fallback instead of the Bash hook adapter. Use `mycelium init --claude-md` only when you want a project-local `CLAUDE.md`.
-
-#### Hyphae Database Initialization
-
-If Hyphae is installed but the database doesn't exist, Mycelium initializes it by running:
-
-```bash
-hyphae stats
-```
-
-This creates the SQLite database at:
-
-- **macOS**: `~/Library/Application Support/hyphae/hyphae.db`
-- **Linux**: `~/.local/share/hyphae/hyphae.db`
-- **Windows**: `%APPDATA%\hyphae\hyphae.db`
-
-#### CLAUDE.md Configuration
-
-When the hook adapter flow is supported, Mycelium patches your `~/.claude/CLAUDE.md` (or creates it) with:
-
-- A reference to `@MYCELIUM.md` (a slim 10-line file with golden rules)
-- Information about token savings and Hyphae/Rhizome integration
-
-If an old 137-line Mycelium block is present, it's replaced with the new slim reference.
-
-On platforms where the Bash hook adapter is not supported, `--claude-md` remains available as the docs-only fallback.
-
-### 3. Configures Other MCP Clients
-
-If you have other MCP clients installed, Mycelium auto-detects and configures them:
-
-| Client | Config Location | MCP Servers Registered |
-|--------|-----------------|------------------------|
-| **Cursor** | `~/.cursor/mcp.json` | hyphae, rhizome |
-| **Windsurf** | `~/.windsurf/mcp.json` | hyphae, rhizome |
-| **Cline** | `.vscode/cline_mcp_config.json` (project-local) | hyphae, rhizome |
-| **Continue** | `~/.continue/config.json` | hyphae, rhizome |
-| **Claude Desktop** | `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `~/.config/Claude/claude_desktop_config.json` (Linux) | hyphae, rhizome |
-
-You can also configure a specific client manually:
-
-```bash
-mycelium init --ecosystem --client cursor
-mycelium init --ecosystem --client windsurf
-mycelium init --ecosystem --client cline
-```
-
-### 4. Reports Missing Tools
-
-If tools are missing, Mycelium shows install commands:
-
-```
-Missing tools:
-  hyphae    → cargo install --git https://github.com/basidiocarp/hyphae hyphae-cli --no-default-features
-  rhizome   → cargo install --git https://github.com/basidiocarp/rhizome rhizome-cli
-  cap       → git clone https://github.com/basidiocarp/cap && cd cap && npm i && npm run dev:all
-
-Or install all: curl -sSfL https://raw.githubusercontent.com/basidiocarp/.github/main/install.sh | sh
-```
-
-## Running the Setup
-
-### Primary Onboarding
+Use `stipe init` for first-time setup and shared ecosystem repair:
 
 ```bash
 stipe init
 ```
 
-Use this for first-time setup and repair. It owns the operator-facing flow.
+Use Mycelium directly only for Mycelium-owned guidance files, hook adapter repair, and configuration inspection or cleanup.
 
-### Lower-Level Integration
+## Mycelium-Owned Setup Modes
 
-```bash
-mycelium init --ecosystem
-```
+### Global Claude Code Guidance
 
-This applies the Mycelium-side integration without the onboarding wrapper. Good for:
-
-- CI/CD pipelines
-- Scripted setup
-- Re-running after installing new tools
-
-### Configure Specific Client
+Install global docs-only guidance without shell hook setup:
 
 ```bash
-mycelium init --ecosystem --client claude-code
-mycelium init --ecosystem --client cursor
-mycelium init --ecosystem --client generic
+mycelium init -g --claude-md
 ```
 
-The `--client generic` flag prints a JSON snippet you can use to manually configure any MCP client:
+This writes or updates Mycelium guidance in the user Claude Code directory. Use it when you want global instructions but do not want to run full ecosystem setup from Mycelium.
 
-```json
-{
-  "mcpServers": {
-    "hyphae": {
-      "command": "hyphae",
-      "args": ["serve"]
-    },
-    "rhizome": {
-      "command": "rhizome",
-      "args": ["serve", "--expanded"]
-    }
-  }
-}
+### Claude Code Hook Adapter Repair
+
+On supported platforms, reinstall or repair the Mycelium Claude Code hook adapter with:
+
+```bash
+mycelium init -g
 ```
+
+This refreshes the thin delegator hook, `MYCELIUM.md`, and the Claude settings patch that Mycelium still owns.
+
+### Project-Local Claude Code Guidance
+
+Write project-local guidance only:
+
+```bash
+mycelium init --claude-md
+```
+
+Use this when you want a `CLAUDE.md` in the current repository without changing global setup.
 
 ## Verification
 
-### Check Configuration
+### Check Current Configuration
 
-To see what's installed and configured:
+Inspect the current Mycelium-managed state:
 
 ```bash
-mycelium show config
+mycelium config
 ```
 
 Example output:
@@ -177,191 +64,83 @@ Example output:
 ```
 mycelium Configuration:
 
-ok Hook: /Users/alice/.claude/hooks/mycelium-rewrite.sh (thin delegator, version 0.5.2)
-ok MYCELIUM.md: /Users/alice/.claude/MYCELIUM.md (slim mode)
-ok Integrity: hook hash verified
+ok MYCELIUM.md: /Users/alice/.claude/MYCELIUM.md
 ok Global (~/.claude/CLAUDE.md): @MYCELIUM.md reference
 ok Local (./CLAUDE.md): mycelium enabled
-ok settings.json: Mycelium hook configured
-```
-
-### Run Diagnostics
-
-```bash
-mycelium doctor      # Mycelium checks
-hyphae doctor        # Hyphae database + configuration
-rhizome doctor       # Rhizome LSP servers + code intelligence
-```
-
-### Test the Setup
-
-After running `stipe init` and any required `mycelium init --ecosystem` integration, test it in Claude Code:
-
-1. Open Claude Code
-2. Try a simple command: `git status`
-3. You should see filtered, condensed output (not raw git output)
-4. Run: `mycelium gain` to see token savings
-
-Example:
-
-```bash
-# In Claude Code terminal
-git status
-# Output:
-# On branch main, working tree clean
-
-# Raw git status would be ~150 tokens
-# Filtered: ~20 tokens (87% savings)
 ```
 
 ### Check Token Savings
-
-After a few commands, check accumulated savings:
 
 ```bash
 mycelium gain
 ```
 
-Example output:
+### Confirm CLAUDE.md Output
 
-```
-Token Savings Report
-────────────────────────────────────────────────────────────────
-
-Session:     15 commands, 2,847 → 658 tokens (76.9% savings, saved 2,189 tokens)
-Total:       342 commands, 98,234 → 16,542 tokens (83.2% savings, saved 81,692 tokens)
-
-Top commands by savings:
-  cargo test           87.3% savings (saved 456 tokens)
-  gh pr view           79.2% savings (saved 234 tokens)
-  git log              81.4% savings (saved 892 tokens)
-```
-
-### Check Capture Hooks
-
-Once you've run a few commands in Claude Code, verify that captures are working:
+After running one of the docs-only init modes, verify the expected file exists:
 
 ```bash
-hyphae recall "correction"   # Find code corrections
-hyphae recall "error"        # Find captured errors
-hyphae recall "session"      # Find session summaries
+ls ~/.claude/MYCELIUM.md
+ls ./CLAUDE.md
 ```
+
+Use the global path for `mycelium init -g --claude-md` and the local path for `mycelium init --claude-md`.
 
 ## Re-Running Setup
 
-If the problem is onboarding or repair, rerun `stipe init`.
-
-You can safely re-run `mycelium init --ecosystem` at any time:
-
-- **After installing a new tool** — It will detect and configure the new tool, keeping existing configurations intact.
-- **After updating tools** — It will re-register MCP servers with any new version information.
-- **To fix broken configuration** — It's idempotent; it won't duplicate hooks or settings.
-
-Example workflow:
+If setup, onboarding, shared repair, or MCP registration is the problem, rerun:
 
 ```bash
-# Initial setup
-mycelium init --ecosystem
-
-# Later, install another tool
-cargo install --git https://github.com/basidiocarp/cap cap-cli
-
-# Re-run to configure the new tool
-mycelium init --ecosystem
-
-# Now cap is configured everywhere
+stipe init
 ```
 
-## Configuration Files Created/Modified
+You can re-run the Mycelium docs-only commands whenever you want to refresh guidance files:
 
-Here's what `mycelium init --ecosystem` touches:
+```bash
+mycelium init -g --claude-md
+mycelium init --claude-md
+```
 
-| File | Action | Purpose |
-|------|--------|---------|
-| `~/.claude/hooks/mycelium-rewrite.sh` | Created/Updated | PreToolUse hook for command rewriting |
-| `~/.claude/hooks/session-summary.sh` | Created/Updated | Stop hook for session capture |
-| `~/.claude/hooks/basidiocarp/capture-*.js` | Created/Updated | PostToolUse hooks for error/correction/change capture |
-| `~/.claude/MYCELIUM.md` | Created/Updated | Slim instructions file (10 lines) |
-| `~/.claude/CLAUDE.md` | Patched | Adds `@MYCELIUM.md` reference, migrates old blocks |
-| `~/.claude/settings.json` | Patched | Registers hooks in Claude Code settings |
-| `~/.cursor/mcp.json` | Patched (if Cursor installed) | Registers hyphae, rhizome MCP servers |
-| `~/.windsurf/mcp.json` | Patched (if Windsurf installed) | Registers hyphae, rhizome MCP servers |
-| `~/.continue/config.json` | Patched (if Continue installed) | Registers hyphae, rhizome MCP servers |
-| `~/.config/Claude/claude_desktop_config.json` | Patched (if Claude Desktop installed) | Registers hyphae, rhizome MCP servers |
-| `~/Library/Application Support/hyphae/hyphae.db` | Created (if missing) | Hyphae SQLite database |
-| `~/.local/share/hyphae/hyphae.db` | Created (if missing) | Hyphae SQLite database (Linux) |
+## Uninstall
 
-All changes preserve existing configuration. Nothing is overwritten unless it's outdated Mycelium config.
+Remove Mycelium-managed setup:
+
+```bash
+mycelium init -g --uninstall
+```
+
+Use `mycelium config` before and after uninstall if you want to confirm what changed.
 
 ## Troubleshooting
 
-### Claude Code not found
+### I need onboarding or repair
 
-```
-! claude not found in PATH — skipping Claude Code configuration.
-  Install Claude Code first, then re-run: mycelium init --ecosystem
-```
+Use `stipe init` for ecosystem onboarding, shared repair, and MCP registration. Use `mycelium init -g` if the Claude hook adapter itself needs repair.
 
-**Solution**: Install Claude Code, then re-run the command.
+### My Claude Code guidance files look stale
 
-### MCP registration failed
-
-```
-! Failed to register hyphae MCP
-```
-
-**Solution**:
-
-1. Verify `claude` CLI is installed: `claude --version`
-2. Verify Hyphae is installed: `hyphae --version`
-3. Try manually: `claude mcp add --scope user hyphae -- hyphae serve`
-4. Check `~/.claude/settings.json` for syntax errors
-
-### Hooks not executing in Claude Code
-
-**Solution**:
-
-1. Check hook is executable: `ls -l ~/.claude/hooks/mycelium-rewrite.sh`
-2. Check settings.json is valid JSON: `jq . ~/.claude/settings.json`
-3. Verify hook path in settings.json matches actual file location
-4. Restart Claude Code
-
-### Hyphae database not initializing
-
-```
-! Hyphae database failed to initialize
-```
-
-**Solution**:
+Refresh them directly:
 
 ```bash
-# Manually initialize
-hyphae stats
-
-# Or set data dir explicitly
-export XDG_DATA_HOME=~/.local/share  # Linux
-# or
-export HYPHAE_DATA_DIR=~/Library/Application\ Support/hyphae  # macOS
-hyphae stats
+mycelium init -g --claude-md
+mycelium init --claude-md
 ```
 
-### Captures not working
+### I need to inspect what Mycelium changed
 
-If you're not seeing captured errors, corrections, or code changes in Hyphae:
+Run:
 
-1. Verify Hyphae is installed: `hyphae --version`
-2. Check database exists: `ls -la ~/Library/Application\ Support/hyphae/hyphae.db` (macOS)
-3. Try manually storing: `hyphae store --topic test --content "test" `
-4. Check hook output: Look for errors in Claude Code's output/error panel
+```bash
+mycelium config
+```
 
 ## What Happens Next
 
-Once setup is complete:
+Once setup is complete, Mycelium continues doing its core job:
 
-- **Mycelium** intercepts every command you run in Claude Code and filters output for 60-90% token savings
-- **Hyphae** stores errors, corrections, code changes, and session summaries for later recall
-- **Rhizome** provides code intelligence (symbol lookup, LSP completions, codebase structure)
-- **Token usage** drops significantly on common dev operations
+- filtering and compressing command output for lower token usage
+- routing large output to Hyphae when available
+- using Rhizome structural reads for large code files when available
 
 Example session improvements:
 

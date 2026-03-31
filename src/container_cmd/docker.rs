@@ -262,7 +262,7 @@ mod tests {
     #[test]
     fn test_docker_ps_token_savings() {
         fn count_tokens(text: &str) -> usize {
-            text.split_whitespace().count()
+            crate::tracking::estimate_tokens(text)
         }
 
         // Simulate docker ps output formatting

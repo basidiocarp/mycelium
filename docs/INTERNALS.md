@@ -471,42 +471,26 @@ Last 7 days:
 
 ## Ecosystem Integration
 
-### Initialization: `src/init/ecosystem.rs::run_ecosystem()`
+### Initialization ownership moved to `stipe`
 
-`mycelium init --ecosystem` discovers sibling tools and configures them:
+Ecosystem onboarding, shared repair, and MCP registration now live in `stipe init`.
+`mycelium init` no longer owns sibling-tool discovery or broader ecosystem mutation.
 
-```
-1. Detect installed tools
-   ├─ mycelium (always installed — we're running it)
-   ├─ hyphae (check spore::discover(Tool::Hyphae))
-   ├─ rhizome (check spore::discover(Tool::Rhizome))
-   └─ cap (run `cap --version`)
+Mycelium still owns:
 
-2. Print ecosystem status
-   ├─ List each tool with version
-   └─ Show availability status
+- its local and global instruction surfaces
+- its Claude hook adapter setup
+- its tracking database and token-optimization runtime
 
-3. Configure Claude Code
-   ├─ Check if `claude` CLI is available
-   ├─ For each tool, register MCP server:
-   │   └─ `claude mcp add --scope user <name> -- <binary> <args>`
-   ├─ Examples:
-   │   - hyphae → `hyphae serve`
-   │   - rhizome → `rhizome serve`
-   └─ Show which MCPs were registered
+Use `stipe init` when you need to:
 
-4. Initialize tool databases
-   ├─ hyphae: create SQLite database if missing
-   ├─ rhizome: initialize code index if missing
-   └─ mycelium: create tracking database if missing
+- discover sibling tools
+- register MCP servers
+- repair shared ecosystem registration state
+- bootstrap shared ecosystem services
 
-5. Install capture hooks
-   ├─ session-summary hook (Stop hook)
-   ├─ capture-errors hook (PostToolUse)
-   ├─ capture-corrections hook (PostToolUse)
-   ├─ capture-code-changes hook (PostToolUse)
-   └─ hooks stored in ~/.claude/hooks/basidiocarp/
-```
+The older `src/init/ecosystem.rs` implementation described here was removed as part of the
+Batch 2 ownership convergence work so setup orchestration has a single owner.
 
 ### Hook Installation: `src/init/hook.rs`
 
@@ -722,9 +706,10 @@ src/
 ├── tracking.rs                # SQLite database operations
 ├── init/                      # Setup & installation
 │   ├── mod.rs
-│   ├── ecosystem.rs           # Tool discovery & MCP registration
 │   ├── hook.rs                # Hook installation
 │   ├── claude_md.rs           # CLAUDE.md injection
+│   ├── host_status.rs         # Platform capability reporting and operator hints
+│   ├── json_patch.rs          # Claude settings patch helpers
 │   └── ...
 ├── filter.rs                  # Generic filter infrastructure
 ├── vcs/                       # Version control filters
@@ -777,7 +762,7 @@ src/
 ### With Claude Code
 
 - **Hook**: Shell hook rewrites commands before execution
-- **MCP servers**: Registered via `claude mcp add` (in `init --ecosystem`)
+- **MCP servers**: Registered by `stipe init` during ecosystem setup
 - **Data**: Hyphae chunks accessible to agents via `hyphae_get_command_chunks()`
 
 ### With Cap

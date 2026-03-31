@@ -52,6 +52,13 @@ pub(super) fn current_project_path_string() -> String {
         .unwrap_or_default()
 }
 
+pub(super) fn current_runtime_session_id() -> Option<String> {
+    std::env::var("CLAUDE_SESSION_ID")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
 fn canonicalize_project_path(path: String) -> String {
     canonicalize_pathbuf(PathBuf::from(path))
         .to_string_lossy()

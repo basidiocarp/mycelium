@@ -337,7 +337,7 @@ error: aborting due to 2 previous errors
     }
 
     fn count_tokens(text: &str) -> usize {
-        text.split_whitespace().count()
+        crate::tracking::estimate_tokens(text)
     }
 
     #[test]

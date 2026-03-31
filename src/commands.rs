@@ -511,6 +511,9 @@ pub enum Commands {
         /// Show recent command history
         #[arg(short = 'H', long)]
         history: bool,
+        /// Maximum entries to include in recent history and by-command JSON exports
+        #[arg(long, default_value = "10")]
+        limit: usize,
         /// Show monthly quota savings estimate
         #[arg(short, long)]
         quota: bool,
@@ -607,7 +610,7 @@ pub enum Commands {
     },
 
     // ── Setup ────────────────────────────────────────────────────────────────
-    /// Initialize Mycelium host adapters and CLAUDE.md instructions
+    /// Initialize Mycelium CLAUDE.md instructions and Claude Code hook integration
     #[command(display_order = 110)]
     Init {
         /// Use global ~/.claude integration instead of local CLAUDE.md
@@ -625,18 +628,6 @@ pub enum Commands {
         /// Hook only, no Mycelium.md (Claude Code Bash hook adapter; macOS/Linux only)
         #[arg(long = "hook-only", group = "mode")]
         hook_only: bool,
-
-        /// Detect sibling ecosystem tools and configure available host adapters
-        #[arg(long, group = "mode")]
-        ecosystem: bool,
-
-        /// Interactive onboarding wizard (falls back to --ecosystem if stdin is not a TTY)
-        #[arg(long, group = "mode")]
-        onboard: bool,
-
-        /// Target a specific MCP client (claude-code, codex-cli, cursor, windsurf, cline, continue, claude-desktop, generic)
-        #[arg(long)]
-        client: Option<String>,
 
         /// Auto-patch settings.json without prompting (hook adapter mode)
         #[arg(long = "auto-patch", group = "patch")]
@@ -1505,6 +1496,18 @@ mod tests {
     }
 
     #[test]
+    fn test_gain_limit_flag_parses() {
+        let cli = Cli::try_parse_from(["mycelium", "gain", "--history", "--limit", "25"]).unwrap();
+        match cli.command {
+            Commands::Gain { history, limit, .. } => {
+                assert!(history);
+                assert_eq!(limit, 25);
+            }
+            _ => panic!("Expected Gain command"),
+        }
+    }
+
+    #[test]
     fn test_gain_diagnostics_conflicts_with_history() {
         let err = match Cli::try_parse_from(["mycelium", "gain", "--diagnostics", "--history"]) {
             Ok(_) => panic!("expected clap conflict"),
@@ -1543,5 +1546,57 @@ mod tests {
             Err(err) => err,
         };
         assert_eq!(err.kind(), clap::error::ErrorKind::MissingRequiredArgument);
+    }
+
+    #[test]
+    fn test_init_hook_modes_still_parse() {
+        let cli = Cli::try_parse_from(["mycelium", "init", "--global", "--hook-only"]).unwrap();
+        match cli.command {
+            Commands::Init {
+                global,
+                hook_only,
+                claude_md,
+                show,
+                uninstall,
+                ..
+            } => {
+                assert!(global);
+                assert!(hook_only);
+                assert!(!claude_md);
+                assert!(!show);
+                assert!(!uninstall);
+            }
+            _ => panic!("Expected Init command"),
+        }
+
+        let cli = Cli::try_parse_from(["mycelium", "init", "--claude-md"]).unwrap();
+        match cli.command {
+            Commands::Init {
+                global,
+                hook_only,
+                claude_md,
+                ..
+            } => {
+                assert!(!global);
+                assert!(!hook_only);
+                assert!(claude_md);
+            }
+            _ => panic!("Expected Init command"),
+        }
+    }
+
+    #[test]
+    fn test_removed_init_setup_flags_are_rejected() {
+        for argv in [
+            ["mycelium", "init", "--ecosystem"].as_slice(),
+            ["mycelium", "init", "--onboard"].as_slice(),
+            ["mycelium", "init", "--client", "codex"].as_slice(),
+        ] {
+            let err = match Cli::try_parse_from(argv) {
+                Ok(_) => panic!("expected parse failure"),
+                Err(err) => err,
+            };
+            assert_eq!(err.kind(), clap::error::ErrorKind::UnknownArgument);
+        }
     }
 }

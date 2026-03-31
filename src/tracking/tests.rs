@@ -79,6 +79,59 @@ fn test_tracker_record_and_recent() {
     });
 }
 
+#[test]
+fn test_tracker_recent_detailed_includes_token_counts_and_project_path() {
+    with_test_db(
+        "test_tracker_recent_detailed_includes_token_counts_and_project_path",
+        |db_path| {
+            let tracker =
+                Tracker::new_with_override(Some(db_path)).expect("Failed to create tracker");
+            let project_path = PathBuf::from(".")
+                .canonicalize()
+                .expect("Failed to canonicalize cwd")
+                .to_string_lossy()
+                .to_string();
+
+            tracker
+                .record("cargo test", "mycelium cargo test", 1000, 200, 50)
+                .expect("Failed to record");
+
+            let recent = tracker
+                .get_recent_detailed_filtered(5, Some(&project_path))
+                .expect("Failed to get detailed recent commands");
+            let record = recent.first().expect("Expected a detailed record");
+
+            assert_eq!(record.command, "mycelium cargo test");
+            assert_eq!(record.project_path, project_path);
+            assert!(record.session_id.is_none());
+            assert_eq!(record.input_tokens, 1000);
+            assert_eq!(record.output_tokens, 200);
+            assert_eq!(record.saved_tokens, 800);
+            assert_eq!(record.savings_pct, 80.0);
+        },
+    );
+}
+
+#[test]
+fn test_get_by_command_limited_honors_limit() {
+    with_test_db("test_get_by_command_limited_honors_limit", |db_path| {
+        let tracker = Tracker::new_with_override(Some(db_path)).expect("Failed to create tracker");
+
+        tracker
+            .record("git status", "mycelium git status", 100, 10, 10)
+            .expect("Failed to record git status");
+        tracker
+            .record("cargo test", "mycelium cargo test", 200, 20, 10)
+            .expect("Failed to record cargo test");
+
+        let commands = tracker
+            .get_by_command_limited(None, 1)
+            .expect("Failed to get by-command stats");
+
+        assert_eq!(commands.len(), 1);
+    });
+}
+
 // 4. track_passthrough doesn't dilute stats
 #[test]
 fn test_track_passthrough_no_dilution() {
@@ -433,6 +486,49 @@ fn test_current_project_path_string_honors_env_override() {
     unsafe { std::env::remove_var("MYCELIUM_PROJECT_PATH") };
 
     assert_eq!(PathBuf::from(actual), expected);
+}
+
+#[test]
+fn test_current_runtime_session_id_honors_claude_env() {
+    let _guard = tracking_test_lock()
+        .lock()
+        .expect("tracking test lock poisoned");
+
+    // SAFETY: tracking tests serialize access with a global mutex, so process-wide
+    // environment mutation is isolated to this test.
+    unsafe { std::env::set_var("CLAUDE_SESSION_ID", "claude-session-42") };
+    let actual = super::utils::current_runtime_session_id();
+    // SAFETY: paired with set_var above.
+    unsafe { std::env::remove_var("CLAUDE_SESSION_ID") };
+
+    assert_eq!(actual.as_deref(), Some("claude-session-42"));
+}
+
+#[test]
+fn test_tracker_recent_detailed_includes_runtime_session_id_when_available() {
+    with_test_db(
+        "test_tracker_recent_detailed_includes_runtime_session_id_when_available",
+        |db_path| {
+            let tracker =
+                Tracker::new_with_override(Some(db_path)).expect("Failed to create tracker");
+
+            // SAFETY: tracking tests serialize access with a global mutex, so process-wide
+            // environment mutation is isolated to this test.
+            unsafe { std::env::set_var("CLAUDE_SESSION_ID", "claude-session-99") };
+            tracker
+                .record("cargo test", "mycelium cargo test", 1000, 200, 50)
+                .expect("Failed to record");
+            // SAFETY: paired with set_var above.
+            unsafe { std::env::remove_var("CLAUDE_SESSION_ID") };
+
+            let recent = tracker
+                .get_recent_detailed_filtered(5, None)
+                .expect("Failed to get detailed recent commands");
+            let record = recent.first().expect("Expected a detailed record");
+
+            assert_eq!(record.session_id.as_deref(), Some("claude-session-99"));
+        },
+    );
 }
 
 // 14. get_by_project groups by project_path and returns sorted results

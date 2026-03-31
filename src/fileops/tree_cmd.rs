@@ -205,7 +205,7 @@ mod tests {
     #[test]
     fn test_tree_token_savings() {
         fn count_tokens(text: &str) -> usize {
-            text.split_whitespace().count()
+            crate::tracking::estimate_tokens(text)
         }
 
         let input = include_str!("../../tests/fixtures/tree_output_raw.txt");

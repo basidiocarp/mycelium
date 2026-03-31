@@ -2,6 +2,19 @@
 
 All notable changes to Mycelium are documented in this file.
 
+## v0.8.0 - 2026-03-31
+
+### Changed
+
+- **Token-optimizer ownership**: Mycelium now stays on token optimization, analytics, and Hyphae interaction surfaces while Stipe owns shared ecosystem setup and host mutation flows.
+- **Shared MCP transport**: Hyphae communication now uses Spore's MCP client and the published ecosystem error envelope instead of a repo-local subprocess loop.
+- **Versioned integration boundaries**: Hyphae command-output writes and Cap-facing gain/history reads now flow through explicit schema-versioned contracts with identity-v1 fields.
+
+### Fixed
+
+- **Private coupling removal**: Cap no longer depends on Mycelium's private SQLite/config layouts for gain analytics or recent history.
+- **Runtime session propagation**: Hyphae-bound command-output storage now forwards runtime session ids so later command retrieval can join correctly with the active session timeline.
+
 ## v0.7.4 - 2026-03-28
 
 ### Changed

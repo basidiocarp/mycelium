@@ -314,7 +314,7 @@ mod tests {
     #[test]
     fn test_wget_output_token_savings() {
         fn count_tokens(text: &str) -> usize {
-            text.split_whitespace().count()
+            crate::tracking::estimate_tokens(text)
         }
 
         let stderr = r#"--2024-01-15 10:30:45--  https://example.com/large-file.tar.gz

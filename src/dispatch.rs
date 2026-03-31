@@ -414,9 +414,6 @@ pub fn dispatch(cli: Cli) -> Result<()> {
             show,
             claude_md,
             hook_only,
-            ecosystem,
-            onboard,
-            client,
             auto_patch,
             no_patch,
             uninstall,
@@ -426,9 +423,6 @@ pub fn dispatch(cli: Cli) -> Result<()> {
                 show,
                 claude_md,
                 hook_only,
-                ecosystem,
-                onboard,
-                client,
                 auto_patch,
                 no_patch,
                 uninstall,
@@ -444,6 +438,7 @@ pub fn dispatch(cli: Cli) -> Result<()> {
             explain,
             graph,
             history,
+            limit,
             quota,
             tier,
             daily,
@@ -463,6 +458,7 @@ pub fn dispatch(cli: Cli) -> Result<()> {
                 explain,
                 graph,
                 history,
+                limit,
                 quota,
                 &tier,
                 daily,
@@ -1073,9 +1069,6 @@ fn dispatch_init_commands(
     show: bool,
     claude_md: bool,
     hook_only: bool,
-    ecosystem: bool,
-    onboard: bool,
-    client: Option<String>,
     auto_patch: bool,
     no_patch: bool,
     uninstall: bool,
@@ -1085,17 +1078,6 @@ fn dispatch_init_commands(
         init::show_config()?;
     } else if uninstall {
         init::uninstall(global, verbose)?;
-    } else if onboard {
-        eprintln!("[!] Onboarding has moved to stipe.");
-        eprintln!("    Run: stipe init");
-        std::process::exit(1);
-    } else if ecosystem {
-        eprintln!("[!] Ecosystem setup has moved to stipe.");
-        eprintln!("    Run: stipe init");
-        if let Some(c) = client {
-            eprintln!("    or: stipe init --client {}", c);
-        }
-        std::process::exit(1);
     } else {
         let patch_mode = if auto_patch {
             init::PatchMode::Auto

@@ -7,7 +7,8 @@
 
 use anyhow::{Context, Result, bail};
 use serde::Deserialize;
-use serde_json::json;
+use serde_json::{Value, json};
+use spore::{EcosystemError, Tool};
 use std::io::{Read, Write};
 use std::process::{Command, Stdio};
 use std::sync::mpsc;
@@ -53,19 +54,7 @@ fn call_gather_context(
     budget: u64,
     include: Option<&str>,
 ) -> Result<String> {
-    let mut arguments = json!({
-        "task": task,
-        "token_budget": budget,
-    });
-
-    if let Some(proj) = project {
-        arguments["project"] = json!(proj);
-    }
-
-    if let Some(inc) = include {
-        let sources: Vec<&str> = inc.split(',').map(|s| s.trim()).collect();
-        arguments["include"] = json!(sources);
-    }
+    let arguments = build_gather_context_arguments(task, project, budget, include);
 
     let request = spore::jsonrpc::Request::new(
         "tools/call",
@@ -112,6 +101,40 @@ fn call_gather_context(
     parse_mcp_response(&response)
 }
 
+fn build_gather_context_arguments(
+    task: &str,
+    project: Option<&str>,
+    budget: u64,
+    include: Option<&str>,
+) -> Value {
+    let mut arguments = serde_json::Map::from_iter([
+        ("task".to_string(), json!(task)),
+        ("token_budget".to_string(), json!(budget)),
+    ]);
+
+    if let Some(proj) = project {
+        arguments.insert("project".to_string(), json!(proj));
+
+        let detected = crate::hyphae_client::detect_project_identity();
+        if detected.project == proj
+            && let (Some(project_root), Some(worktree_id)) = (
+                detected.project_root.as_deref(),
+                detected.worktree_id.as_deref(),
+            )
+        {
+            arguments.insert("project_root".to_string(), json!(project_root));
+            arguments.insert("worktree_id".to_string(), json!(worktree_id));
+        }
+    }
+
+    if let Some(inc) = include {
+        let sources: Vec<&str> = inc.split(',').map(|s| s.trim()).collect();
+        arguments.insert("include".to_string(), json!(sources));
+    }
+
+    Value::Object(arguments)
+}
+
 fn parse_mcp_response(response: &str) -> Result<String> {
     for line in response.lines() {
         let line = line.trim();
@@ -120,24 +143,66 @@ fn parse_mcp_response(response: &str) -> Result<String> {
         }
 
         if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
-            if let Some(text) = json
-                .get("result")
-                .and_then(|r| r.get("content"))
-                .and_then(|c| c.as_array())
-                .and_then(|a| a.first())
-                .and_then(|item| item.get("text"))
-                .and_then(|t| t.as_str())
-            {
-                return Ok(text.to_string());
+            if let Some(error) = json.get("error") {
+                bail!(
+                    "{}",
+                    EcosystemError::new(
+                        Tool::Hyphae,
+                        "jsonrpc_error",
+                        format!("Hyphae returned error: {error}")
+                    )
+                    .to_json_string()
+                );
             }
 
-            if let Some(error) = json.get("error") {
-                bail!("Hyphae returned error: {error}");
+            if let Some(result) = json.get("result") {
+                if result_is_error(result) {
+                    let message = first_tool_result_text(result)
+                        .filter(|text| !text.trim().is_empty())
+                        .unwrap_or("Hyphae tool call failed");
+                    bail!(
+                        "{}",
+                        EcosystemError::new(
+                            Tool::Hyphae,
+                            "tool_error",
+                            format!("Hyphae returned tool error: {message}")
+                        )
+                        .to_json_string()
+                    );
+                }
+
+                if let Some(text) = first_tool_result_text(result) {
+                    return Ok(text.to_string());
+                }
             }
         }
     }
 
-    bail!("No valid JSON-RPC response from Hyphae")
+    bail!(
+        "{}",
+        EcosystemError::new(
+            Tool::Hyphae,
+            "invalid_response",
+            "No valid JSON-RPC response from Hyphae"
+        )
+        .to_json_string()
+    )
+}
+
+fn result_is_error(result: &serde_json::Value) -> bool {
+    result
+        .get("isError")
+        .and_then(|value| value.as_bool())
+        .unwrap_or(false)
+}
+
+fn first_tool_result_text<'a>(result: &'a serde_json::Value) -> Option<&'a str> {
+    result
+        .get("content")
+        .and_then(|content| content.as_array())
+        .and_then(|items| items.first())
+        .and_then(|item| item.get("text"))
+        .and_then(|text| text.as_str())
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -340,10 +405,60 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_mcp_response_tool_error_takes_priority_over_payload_text() {
+        let response = r#"{"jsonrpc":"2.0","id":1,"result":{"isError":true,"content":[{"type":"text","text":"{\"context\":[],\"tokens_used\":0,\"tokens_budget\":2000,\"sources_queried\":[]}"}]}}"#;
+        let err = parse_mcp_response(response).unwrap_err();
+        let payload: serde_json::Value =
+            serde_json::from_str(&err.to_string()).expect("ecosystem error json");
+        assert_eq!(payload["tool"].as_str(), Some("hyphae"));
+        assert_eq!(payload["code"].as_str(), Some("tool_error"));
+    }
+
+    #[test]
     fn test_parse_mcp_response_error() {
         let response =
             r#"{"jsonrpc":"2.0","id":1,"error":{"code":-32600,"message":"Invalid request"}}"#;
         let result = parse_mcp_response(response);
         assert!(result.is_err());
+        let payload: serde_json::Value =
+            serde_json::from_str(&result.unwrap_err().to_string()).expect("ecosystem error json");
+        assert_eq!(payload["code"].as_str(), Some("jsonrpc_error"));
+    }
+
+    #[test]
+    fn test_build_gather_context_arguments_stays_global_without_project() {
+        let arguments = build_gather_context_arguments("login", None, 500, Some("memories"));
+
+        assert_eq!(arguments["task"], "login");
+        assert_eq!(arguments["token_budget"], 500);
+        assert!(arguments.get("project").is_none());
+        assert!(arguments.get("project_root").is_none());
+        assert!(arguments.get("worktree_id").is_none());
+        assert_eq!(arguments["include"], json!(["memories"]));
+    }
+
+    #[test]
+    fn test_build_gather_context_arguments_adds_identity_for_matching_project() {
+        let detected = crate::hyphae_client::detect_project_identity();
+        if let (Some(project_root), Some(worktree_id)) = (
+            detected.project_root.as_deref(),
+            detected.worktree_id.as_deref(),
+        ) {
+            let arguments =
+                build_gather_context_arguments("login", Some(&detected.project), 500, None);
+
+            assert_eq!(arguments["project"], detected.project);
+            assert_eq!(arguments["project_root"], project_root);
+            assert_eq!(arguments["worktree_id"], worktree_id);
+        }
+    }
+
+    #[test]
+    fn test_build_gather_context_arguments_omits_identity_for_mismatched_project() {
+        let arguments = build_gather_context_arguments("login", Some("other-project"), 500, None);
+
+        assert_eq!(arguments["project"], "other-project");
+        assert!(arguments.get("project_root").is_none());
+        assert!(arguments.get("worktree_id").is_none());
     }
 }

@@ -323,7 +323,7 @@ collected 0 items
     }
 
     fn count_tokens(text: &str) -> usize {
-        text.split_whitespace().count()
+        crate::tracking::estimate_tokens(text)
     }
 
     #[test]

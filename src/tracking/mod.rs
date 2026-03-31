@@ -38,7 +38,7 @@ use jiff::{SignedDuration, Timestamp};
 use rusqlite::{Connection, params};
 use serde::Serialize;
 
-use utils::{current_project_path_string, get_db_path};
+use utils::{current_project_path_string, current_runtime_session_id, get_db_path};
 
 #[allow(unused_imports)]
 pub use queries::ParseHealthRow;
@@ -94,6 +94,28 @@ pub struct CommandRecord {
     /// Number of tokens saved (input - output)
     pub saved_tokens: usize,
     /// Savings percentage ((saved / input) * 100)
+    pub savings_pct: f64,
+}
+
+/// Detailed command history record for CLI JSON export and dashboard consumers.
+#[derive(Debug, Clone, Serialize)]
+pub struct DetailedCommandRecord {
+    /// UTC timestamp when the command was executed.
+    pub timestamp: String,
+    /// The Mycelium command that was executed (e.g., "mycelium ls").
+    pub command: String,
+    /// Canonical project path captured when the command was recorded.
+    pub project_path: String,
+    /// Runtime session identifier propagated from the calling agent when available.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
+    /// Estimated input tokens before Mycelium filtering.
+    pub input_tokens: usize,
+    /// Output tokens after Mycelium filtering.
+    pub output_tokens: usize,
+    /// Number of tokens saved (input - output).
+    pub saved_tokens: usize,
+    /// Savings percentage ((saved / input) * 100).
     pub savings_pct: f64,
 }
 
@@ -228,12 +250,14 @@ pub struct ProjectStats {
 /// Statistics for a single command aggregated across all executions.
 ///
 /// Used in `GainSummary::by_command` to break down token savings by command type.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct CommandStats {
     /// The Mycelium command (e.g., "mycelium ls", "mycelium gh pr view")
     pub command: String,
     /// Number of times this command was executed
     pub count: usize,
+    /// Total input tokens across all executions of this command.
+    pub input_tokens: usize,
     /// Total tokens saved across all executions of this command
     pub tokens_saved: usize,
     /// Average savings percentage for this command
@@ -360,15 +384,17 @@ impl Tracker {
         };
 
         let project_path = current_project_path_string();
+        let session_id = current_runtime_session_id();
 
         self.conn.execute(
-            "INSERT INTO commands (timestamp, original_cmd, mycelium_cmd, project_path, input_tokens, output_tokens, saved_tokens, savings_pct, exec_time_ms, execution_kind)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            "INSERT INTO commands (timestamp, original_cmd, mycelium_cmd, project_path, session_id, input_tokens, output_tokens, saved_tokens, savings_pct, exec_time_ms, execution_kind)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
             params![
                 Timestamp::now().to_string(),
                 original_cmd,
                 mycelium_cmd,
                 project_path,
+                session_id,
                 input_tokens as i64,
                 output_tokens as i64,
                 saved as i64,
@@ -410,15 +436,17 @@ impl Tracker {
         };
 
         let project_path = current_project_path_string();
+        let session_id = current_runtime_session_id();
 
         self.conn.execute(
-            "INSERT INTO commands (timestamp, original_cmd, mycelium_cmd, project_path, input_tokens, output_tokens, saved_tokens, savings_pct, exec_time_ms, parse_tier, format_mode, execution_kind)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+            "INSERT INTO commands (timestamp, original_cmd, mycelium_cmd, project_path, session_id, input_tokens, output_tokens, saved_tokens, savings_pct, exec_time_ms, parse_tier, format_mode, execution_kind)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
             params![
                 Timestamp::now().to_string(),
                 original_cmd,
                 mycelium_cmd,
                 project_path,
+                session_id,
                 input_tokens as i64,
                 output_tokens as i64,
                 saved as i64,
@@ -442,15 +470,17 @@ impl Tracker {
         exec_time_ms: u64,
     ) -> Result<()> {
         let project_path = current_project_path_string();
+        let session_id = current_runtime_session_id();
 
         self.conn.execute(
-            "INSERT INTO commands (timestamp, original_cmd, mycelium_cmd, project_path, input_tokens, output_tokens, saved_tokens, savings_pct, exec_time_ms, execution_kind)
-             VALUES (?1, ?2, ?3, ?4, 0, 0, 0, 0.0, ?5, 'passthrough')",
+            "INSERT INTO commands (timestamp, original_cmd, mycelium_cmd, project_path, session_id, input_tokens, output_tokens, saved_tokens, savings_pct, exec_time_ms, execution_kind)
+             VALUES (?1, ?2, ?3, ?4, ?5, 0, 0, 0, 0.0, ?6, 'passthrough')",
             params![
                 Timestamp::now().to_string(),
                 original_cmd,
                 mycelium_cmd,
                 project_path,
+                session_id,
                 exec_time_ms as i64,
             ],
         )?;

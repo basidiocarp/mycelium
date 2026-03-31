@@ -14,6 +14,7 @@ pub(crate) fn show_summary(
     project_scope: Option<&str>,
     graph: bool,
     history: bool,
+    limit: usize,
     quota: bool,
     tier: &str,
 ) -> Result<()> {
@@ -160,7 +161,7 @@ pub(crate) fn show_summary(
     }
 
     if history {
-        let recent = tracker.get_recent_filtered(10, project_scope)?;
+        let recent = tracker.get_recent_filtered(limit, project_scope)?;
         if !recent.is_empty() {
             println!("{}", styled("Recent Commands", true));
             println!("──────────────────────────────────────────────────────────");

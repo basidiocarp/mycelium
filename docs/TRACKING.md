@@ -291,6 +291,30 @@ fn main() -> anyhow::Result<()> {
 
 ### JSON Export Schema
 
+`mycelium gain --format json` now emits a versioned contract for dashboard
+consumers:
+
+```json
+{
+  "schema_version": "1.0",
+  "summary": { "...": "..." },
+  "by_command": [
+    {
+      "command": "mycelium cargo test",
+      "count": 5,
+      "input_tokens": 6200,
+      "tokens_saved": 5034,
+      "avg_savings_pct": 81.2,
+      "exec_time_ms": 140
+    }
+  ]
+}
+```
+
+When `--history` is present, the JSON export also includes a `history` array of
+recent command records. `--daily`, `--weekly`, and `--monthly` continue to add
+their respective arrays.
+
 #### DayStats JSON
 
 ```json

@@ -2,16 +2,11 @@ use std::path::PathBuf;
 use std::process::Command;
 
 pub fn mycelium_config_dir() -> Option<PathBuf> {
-    dirs::config_dir()
-        .or_else(dirs::home_dir)
-        .map(|dir| dir.join("mycelium"))
+    Some(spore::paths::config_dir("mycelium"))
 }
 
 pub fn mycelium_data_dir() -> Option<PathBuf> {
-    dirs::data_local_dir()
-        .or_else(dirs::data_dir)
-        .or_else(dirs::home_dir)
-        .map(|dir| dir.join("mycelium"))
+    Some(spore::paths::data_dir("mycelium"))
 }
 
 pub fn claude_dir() -> Option<PathBuf> {

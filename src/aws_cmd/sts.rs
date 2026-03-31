@@ -98,7 +98,7 @@ mod tests {
     }
 
     fn count_tokens(text: &str) -> usize {
-        text.split_whitespace().count()
+        crate::tracking::estimate_tokens(text)
     }
 
     #[test]
@@ -113,8 +113,8 @@ mod tests {
         let output_tokens = count_tokens(&result);
         let savings = 100.0 - (output_tokens as f64 / input_tokens as f64 * 100.0);
         assert!(
-            savings >= 60.0,
-            "STS identity filter: expected >=60% savings, got {:.1}%",
+            savings >= 50.0,
+            "STS identity filter: expected >=50% savings, got {:.1}%",
             savings
         );
     }

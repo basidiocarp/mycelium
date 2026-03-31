@@ -91,7 +91,7 @@ mod tests {
     #[test]
     fn test_filter_s3_ls_token_savings() {
         fn count_tokens(text: &str) -> usize {
-            text.split_whitespace().count()
+            crate::tracking::estimate_tokens(text)
         }
 
         // Build a 110-item list so the truncation filter (keeps 40, drops 70) produces ~62% savings.

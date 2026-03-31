@@ -43,6 +43,7 @@ mycelium gain --failures             # Parsing failure log (fallback commands)
 mycelium gain --diagnostics          # Rewrite quality + passthrough diagnostics
 mycelium gain --diagnostics --explain # Explain diagnostic scoring and scope
 mycelium gain --format json          # JSON export (for dashboards)
+mycelium gain --history --limit 50 --format json  # Recent history JSON for Cap
 mycelium gain --format csv           # CSV export
 ```
 
@@ -53,6 +54,7 @@ mycelium gain --format csv           # CSV export
 | `--project` | `-p` | Filter by current directory |
 | `--graph` | `-g` | ASCII graph of last 30 days |
 | `--history` | `-H` | Recent command history |
+| `--limit` | — | Max entries for recent history and by-command JSON exports (default: `10`) |
 | `--quota` | `-q` | Estimated savings on monthly quota |
 | `--tier` | `-t` | Subscription tier: `pro`, `5x`, `20x` (default: `20x`) |
 | `--diagnostics` | — | Rewrite coverage, parse recovery, and passthrough diagnostics |
@@ -69,6 +71,7 @@ mycelium gain --format csv           # CSV export
 - quality score, hook coverage, and parse recovery are global
 - passthrough summaries honor `--project` / `--project-path`
 - diagnostics output is text-only; it does not support `--format json` or `--format csv`
+- JSON exports include `schema_version`, `summary`, and `by_command`; `--history` adds a `history` array and `--daily` adds `daily`
 
 **Example output:**
 ```text

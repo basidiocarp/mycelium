@@ -349,7 +349,7 @@ utils.go:15:5: unreachable code"#;
     #[test]
     fn test_filter_go_test_token_savings() {
         fn count_tokens(text: &str) -> usize {
-            text.split_whitespace().count()
+            crate::tracking::estimate_tokens(text)
         }
 
         // Build a realistic `go test -json` fixture with many passing tests across multiple
@@ -405,7 +405,7 @@ utils.go:15:5: unreachable code"#;
     #[test]
     fn test_filter_go_build_token_savings() {
         fn count_tokens(text: &str) -> usize {
-            text.split_whitespace().count()
+            crate::tracking::estimate_tokens(text)
         }
 
         // Real `go build` output includes many verbose non-error lines: module download
@@ -452,7 +452,7 @@ utils.go:15:5: unreachable code"#;
     #[test]
     fn test_filter_go_vet_token_savings() {
         fn count_tokens(text: &str) -> usize {
-            text.split_whitespace().count()
+            crate::tracking::estimate_tokens(text)
         }
 
         // Real `go vet` output includes verbose "note:" lines and many "checking package"

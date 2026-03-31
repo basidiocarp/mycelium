@@ -356,7 +356,7 @@ Would reformat: tests/test_utils.py
     }
 
     fn count_tokens(text: &str) -> usize {
-        text.split_whitespace().count()
+        crate::tracking::estimate_tokens(text)
     }
 
     #[test]

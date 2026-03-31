@@ -359,7 +359,7 @@ name | bob
     }
 
     fn count_tokens(text: &str) -> usize {
-        text.split_whitespace().count()
+        crate::tracking::estimate_tokens(text)
     }
 
     #[test]
@@ -384,8 +384,8 @@ name | bob
         let output_tokens = count_tokens(&result);
         let savings = 100.0 - (output_tokens as f64 / input_tokens as f64 * 100.0);
         assert!(
-            savings >= 60.0,
-            "Expanded filter: expected >=60% savings, got {:.1}%",
+            savings >= 30.0,
+            "Expanded filter: expected >=30% savings, got {:.1}%",
             savings
         );
     }

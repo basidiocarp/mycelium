@@ -161,7 +161,7 @@ mod tests {
     #[test]
     fn test_compact_diff_token_savings() {
         fn count_tokens(text: &str) -> usize {
-            text.split_whitespace().count()
+            crate::tracking::estimate_tokens(text)
         }
 
         // Build a large diff across many files with long context lines. The compact_diff filter

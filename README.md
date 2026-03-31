@@ -4,7 +4,7 @@ Token-optimized CLI proxy. Filters and compresses command output before it reach
 
 Part of the [Basidiocarp ecosystem](https://github.com/basidiocarp) — see the [Technical Overview](https://github.com/basidiocarp/.github/blob/main/profile/README.md#technical-overview) for how Mycelium fits with Hyphae, Rhizome, Cap, and Lamella.
 
-`stipe` owns onboarding and repair for the ecosystem. Mycelium handles the lower-level filtering and integration work that those flows depend on.
+`stipe` owns ecosystem onboarding, shared repair, and MCP registration. Mycelium owns token optimization plus its retained Claude Code guidance, hook adapter, config display, and uninstall flows.
 
 ## The Ecosystem
 
@@ -38,14 +38,11 @@ Part of the [Basidiocarp ecosystem](https://github.com/basidiocarp) — see the 
 # Quick install (all ecosystem tools)
 curl -fsSL https://raw.githubusercontent.com/basidiocarp/.github/main/install.sh | sh
 
-# Onboarding and repair
+# Onboarding, shared repair, and MCP setup
 stipe init
 
 # Install Mycelium
 cargo install --git https://github.com/basidiocarp/mycelium
-
-# Lower-level integration after Stipe has onboarded the ecosystem
-mycelium init --ecosystem
 ```
 
 ## How It Works
@@ -74,14 +71,23 @@ flowchart LR
 6. **Hyphae routing** — Large outputs stored as retrievable chunks in Hyphae (when installed)
 7. **Rhizome code intelligence** — `mycelium read` uses tree-sitter structural outlines for large code files (when installed)
 
-### Ecosystem Integration
+### Mycelium Setup Surface
 
-Mycelium is also the ecosystem orchestrator:
-- `mycelium init --ecosystem` — lower-level integration that detects tools, registers MCP servers, installs hooks, and initializes databases
-- `stipe init` — primary onboarding and repair entry point for the ecosystem
-- Installs **Hyphae capture hooks** (errors, corrections, test results, code changes) into `~/.claude/hooks/`
-- Persistent Hyphae connection with auto-reconnect for large output chunking
-- Session summary hook captures task description, files modified, tools used, errors resolved
+Use `stipe init` for ecosystem setup, onboarding, shared repair, and client registration.
+
+Mycelium still provides Mycelium-specific init and inspection modes when you need them:
+- `mycelium init -g` — install or repair the Claude Code hook adapter, `MYCELIUM.md`, and settings patch on supported platforms
+- `mycelium init -g --claude-md` — install global Claude Code docs-only guidance without hook setup
+- `mycelium init --claude-md` — write project-local Claude Code guidance only
+- `mycelium config` — inspect current Mycelium configuration
+- `mycelium init -g --uninstall` — remove Mycelium-managed setup
+
+Older setup flags such as `mycelium init --ecosystem`, `mycelium init --onboard`, and `mycelium init --client ...` have been removed. Use `stipe init` or `stipe init --client ...` instead.
+
+When installed, Mycelium can work with Hyphae and Rhizome for:
+- Hyphae-backed storage of large outputs and capture data
+- Rhizome-powered structural reads for large code files
+- Claude Code guidance files such as `MYCELIUM.md` and `CLAUDE.md` references where supported
 
 ## Documentation
 

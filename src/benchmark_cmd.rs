@@ -174,8 +174,8 @@ fn bench(
     let raw_output = run_shell(raw_cmd);
     let filtered_output = run_mycelium(mycelium, mycelium_args);
 
-    let raw_tokens = estimate_tokens(&raw_output);
-    let filtered_tokens = estimate_tokens(&filtered_output);
+    let raw_tokens = tracking::estimate_tokens(&raw_output);
+    let filtered_tokens = tracking::estimate_tokens(&filtered_output);
 
     let (icon, status) = if filtered_output.is_empty() && !raw_output.is_empty() {
         ("✗".red().to_string(), BenchStatus::Fail)
@@ -294,10 +294,6 @@ fn current_binary() -> Result<String> {
         .map_err(|e| anyhow::anyhow!("Cannot resolve current binary: {e}"))
 }
 
-fn estimate_tokens(text: &str) -> usize {
-    text.len().div_ceil(4)
-}
-
 fn run_shell(cmd: &str) -> String {
     crate::platform::shell_command(cmd)
         .output()
@@ -327,9 +323,9 @@ mod tests {
 
     #[test]
     fn test_estimate_tokens() {
-        assert_eq!(estimate_tokens(""), 0);
-        assert_eq!(estimate_tokens("abcd"), 1);
-        assert_eq!(estimate_tokens("abcdefgh"), 2);
+        assert_eq!(tracking::estimate_tokens(""), 0);
+        assert_eq!(tracking::estimate_tokens("abcd"), 1);
+        assert_eq!(tracking::estimate_tokens("abcdefgh"), 2);
     }
 
     #[test]

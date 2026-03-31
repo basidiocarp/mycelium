@@ -105,7 +105,7 @@ mod tests {
     #[test]
     fn test_filter_rds_instances_token_savings() {
         fn count_tokens(text: &str) -> usize {
-            text.split_whitespace().count()
+            crate::tracking::estimate_tokens(text)
         }
 
         let input = r#"{

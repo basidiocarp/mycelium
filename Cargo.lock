@@ -723,7 +723,7 @@ dependencies = [
 
 [[package]]
 name = "mycelium"
-version = "0.7.4"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -1115,8 +1115,8 @@ checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 
 [[package]]
 name = "spore"
-version = "0.4.3"
-source = "git+https://github.com/basidiocarp/spore?tag=v0.4.3#974f813f34debebc7d4f91b57938c5843fb4c887"
+version = "0.4.6"
+source = "git+https://github.com/basidiocarp/spore?tag=v0.4.6#f6a12506876ce74d69f47c16c952a7822aec977b"
 dependencies = [
  "anyhow",
  "chrono",

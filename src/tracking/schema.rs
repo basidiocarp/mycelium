@@ -41,6 +41,7 @@ pub(super) fn init_schema(conn: &Connection) -> Result<()> {
         "ALTER TABLE commands ADD COLUMN project_path TEXT DEFAULT ''",
         [],
     );
+    let _ = conn.execute("ALTER TABLE commands ADD COLUMN session_id TEXT", []);
     // One-time migration: normalize NULLs from pre-default schema
     let has_nulls: bool = conn
         .query_row(
@@ -63,6 +64,10 @@ pub(super) fn init_schema(conn: &Connection) -> Result<()> {
     // Index for fast project-scoped gain queries
     let _ = conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_project_path_timestamp ON commands(project_path, timestamp)",
+        [],
+    );
+    let _ = conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_commands_session_id_timestamp ON commands(session_id, timestamp)",
         [],
     );
     // Migration: add parse_tier column for parser framework observability
