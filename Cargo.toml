@@ -39,7 +39,7 @@ strip-ansi-escapes = "0.2"
 spore = { git = "https://github.com/basidiocarp/spore", tag = "v0.4.6" }
 libc = "0.2"
 which = "7"
-tree-sitter = "0.25"
+tree-sitter = "0.26"
 tree-sitter-bash = "0.25"
 
 [build-dependencies]
