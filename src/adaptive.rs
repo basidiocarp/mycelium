@@ -18,6 +18,10 @@ pub fn classify_with_tuning(content: &str, tuning: CompactionTuning) -> Adaptive
     let line_count = content.lines().count();
     let byte_count = content.len();
 
+    if line_count <= 5 {
+        return AdaptiveLevel::Passthrough;
+    }
+
     if line_count < tuning.adaptive_small_lines && byte_count < tuning.adaptive_small_bytes {
         AdaptiveLevel::Passthrough
     } else if line_count <= tuning.adaptive_large_lines {
@@ -97,6 +101,15 @@ mod tests {
         assert_eq!(
             classify_with_profile(&content, CompactionProfile::Balanced),
             AdaptiveLevel::Light
+        );
+    }
+
+    #[test]
+    fn test_passthrough_for_very_small_output_even_when_large_in_bytes() {
+        let content = format!("{}\n", "x".repeat(600)).repeat(5);
+        assert_eq!(
+            classify_with_profile(&content, CompactionProfile::Balanced),
+            AdaptiveLevel::Passthrough
         );
     }
 

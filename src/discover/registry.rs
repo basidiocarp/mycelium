@@ -58,6 +58,30 @@ fn regex_set() -> &'static RegexSet {
     RE.get_or_init(|| RegexSet::new(PATTERNS).expect("invalid regex patterns"))
 }
 
+const DIAGNOSTIC_PASSTHROUGH: &[&str] = &[
+    "which",
+    "type",
+    "file",
+    "stat",
+    "otool",
+    "ldd",
+    "readelf",
+    "uname",
+    "whoami",
+    "hostname",
+    "printenv",
+    "echo",
+    "printf",
+    "id",
+    "groups",
+    "locale",
+    "sw_vers",
+    "xcode-select",
+    "rustup",
+    "nvm",
+    "pyenv",
+];
+
 fn find_fd_rewrite_active() -> bool {
     #[cfg(test)]
     {
@@ -579,6 +603,10 @@ fn rewrite_segment(seg: &str, excluded: &[String]) -> Option<String> {
         return Some(format!("{env_prefix}{}{rewritten}", wrapper.prefix));
     }
 
+    if is_diagnostic_passthrough_command(&cmd_clean) {
+        return Some(format!("{env_prefix}mycelium invoke {cmd_clean}"));
+    }
+
     if cmd_clean.starts_with("find ") && find_fd_rewrite_active() {
         return rewrite_find_to_fd(&cmd_clean).map(|rewritten| format!("{env_prefix}{rewritten}"));
     }
@@ -714,6 +742,34 @@ fn extension_from_find_pattern(pattern: &str) -> Option<String> {
         return None;
     }
     Some(extension.to_string())
+}
+
+fn diagnostic_passthrough_base(cmd: &str) -> bool {
+    let (_, cmd_clean) = shell::strip_env_prefix_segments(cmd);
+    let effective = shell::unwrap_all_task_runner_commands(&cmd_clean);
+    let Some(base) = effective.split_whitespace().next() else {
+        return false;
+    };
+
+    if DIAGNOSTIC_PASSTHROUGH.contains(&base) {
+        return true;
+    }
+
+    if base == "ls"
+        && effective
+            .split_whitespace()
+            .skip(1)
+            .any(|arg| arg.starts_with('-'))
+    {
+        return true;
+    }
+
+    false
+}
+
+#[allow(dead_code)]
+pub(crate) fn is_diagnostic_passthrough_command(cmd: &str) -> bool {
+    diagnostic_passthrough_base(cmd)
 }
 
 /// Strip a command prefix with word-boundary check.

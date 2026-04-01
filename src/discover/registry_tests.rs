@@ -88,6 +88,46 @@ fn test_classify_echo_ignored() {
 }
 
 #[test]
+fn test_rewrite_which_passthroughs_through_invoke() {
+    assert_eq!(
+        rewrite_command("which git", &[]),
+        Some("mycelium invoke which git".into())
+    );
+}
+
+#[test]
+fn test_rewrite_type_passthroughs_through_invoke() {
+    assert_eq!(
+        rewrite_command("type cargo", &[]),
+        Some("mycelium invoke type cargo".into())
+    );
+}
+
+#[test]
+fn test_rewrite_env_prefixed_diagnostic_passthrough() {
+    assert_eq!(
+        rewrite_command("FOO=1 echo hello", &[]),
+        Some("FOO=1 mycelium invoke echo hello".into())
+    );
+}
+
+#[test]
+fn test_rewrite_ls_with_flags_passthroughs_through_invoke() {
+    assert_eq!(
+        rewrite_command("ls -la /tmp", &[]),
+        Some("mycelium invoke ls -la /tmp".into())
+    );
+}
+
+#[test]
+fn test_rewrite_compound_diagnostic_and_supported_command() {
+    assert_eq!(
+        rewrite_command("which git && git status", &[]),
+        Some("mycelium invoke which git && mycelium git status".into())
+    );
+}
+
+#[test]
 fn test_classify_terraform_supported() {
     match classify_command("terraform plan -var-file=prod.tfvars") {
         Classification::Supported {

@@ -1261,6 +1261,35 @@ fn dispatch_proxy(args: &[std::ffi::OsString], cli: &Cli) -> Result<()> {
 
 fn dispatch_invoke_command(command: &[String], explain: bool, cli: &Cli) -> Result<()> {
     let rendered_command = crate::platform::render_shell_command(command);
+
+    if crate::discover::registry::is_diagnostic_passthrough_command(rendered_command.trim()) {
+        if explain {
+            println!("Mycelium invoke");
+            println!("Input: {}", rendered_command.trim());
+            println!("Execute: {}", rendered_command.trim());
+            println!("Mode: raw shell passthrough");
+            println!("Reason: matched diagnostic passthrough allowlist");
+            return Ok(());
+        }
+
+        if cli.verbose > 0 {
+            eprintln!("Invoke mode (raw): {}", rendered_command);
+        }
+
+        let timer = tracking::TimedExecution::start();
+        let mut child_command = crate::platform::invoke_shell_command(&rendered_command);
+        if cli.skip_env {
+            child_command.env("SKIP_ENV_VALIDATION", "1");
+        }
+
+        return run_spawned_command(
+            child_command,
+            &rendered_command,
+            &format!("mycelium invoke {}", rendered_command),
+            timer,
+        );
+    }
+
     let resolution = rewrite_cmd::resolve_runtime_command(&rendered_command);
 
     if explain {

@@ -233,6 +233,14 @@ fn registry_estimated_savings(
         return None;
     }
 
+    if rewritten.starts_with("mycelium invoke ")
+        && registry::is_diagnostic_passthrough_command(
+            rewritten.trim_start_matches("mycelium invoke ").trim(),
+        )
+    {
+        return None;
+    }
+
     if rewritten.starts_with("fd ") {
         return Some(30.0);
     }
@@ -260,6 +268,14 @@ fn explain_registry_match(
 ) -> String {
     if matches!(source, RewriteSource::Passthrough) {
         return "command already starts with `mycelium`".to_string();
+    }
+
+    if rewritten.starts_with("mycelium invoke ")
+        && registry::is_diagnostic_passthrough_command(
+            rewritten.trim_start_matches("mycelium invoke ").trim(),
+        )
+    {
+        return "matched diagnostic passthrough allowlist and will execute with raw shell semantics".to_string();
     }
 
     if rewritten.starts_with("fd ") {
@@ -509,6 +525,23 @@ mod tests {
             resolution
                 .reason
                 .contains("rewrote safe find command to `fd`")
+        );
+    }
+
+    #[test]
+    fn test_resolve_routes_diagnostic_commands_to_invoke_passthrough() {
+        let resolution = resolve_with_inputs("which git", &[], &[]);
+
+        assert_eq!(
+            resolution.rewritten,
+            Some("mycelium invoke which git".to_string())
+        );
+        assert_eq!(resolution.source, RewriteSource::BuiltInRegistry);
+        assert_eq!(resolution.estimated_savings_pct, None);
+        assert!(
+            resolution
+                .reason
+                .contains("diagnostic passthrough allowlist")
         );
     }
 }
