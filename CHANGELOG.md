@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.8.3
+
+### Fixed
+- route diagnostic shell commands through raw invoke passthrough without misleading savings estimates
+- keep outputs of five lines or fewer on the passthrough path even when byte size is large
+
 ## v0.8.2
 
 ### Features
