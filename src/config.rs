@@ -176,6 +176,9 @@ pub struct FilterConfig {
     pub hyphae: Option<HyphaeConfig>,
     #[serde(default)]
     pub rhizome: Option<RhizomeConfig>,
+    /// Show a header line when output is filtered (default: true)
+    #[serde(default = "default_true")]
+    pub show_filter_header: bool,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -194,6 +197,10 @@ pub struct CompactionTuning {
     pub adaptive_small_lines: usize,
     pub adaptive_small_bytes: usize,
     pub adaptive_large_lines: usize,
+    /// Outputs at or below this token count pass through unfiltered (default: 500).
+    pub passthrough_tokens: usize,
+    /// Outputs at or below this token count use light filtering (default: 2000).
+    pub light_tokens: usize,
 }
 
 impl CompactionProfile {
@@ -205,6 +212,8 @@ impl CompactionProfile {
                 adaptive_small_lines: 80,
                 adaptive_small_bytes: 4096,
                 adaptive_large_lines: 800,
+                passthrough_tokens: 500,
+                light_tokens: 2000,
             },
             Self::Balanced => CompactionTuning {
                 diff_max_hunk_lines: 150,
@@ -212,6 +221,8 @@ impl CompactionProfile {
                 adaptive_small_lines: 50,
                 adaptive_small_bytes: 2048,
                 adaptive_large_lines: 500,
+                passthrough_tokens: 500,
+                light_tokens: 2000,
             },
             Self::Aggressive => CompactionTuning {
                 diff_max_hunk_lines: 80,
@@ -219,6 +230,8 @@ impl CompactionProfile {
                 adaptive_small_lines: 25,
                 adaptive_small_bytes: 1024,
                 adaptive_large_lines: 250,
+                passthrough_tokens: 500,
+                light_tokens: 2000,
             },
         }
     }
@@ -250,6 +263,7 @@ impl Default for FilterConfig {
             adaptive: None,
             hyphae: None,
             rhizome: None,
+            show_filter_header: true,
         }
     }
 }

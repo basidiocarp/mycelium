@@ -203,15 +203,18 @@ fn rewrite_segment_passthrough_reason(cmd: &str, excluded: &[String]) -> Option<
         );
     }
 
-    // If the first segment before any pipe is a diagnostic passthrough command,
-    // treat the whole piped expression as passthrough. For example `stat x | head -3`
-    // should not be rewritten even though the pipe triggers unsafe-shell detection.
-    let first_segment = trimmed.split('|').next().unwrap_or(trimmed).trim();
-    if diagnostic_passthrough_base(first_segment) {
-        return Some(format!(
-            "first pipe segment `{}` is a diagnostic passthrough command",
-            first_segment
-        ));
+    // If a piped command's first segment is a diagnostic passthrough,
+    // block rewriting so the whole pipe passes through raw shell.
+    // Non-piped diagnostics are handled by rewrite_segment which routes
+    // them to `mycelium invoke <cmd>`.
+    if trimmed.contains('|') {
+        let first_segment = trimmed.split('|').next().unwrap_or(trimmed).trim();
+        if diagnostic_passthrough_base(first_segment) {
+            return Some(format!(
+                "first pipe segment `{}` is a diagnostic passthrough command",
+                first_segment
+            ));
+        }
     }
 
     None
@@ -436,13 +439,15 @@ pub fn rewrite_command(cmd: &str, excluded: &[String]) -> Option<String> {
         return Some(trimmed.to_string());
     }
 
-    // Fast-path: if the first token before any pipe is a diagnostic passthrough command,
-    // skip rewriting immediately without going through the full block-reason analysis.
-    // This ensures `stat x | head -3` is treated as passthrough even though the pipe
-    // would otherwise trigger has_unsafe_shell_syntax.
-    let first_pipe_segment = trimmed.split('|').next().unwrap_or(trimmed).trim();
-    if diagnostic_passthrough_base(first_pipe_segment) {
-        return None;
+    // Fast-path: if a piped command's first segment is a diagnostic passthrough,
+    // skip rewriting so the whole pipe passes through raw shell.
+    // Only applies to piped commands — non-piped diagnostics still get rewritten
+    // to `mycelium invoke <cmd>` for proper routing.
+    if trimmed.contains('|') {
+        let first_pipe_segment = trimmed.split('|').next().unwrap_or(trimmed).trim();
+        if diagnostic_passthrough_base(first_pipe_segment) {
+            return None;
+        }
     }
 
     if rewrite_block_reason(trimmed, excluded).is_some() {

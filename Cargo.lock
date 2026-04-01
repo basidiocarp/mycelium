@@ -723,7 +723,7 @@ dependencies = [
 
 [[package]]
 name = "mycelium"
-version = "0.8.3"
+version = "0.8.5"
 dependencies = [
  "anyhow",
  "clap",

@@ -33,8 +33,48 @@ impl std::fmt::Display for FilterLevel {
     }
 }
 
+/// Quality signal reported by a filter after processing.
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[allow(dead_code)] // Used in Step 5 when filters migrate to filter_with_quality
+pub enum FilterQuality {
+    /// Filter understood the output format and produced structured compression.
+    Full,
+    /// Filter partially matched — some structure extracted, some raw passthrough.
+    Degraded,
+    /// Filter didn't understand the output — raw passthrough returned.
+    Passthrough,
+}
+
+/// Result of a filter operation, including quality metadata.
+#[allow(dead_code)] // Used in Step 5 when filters migrate to filter_with_quality
+pub struct FilterResult {
+    pub output: String,
+    pub quality: FilterQuality,
+    pub input_tokens: usize,
+    pub output_tokens: usize,
+}
+
 pub trait FilterStrategy {
+    /// Filter content and return quality metadata.
+    ///
+    /// The default implementation wraps [`FilterStrategy::filter`] and reports
+    /// [`FilterQuality::Full`]. Individual filters can override this to return
+    /// accurate quality signals.
+    #[allow(dead_code)] // Will be called by route_or_filter in Step 5
+    fn filter_with_quality(&self, content: &str, lang: &Language) -> FilterResult {
+        let input_tokens = crate::tracking::utils::estimate_tokens(content);
+        let output = self.filter(content, lang);
+        let output_tokens = crate::tracking::utils::estimate_tokens(&output);
+        FilterResult {
+            output,
+            quality: FilterQuality::Full,
+            input_tokens,
+            output_tokens,
+        }
+    }
+
     fn filter(&self, content: &str, lang: &Language) -> String;
+
     #[allow(dead_code)]
     fn name(&self) -> &'static str;
 }
