@@ -1,4 +1,5 @@
 //! Token-optimized directory listing that excludes noise directories and aggregates counts.
+use crate::tracking;
 use anyhow::{Context, Result};
 use std::process::Command;
 
@@ -27,32 +28,107 @@ const NOISE_DIRS: &[&str] = &[
     ".eggs",
 ];
 
+#[derive(Debug, PartialEq, Eq)]
+enum LsExecutionPlan {
+    Passthrough,
+    Compact {
+        show_all: bool,
+        flags: Vec<String>,
+        paths: Vec<String>,
+    },
+}
+
 /// Execute `ls` and format output as a compact directory listing with noise filtering.
 pub fn run(args: &[String], verbose: u8) -> Result<()> {
-    // Separate flags from paths
+    match plan_ls(args) {
+        LsExecutionPlan::Passthrough => run_passthrough(args, verbose),
+        LsExecutionPlan::Compact {
+            show_all,
+            flags,
+            paths,
+        } => run_compact_ls(show_all, &flags, &paths, verbose),
+    }
+}
+
+fn plan_ls(args: &[String]) -> LsExecutionPlan {
     let show_all = args
         .iter()
         .any(|a| (a.starts_with('-') && !a.starts_with("--") && a.contains('a')) || a == "--all");
 
-    let flags: Vec<&str> = args
+    let flags: Vec<String> = args
         .iter()
         .filter(|a| a.starts_with('-'))
-        .map(|s| s.as_str())
+        .cloned()
         .collect();
-    let paths: Vec<&str> = args
+    let paths: Vec<String> = args
         .iter()
         .filter(|a| !a.starts_with('-'))
-        .map(|s| s.as_str())
+        .cloned()
         .collect();
 
+    if flags.iter().any(|flag| requests_raw_diagnostic_ls(flag)) {
+        return LsExecutionPlan::Passthrough;
+    }
+
+    LsExecutionPlan::Compact {
+        show_all,
+        flags,
+        paths,
+    }
+}
+
+fn requests_raw_diagnostic_ls(flag: &str) -> bool {
+    if let Some(short_flags) = flag
+        .strip_prefix('-')
+        .filter(|value| !value.starts_with('-'))
+    {
+        return short_flags
+            .chars()
+            .any(|c| matches!(c, 'l' | 'n' | 'o' | 'g' | 'i' | 's' | '@' | 'e' | 'T'));
+    }
+
+    matches!(flag, "--long" | "--numeric-uid-gid" | "--inode" | "--size")
+        || flag.starts_with("--time-style=")
+}
+
+fn run_passthrough(args: &[String], verbose: u8) -> Result<()> {
+    let timer = tracking::TimedExecution::start();
+
+    if verbose > 0 {
+        eprintln!("ls passthrough: {:?}", args);
+    }
+
+    let status = Command::new("ls")
+        .args(args)
+        .status()
+        .context("Failed to run ls")?;
+
+    let args_str = if args.is_empty() {
+        String::new()
+    } else {
+        format!(" {}", args.join(" "))
+    };
+    timer.track_passthrough(
+        &format!("ls{args_str}"),
+        &format!("mycelium ls{args_str} (passthrough)"),
+    );
+
+    if !status.success() {
+        std::process::exit(status.code().unwrap_or(1));
+    }
+
+    Ok(())
+}
+
+fn run_compact_ls(show_all: bool, flags: &[String], paths: &[String], verbose: u8) -> Result<()> {
     // Build ls -la + any extra flags the user passed (e.g. -R)
     // Strip -l, -a, -h (we handle all of these ourselves)
     let mut cmd = Command::new("ls");
     cmd.arg("-la");
-    for flag in &flags {
+    for flag in flags {
         if flag.starts_with("--") {
             // Long flags: skip --all (already handled)
-            if *flag != "--all" {
+            if flag != "--all" {
                 cmd.arg(flag);
             }
         } else {
@@ -71,7 +147,7 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
     if paths.is_empty() {
         cmd.arg(".");
     } else {
-        for p in &paths {
+        for p in paths {
             cmd.arg(p);
         }
     }
@@ -100,11 +176,6 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
         );
     }
 
-    let _target_display = if paths.is_empty() {
-        ".".to_string()
-    } else {
-        paths.join(" ")
-    };
     print!("{}", filtered);
 
     Ok(())
@@ -218,6 +289,33 @@ fn compact_ls(raw: &str, show_all: bool) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_plan_ls_passthroughs_long_listing_flags() {
+        assert_eq!(plan_ls(&["-la".into()]), LsExecutionPlan::Passthrough);
+        assert_eq!(
+            plan_ls(&["--long".into(), "src".into()]),
+            LsExecutionPlan::Passthrough
+        );
+    }
+
+    #[test]
+    fn test_plan_ls_passthroughs_inode_and_size_flags() {
+        assert_eq!(plan_ls(&["-si".into()]), LsExecutionPlan::Passthrough);
+        assert_eq!(
+            plan_ls(&["--numeric-uid-gid".into(), ".".into()]),
+            LsExecutionPlan::Passthrough
+        );
+    }
+
+    #[test]
+    fn test_plan_ls_keeps_compact_mode_for_non_diagnostic_flags() {
+        assert!(matches!(
+            plan_ls(&["-a".into(), "src".into()]),
+            LsExecutionPlan::Compact { show_all: true, .. }
+        ));
+        assert!(matches!(plan_ls(&[]), LsExecutionPlan::Compact { .. }));
+    }
 
     #[test]
     fn test_compact_basic() {
