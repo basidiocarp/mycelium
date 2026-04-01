@@ -1,7 +1,8 @@
 [package]
 name = "mycelium"
-version = "0.8.6"
+version = "0.8.7"
 edition = "2024"
+rust-version = "1.85"
 authors = ["William Newton"]
 description = "Mycelium - High-performance CLI proxy to minimize LLM token consumption"
 license = "MIT"
@@ -36,7 +37,7 @@ tempfile = "3"
 sha2 = "0.10"
 ureq = "3"
 strip-ansi-escapes = "0.2"
-spore = { git = "https://github.com/basidiocarp/spore", tag = "v0.4.6" }
+spore = { git = "https://github.com/basidiocarp/spore", tag = "v0.4.7" }
 libc = "0.2"
 which = "7"
 tree-sitter = "0.25"
