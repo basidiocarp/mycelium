@@ -62,7 +62,15 @@ pub fn decide_action(output: &str) -> OutputAction {
 pub fn route_or_filter(command: &str, raw: &str, filter_fn: impl FnOnce(&str) -> String) -> String {
     match decide_action(raw) {
         OutputAction::Passthrough => raw.to_string(),
-        OutputAction::Filter => filter_fn(raw),
+        OutputAction::Filter => {
+            let filtered = filter_fn(raw);
+            // A filter that reduces output to empty is always wrong — fall back to raw.
+            if filtered.trim().is_empty() && !raw.trim().is_empty() {
+                raw.to_string()
+            } else {
+                filtered
+            }
+        }
         OutputAction::Chunk => match crate::hyphae_client::store_output(command, raw, None) {
             Ok(summary) => format_chunk_summary(command, &summary),
             Err(e) => {
@@ -70,7 +78,12 @@ pub fn route_or_filter(command: &str, raw: &str, filter_fn: impl FnOnce(&str) ->
                     "[mycelium] Hyphae chunking failed, falling back to filter: {}",
                     e
                 );
-                filter_fn(raw)
+                let filtered = filter_fn(raw);
+                if filtered.trim().is_empty() && !raw.trim().is_empty() {
+                    raw.to_string()
+                } else {
+                    filtered
+                }
             }
         },
     }
@@ -146,6 +159,21 @@ mod tests {
         } else {
             assert_eq!(result, "FILTERED");
         }
+    }
+
+    #[test]
+    fn test_route_or_filter_empty_filter_falls_back_to_raw() {
+        // A filter that returns empty should fall back to raw output
+        let medium = "line\n".repeat(100);
+        let result = route_or_filter("test", &medium, |_| String::new());
+        assert_eq!(result, medium, "Empty filter output should fall back to raw");
+    }
+
+    #[test]
+    fn test_route_or_filter_whitespace_filter_falls_back_to_raw() {
+        let medium = "line\n".repeat(100);
+        let result = route_or_filter("test", &medium, |_| "   \n  ".to_string());
+        assert_eq!(result, medium, "Whitespace-only filter output should fall back to raw");
     }
 
     #[test]
