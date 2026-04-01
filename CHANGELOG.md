@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.2
+
+### Features
+- rewrite safe find commands to fd (`5e5fe6d`)
+
 ## v0.8.1
 
 ### Bug Fixes
