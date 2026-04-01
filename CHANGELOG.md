@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.1
+
+### Bug Fixes
+- passthrough diagnostic ls metadata flags (`b79e5cc`)
+
 All notable changes to Mycelium are documented in this file.
 
 ## v0.8.0 - 2026-03-31
