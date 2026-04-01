@@ -1,6 +1,11 @@
 //! Classifies shell commands against the rule set and rewrites them to Mycelium equivalents.
+#[cfg(not(test))]
+use crate::platform::command_on_path;
+use crate::platform::render_shell_command;
 use regex::{Regex, RegexSet};
 use std::sync::OnceLock;
+#[cfg(test)]
+use std::{cell::RefCell, rc::Rc};
 
 use super::rules::{IGNORED_EXACT, IGNORED_PREFIXES, PATTERNS, RULES};
 
@@ -51,6 +56,64 @@ pub fn category_avg_tokens(category: &str, subcmd: &str) -> usize {
 fn regex_set() -> &'static RegexSet {
     static RE: OnceLock<RegexSet> = OnceLock::new();
     RE.get_or_init(|| RegexSet::new(PATTERNS).expect("invalid regex patterns"))
+}
+
+fn find_fd_rewrite_active() -> bool {
+    #[cfg(test)]
+    {
+        find_fd_rewrite_active_for_tests().unwrap_or(false)
+    }
+
+    #[cfg(not(test))]
+    {
+        read_bool_env("MYCELIUM_FD_REWRITE_ENABLED", true) && command_on_path("fd")
+    }
+}
+
+#[cfg(not(test))]
+fn read_bool_env(name: &str, default: bool) -> bool {
+    std::env::var(name).map_or(default, |value| {
+        matches!(
+            value.trim().to_ascii_lowercase().as_str(),
+            "1" | "true" | "yes" | "on"
+        )
+    })
+}
+
+#[cfg(test)]
+fn find_fd_rewrite_active_for_tests() -> Option<bool> {
+    FIND_FD_REWRITE_ACTIVE_OVERRIDE.with(|value| *value.borrow())
+}
+
+#[cfg(test)]
+pub(crate) struct FindFdRewriteGuard {
+    previous: Option<bool>,
+    _token: Rc<()>,
+}
+
+#[cfg(test)]
+pub(crate) fn set_find_fd_rewrite_active_for_tests(active: bool) -> FindFdRewriteGuard {
+    FIND_FD_REWRITE_ACTIVE_OVERRIDE.with(|value| {
+        let previous = value.replace(Some(active));
+        FindFdRewriteGuard {
+            previous,
+            _token: Rc::new(()),
+        }
+    })
+}
+
+#[cfg(test)]
+impl Drop for FindFdRewriteGuard {
+    fn drop(&mut self) {
+        FIND_FD_REWRITE_ACTIVE_OVERRIDE.with(|value| {
+            value.replace(self.previous);
+        });
+    }
+}
+
+#[cfg(test)]
+thread_local! {
+    static FIND_FD_REWRITE_ACTIVE_OVERRIDE: RefCell<Option<bool>> = const { RefCell::new(None) };
 }
 
 fn compiled() -> &'static Vec<Regex> {
@@ -516,6 +579,10 @@ fn rewrite_segment(seg: &str, excluded: &[String]) -> Option<String> {
         return Some(format!("{env_prefix}{}{rewritten}", wrapper.prefix));
     }
 
+    if cmd_clean.starts_with("find ") && find_fd_rewrite_active() {
+        return rewrite_find_to_fd(&cmd_clean).map(|rewritten| format!("{env_prefix}{rewritten}"));
+    }
+
     // Special case: `head -N file` / `head --lines=N file` → `mycelium read file --max-lines N`
     // Must intercept before generic prefix replacement, which would produce `mycelium read -20 file`.
     // Only intercept when head has a flag (-N, --lines=N, -c, etc.); plain `head file` falls
@@ -562,6 +629,91 @@ fn rewrite_segment(seg: &str, excluded: &[String]) -> Option<String> {
     }
 
     None
+}
+
+fn rewrite_find_to_fd(cmd: &str) -> Option<String> {
+    if !find_fd_rewrite_active() {
+        return None;
+    }
+
+    let words = shell::split_shell_words(cmd);
+    if !matches!(words.first().map(String::as_str), Some("find")) {
+        return None;
+    }
+
+    let mut index = 1;
+    let mut path = ".".to_string();
+    if let Some(candidate) = words.get(index)
+        && !candidate.starts_with('-')
+    {
+        path = candidate.clone();
+        index += 1;
+    }
+
+    let mut name_pattern: Option<String> = None;
+    let mut file_type: Option<String> = None;
+    while index < words.len() {
+        match words[index].as_str() {
+            "-name" => {
+                index += 1;
+                name_pattern = words.get(index).cloned();
+                name_pattern.as_ref()?;
+            }
+            "-type" => {
+                index += 1;
+                file_type = words.get(index).cloned();
+                match file_type.as_deref() {
+                    Some("f" | "d") => {}
+                    _ => return None,
+                }
+            }
+            token
+                if matches!(
+                    token,
+                    "-exec"
+                        | "-delete"
+                        | "-print0"
+                        | "-newer"
+                        | "-not"
+                        | "!"
+                        | "-o"
+                        | "-or"
+                        | "-a"
+                        | "-and"
+                        | "("
+                        | ")"
+                ) || token.starts_with("-exec")
+                    || token.starts_with("-delete")
+                    || token.starts_with("-print0")
+                    || token.starts_with("-newer") =>
+            {
+                return None;
+            }
+            _ => return None,
+        }
+        index += 1;
+    }
+
+    let name_pattern = name_pattern?;
+    let mut args = vec!["fd".to_string()];
+    if let Some(extension) = extension_from_find_pattern(&name_pattern) {
+        args.extend(["-e".to_string(), extension]);
+    } else {
+        args.extend(["--glob".to_string(), name_pattern]);
+    }
+    if let Some(file_type) = file_type {
+        args.extend(["--type".to_string(), file_type]);
+    }
+    args.push(path);
+    Some(render_shell_command(&args))
+}
+
+fn extension_from_find_pattern(pattern: &str) -> Option<String> {
+    let extension = pattern.strip_prefix("*.")?;
+    if extension.is_empty() || extension.chars().any(|c| "*?[]{}".contains(c)) {
+        return None;
+    }
+    Some(extension.to_string())
 }
 
 /// Strip a command prefix with word-boundary check.

@@ -127,8 +127,9 @@ fn resolve_with_inputs(
         } else {
             RewriteSource::BuiltInRegistry
         };
-        let reason = explain_registry_match(&input, excluded, source);
-        let estimated_savings_pct = registry_estimated_savings(&input, excluded, source);
+        let reason = explain_registry_match(&input, &rewritten, excluded, source);
+        let estimated_savings_pct =
+            registry_estimated_savings(&input, &rewritten, excluded, source);
         return RewriteResolution {
             input,
             rewritten: Some(rewritten),
@@ -224,11 +225,16 @@ fn source_label(source: RewriteSource) -> &'static str {
 
 fn registry_estimated_savings(
     input: &str,
+    rewritten: &str,
     excluded: &[String],
     source: RewriteSource,
 ) -> Option<f64> {
     if matches!(source, RewriteSource::Passthrough) {
         return None;
+    }
+
+    if rewritten.starts_with("fd ") {
+        return Some(30.0);
     }
 
     let trimmed = input.trim();
@@ -246,9 +252,18 @@ fn registry_estimated_savings(
     }
 }
 
-fn explain_registry_match(input: &str, excluded: &[String], source: RewriteSource) -> String {
+fn explain_registry_match(
+    input: &str,
+    rewritten: &str,
+    excluded: &[String],
+    source: RewriteSource,
+) -> String {
     if matches!(source, RewriteSource::Passthrough) {
         return "command already starts with `mycelium`".to_string();
+    }
+
+    if rewritten.starts_with("fd ") {
+        return "rewrote safe find command to `fd` because `fd` is available and respects .gitignore by default".to_string();
     }
 
     let trimmed = input.trim();
@@ -398,6 +413,7 @@ mod explain_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::discover::registry::set_find_fd_rewrite_active_for_tests;
 
     #[test]
     fn test_run_supported_command_succeeds() {
@@ -475,5 +491,24 @@ mod tests {
             resolve_with_inputs("git status && gh pr list --json number", &[], &corrections);
         assert!(resolution.rewritten.is_none());
         assert_eq!(resolution.source, RewriteSource::NoRewrite);
+    }
+
+    #[test]
+    fn test_resolve_uses_fd_for_safe_find_commands_when_available() {
+        let _guard = set_find_fd_rewrite_active_for_tests(true);
+
+        let resolution = resolve_with_inputs("find . -name '*.rs' -type f", &[], &[]);
+
+        assert_eq!(
+            resolution.rewritten,
+            Some("fd -e rs --type f .".to_string())
+        );
+        assert_eq!(resolution.source, RewriteSource::BuiltInRegistry);
+        assert_eq!(resolution.estimated_savings_pct, Some(30.0));
+        assert!(
+            resolution
+                .reason
+                .contains("rewrote safe find command to `fd`")
+        );
     }
 }

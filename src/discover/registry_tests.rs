@@ -1243,6 +1243,42 @@ fn test_rewrite_find_with_flags() {
     );
 }
 
+#[test]
+fn test_rewrite_find_with_flags_prefers_fd_when_available() {
+    let _guard = set_find_fd_rewrite_active_for_tests(true);
+    assert_eq!(
+        rewrite_command("find . -name '*.rs' -type f", &[]),
+        Some("fd -e rs --type f .".into())
+    );
+}
+
+#[test]
+fn test_rewrite_find_name_glob_prefers_fd_glob() {
+    let _guard = set_find_fd_rewrite_active_for_tests(true);
+    assert_eq!(
+        rewrite_command("find src -name 'test_*'", &[]),
+        Some("fd --glob 'test_*' src".into())
+    );
+}
+
+#[test]
+fn test_rewrite_find_complex_commands_stay_raw_even_with_fd() {
+    let _guard = set_find_fd_rewrite_active_for_tests(true);
+    assert_eq!(
+        rewrite_command("find . -name '*.rs' -exec sed -n '1p' {} \\;", &[]),
+        None
+    );
+}
+
+#[test]
+fn test_rewrite_find_uses_mycelium_find_when_fd_rewrite_disabled() {
+    let _guard = set_find_fd_rewrite_active_for_tests(false);
+    assert_eq!(
+        rewrite_command("find . -name '*.rs' -type f", &[]),
+        Some("mycelium find . -name '*.rs' -type f".into())
+    );
+}
+
 // --- Ensure PATTERNS and RULES stay aligned after modifications ---
 
 #[test]
