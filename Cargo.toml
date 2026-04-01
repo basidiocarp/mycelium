@@ -31,7 +31,7 @@ serde_json = { version = "1", features = ["preserve_order"] }
 colored = "3"
 dirs = "6"
 rusqlite = { version = "0.39", features = ["bundled"] }
-toml = "1"
+toml = "1.1"
 jiff = "0.2"
 tempfile = "3"
 sha2 = "0.10"
