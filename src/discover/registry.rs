@@ -80,6 +80,17 @@ const DIAGNOSTIC_PASSTHROUGH: &[&str] = &[
     "rustup",
     "nvm",
     "pyenv",
+    // File operations — produce short confirmation output, should not be filtered
+    "timeout",
+    "mv",
+    "cp",
+    "chmod",
+    "mkdir",
+    "rm",
+    "touch",
+    "ln",
+    "codesign",
+    "xattr",
 ];
 
 fn find_fd_rewrite_active() -> bool {
@@ -190,6 +201,17 @@ fn rewrite_segment_passthrough_reason(cmd: &str, excluded: &[String]) -> Option<
         return Some(
             "gh --json/--jq/--template output is structured, so it is not rewritten".to_string(),
         );
+    }
+
+    // If the first segment before any pipe is a diagnostic passthrough command,
+    // treat the whole piped expression as passthrough. For example `stat x | head -3`
+    // should not be rewritten even though the pipe triggers unsafe-shell detection.
+    let first_segment = trimmed.split('|').next().unwrap_or(trimmed).trim();
+    if diagnostic_passthrough_base(first_segment) {
+        return Some(format!(
+            "first pipe segment `{}` is a diagnostic passthrough command",
+            first_segment
+        ));
     }
 
     None
@@ -412,6 +434,15 @@ pub fn rewrite_command(cmd: &str, excluded: &[String]) -> Option<String> {
         || trimmed.contains(" & ");
     if !has_compound && (trimmed.starts_with("mycelium ") || trimmed == "mycelium") {
         return Some(trimmed.to_string());
+    }
+
+    // Fast-path: if the first token before any pipe is a diagnostic passthrough command,
+    // skip rewriting immediately without going through the full block-reason analysis.
+    // This ensures `stat x | head -3` is treated as passthrough even though the pipe
+    // would otherwise trigger has_unsafe_shell_syntax.
+    let first_pipe_segment = trimmed.split('|').next().unwrap_or(trimmed).trim();
+    if diagnostic_passthrough_base(first_pipe_segment) {
+        return None;
     }
 
     if rewrite_block_reason(trimmed, excluded).is_some() {
@@ -767,7 +798,6 @@ fn diagnostic_passthrough_base(cmd: &str) -> bool {
     false
 }
 
-#[allow(dead_code)]
 pub(crate) fn is_diagnostic_passthrough_command(cmd: &str) -> bool {
     diagnostic_passthrough_base(cmd)
 }

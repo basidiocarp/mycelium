@@ -1,6 +1,6 @@
 # Mycelium — Feature Overview
 
-Mycelium filters and compresses command output before it reaches your LLM. Single Rust binary, zero external dependencies, <10ms overhead per command. 60–90% token reduction on typical dev operations.
+Mycelium filters and compresses command output before it reaches your LLM. Single Rust binary with no external runtime dependencies, typically ~5-15ms proxy overhead. 60–90% token reduction on typical dev operations.
 
 ---
 
@@ -8,7 +8,7 @@ Mycelium filters and compresses command output before it reaches your LLM. Singl
 
 | Document | Contents |
 |----------|----------|
-| **[COMMANDS.md](COMMANDS.md)** | Full command reference (45+ commands) |
+| **[COMMANDS.md](COMMANDS.md)** | Public command reference |
 | **[ANALYTICS.md](ANALYTICS.md)** | Analytics, hook system, configuration, tee system |
 | **[ARCHITECTURE.md](ARCHITECTURE.md)** | System design, modules, filtering strategies |
 | **[EXTENDING.md](EXTENDING.md)** | Adding new commands, development patterns, ADRs |
@@ -19,7 +19,7 @@ Mycelium filters and compresses command output before it reaches your LLM. Singl
 
 ## Overview
 
-mycelium acts as a proxy between an LLM (Claude Code, Gemini CLI, etc.) and system commands. Mycelium uses five filtering strategies:
+mycelium acts as a proxy between an LLM (Claude Code, Gemini CLI, etc.) and system commands. Mycelium uses five core filtering strategies:
 
 | Strategy | Description | Example |
 |----------|-------------|---------|
@@ -28,6 +28,10 @@ mycelium acts as a proxy between an LLM (Claude Code, Gemini CLI, etc.) and syst
 | Truncation | Keeps relevant context, removes redundancy | Condensed diff |
 | Deduplication | Merges repeated log lines with counters | `error x42` |
 | Adaptive filtering | Size-aware compression with actionable content preservation | Small outputs pass through, large outputs get full compression |
+
+Companion integrations:
+- Hyphae routing for large-output chunk storage and retrieval
+- Rhizome structural reads for large code files
 
 ### Adaptive filtering
 
@@ -81,4 +85,4 @@ mycelium --skip-env next build  # Disable Next.js env validation
 
 ## Total Command Count
 
-45+ commands across 9 categories. Unrecognized subcommands pass through unchanged.
+50+ public top-level commands across 11 categories, plus tool-specific subcommands. Unrecognized subcommands pass through unchanged.

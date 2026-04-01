@@ -54,6 +54,10 @@ impl From<CommandStats> for ExportCommandStats {
     }
 }
 
+#[allow(
+    clippy::too_many_arguments,
+    reason = "CLI export flags map directly to the supported output selectors"
+)]
 pub(crate) fn export_json(
     tracker: &Tracker,
     daily: bool,

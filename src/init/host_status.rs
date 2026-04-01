@@ -5,6 +5,9 @@ use super::claude_md::resolve_claude_dir;
 use crate::integrity::IntegrityStatus;
 use spore::editors::{self, Editor};
 
+const LEGACY_MYCELIUM_HOOK_COMMAND: &str = "mycelium-rewrite";
+const CORTINA_PRE_TOOL_USE_COMMAND: &str = "cortina adapter claude-code pre-tool-use";
+
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct HostCapability {
     pub supported: bool,
@@ -49,6 +52,12 @@ pub(crate) struct HostAdapterStatus {
     pub detail: String,
 }
 
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ClaudeHookRegistration {
+    pub legacy_mycelium: bool,
+    pub cortina_pre_tool_use: bool,
+}
+
 pub(crate) fn claude_code_capabilities() -> ClaudeCodeCapabilities {
     if cfg!(unix) {
         ClaudeCodeCapabilities {
@@ -91,10 +100,11 @@ fn claude_code_status() -> HostAdapterStatus {
     let capabilities = claude_code_capabilities();
     let hook_status = crate::integrity::verify_hook().unwrap_or(IntegrityStatus::NotInstalled);
     let settings_path = crate::platform::claude_settings_path();
-    let settings_registered = settings_path
+    let settings_registration = settings_path
         .as_ref()
         .and_then(|path| std::fs::read_to_string(path).ok())
-        .is_some_and(|content| claude_settings_registers_mycelium(&content));
+        .map(|content| claude_settings_hook_registration(&content))
+        .unwrap_or_default();
     let detected = crate::utils::which_command("claude").is_some()
         || editors::detect().contains(&Editor::ClaudeCode);
 
@@ -115,36 +125,49 @@ fn claude_code_status() -> HostAdapterStatus {
         };
     }
 
-    let detail = match (&hook_status, settings_path.as_ref(), settings_registered) {
-        (IntegrityStatus::Verified, Some(path), true) => {
+    let detail = match (
+        &hook_status,
+        settings_path.as_ref(),
+        settings_registration.cortina_pre_tool_use,
+        settings_registration.legacy_mycelium,
+    ) {
+        (_, Some(path), true, _) => {
+            format!("Cortina PreToolUse hook registered in {}", path.display())
+        }
+        (IntegrityStatus::Verified, Some(path), false, true) => {
             format!("hook verified and registered in {}", path.display())
         }
-        (IntegrityStatus::NoBaseline, Some(path), true) => {
+        (IntegrityStatus::NoBaseline, Some(path), false, true) => {
             format!(
                 "hook registered in {} but missing integrity baseline",
                 path.display()
             )
         }
-        (IntegrityStatus::NotInstalled, Some(path), false) => {
+        (IntegrityStatus::NotInstalled, Some(path), false, true) => {
+            format!(
+                "legacy hook registered in {} but Mycelium hook is not installed",
+                path.display()
+            )
+        }
+        (IntegrityStatus::NotInstalled, Some(path), false, false) => {
             format!(
                 "settings present at {} but Mycelium hook is not installed",
                 path.display()
             )
         }
-        (IntegrityStatus::Verified | IntegrityStatus::NoBaseline, Some(path), false) => {
+        (IntegrityStatus::Verified | IntegrityStatus::NoBaseline, Some(path), false, false) => {
             format!("hook installed but not registered in {}", path.display())
         }
-        (IntegrityStatus::OrphanedHash, Some(path), _) => {
+        (IntegrityStatus::OrphanedHash, Some(path), false, _) => {
             format!("orphaned integrity hash; settings path {}", path.display())
         }
-        (IntegrityStatus::Tampered { .. }, Some(path), _) => {
+        (IntegrityStatus::Tampered { .. }, Some(path), false, _) => {
             format!("hook is tampered; settings path {}", path.display())
         }
-        (_, Some(path), _) => format!("settings path {}", path.display()),
         _ => "Claude settings path not available".to_string(),
     };
 
-    let configured = claude_adapter_configured(&hook_status, settings_registered);
+    let configured = claude_adapter_configured(&hook_status, settings_registration);
 
     HostAdapterStatus {
         name: "Claude Code",
@@ -187,7 +210,7 @@ fn codex_cli_status() -> HostAdapterStatus {
     }
 }
 
-pub(crate) fn claude_settings_registers_mycelium(content: &str) -> bool {
+pub(crate) fn claude_settings_hook_registration(content: &str) -> ClaudeHookRegistration {
     serde_json::from_str::<serde_json::Value>(content)
         .ok()
         .and_then(|root| {
@@ -196,14 +219,26 @@ pub(crate) fn claude_settings_registers_mycelium(content: &str) -> bool {
                 .and_then(serde_json::Value::as_array)
                 .cloned()
         })
-        .is_some_and(|entries| {
+        .map(|entries| {
             entries
                 .iter()
                 .filter_map(|entry| entry.get("hooks")?.as_array())
                 .flatten()
                 .filter_map(|hook| hook.get("command")?.as_str())
-                .any(|command| command.contains("mycelium-rewrite"))
+                .fold(
+                    ClaudeHookRegistration::default(),
+                    |mut registration, command| {
+                        if command.contains(LEGACY_MYCELIUM_HOOK_COMMAND) {
+                            registration.legacy_mycelium = true;
+                        }
+                        if command.contains(CORTINA_PRE_TOOL_USE_COMMAND) {
+                            registration.cortina_pre_tool_use = true;
+                        }
+                        registration
+                    },
+                )
         })
+        .unwrap_or_default()
 }
 
 pub(crate) fn codex_registered_servers_at_path(path: &Path) -> anyhow::Result<Vec<String>> {
@@ -236,8 +271,13 @@ pub(crate) fn codex_registered_servers_from_str(content: &str) -> anyhow::Result
     Ok(servers)
 }
 
-fn claude_adapter_configured(hook_status: &IntegrityStatus, settings_registered: bool) -> bool {
-    matches!(hook_status, IntegrityStatus::Verified) && settings_registered
+fn claude_adapter_configured(
+    hook_status: &IntegrityStatus,
+    settings_registration: ClaudeHookRegistration,
+) -> bool {
+    settings_registration.cortina_pre_tool_use
+        || (matches!(hook_status, IntegrityStatus::Verified)
+            && settings_registration.legacy_mycelium)
 }
 
 pub(crate) fn global_claude_md_status() -> ClaudeMdStatus {
@@ -323,7 +363,33 @@ mod tests {
           }
         }"#;
 
-        assert!(claude_settings_registers_mycelium(content));
+        let registration = claude_settings_hook_registration(content);
+        assert!(registration.legacy_mycelium || registration.cortina_pre_tool_use);
+    }
+
+    #[test]
+    fn test_claude_settings_registers_cortina_pre_tool_use() {
+        let content = r#"{
+          "hooks": {
+            "PreToolUse": [{
+              "matcher": "Bash",
+              "hooks": [{
+                "type": "command",
+                "command": "cortina adapter claude-code pre-tool-use"
+              }]
+            }]
+          }
+        }"#;
+
+        assert_eq!(
+            claude_settings_hook_registration(content),
+            ClaudeHookRegistration {
+                legacy_mycelium: false,
+                cortina_pre_tool_use: true,
+            }
+        );
+        let registration = claude_settings_hook_registration(content);
+        assert!(registration.legacy_mycelium || registration.cortina_pre_tool_use);
     }
 
     #[test]
@@ -346,12 +412,32 @@ mod tests {
     fn test_no_baseline_does_not_count_as_configured() {
         assert!(!claude_adapter_configured(
             &IntegrityStatus::NoBaseline,
-            true
+            ClaudeHookRegistration {
+                legacy_mycelium: true,
+                cortina_pre_tool_use: false,
+            }
         ));
-        assert!(claude_adapter_configured(&IntegrityStatus::Verified, true));
+        assert!(claude_adapter_configured(
+            &IntegrityStatus::Verified,
+            ClaudeHookRegistration {
+                legacy_mycelium: true,
+                cortina_pre_tool_use: false,
+            }
+        ));
         assert!(!claude_adapter_configured(
             &IntegrityStatus::Verified,
-            false
+            ClaudeHookRegistration::default()
+        ));
+    }
+
+    #[test]
+    fn test_cortina_pre_tool_use_counts_as_configured_without_legacy_hook() {
+        assert!(claude_adapter_configured(
+            &IntegrityStatus::NotInstalled,
+            ClaudeHookRegistration {
+                legacy_mycelium: false,
+                cortina_pre_tool_use: true,
+            }
         ));
     }
 

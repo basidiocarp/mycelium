@@ -62,6 +62,16 @@ fn check_hook() {
         return;
     }
 
+    let settings_registration = crate::platform::claude_settings_path()
+        .as_ref()
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .map(|content| host_status::claude_settings_hook_registration(&content))
+        .unwrap_or_default();
+    if settings_registration.cortina_pre_tool_use {
+        pass("Claude Code hook", "managed by Cortina PreToolUse adapter");
+        return;
+    }
+
     match integrity::verify_hook() {
         Ok(integrity::IntegrityStatus::Verified) => {
             pass("Claude Code hook", "installed and verified");
@@ -172,12 +182,15 @@ fn check_settings_json() {
 
     match std::fs::read_to_string(&settings_path) {
         Ok(content) => {
-            if content.contains("mycelium-rewrite") {
-                pass("claude settings", "hook registered");
+            let registration = host_status::claude_settings_hook_registration(&content);
+            if registration.cortina_pre_tool_use {
+                pass("claude settings", "Cortina PreToolUse hook registered");
+            } else if registration.legacy_mycelium {
+                pass("claude settings", "Mycelium hook registered");
             } else {
                 warn(
                     "claude settings",
-                    "exists but Mycelium hook is not registered",
+                    "exists but no Claude Bash hook is registered",
                 );
             }
         }

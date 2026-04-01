@@ -1408,6 +1408,10 @@ fn run_spawned_command(
     timer.track(tracked_input, tracked_output, &full_output, &full_output);
 
     if !status.success() {
+        // Ensure all output is flushed before exit — diagnostic commands
+        // may produce useful output on stderr even when they fail.
+        let _ = std::io::stdout().flush();
+        let _ = std::io::stderr().flush();
         std::process::exit(status.code().unwrap_or(1));
     }
 

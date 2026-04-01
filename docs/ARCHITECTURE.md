@@ -158,7 +158,7 @@ block-beta
         js["JS/TS Stack\njs/tsc, next, vitest\nlint_cmd/, pnpm/"]
         python["Python\npython/ruff, pytest\npip, mypy"]
         gomod["Go\ngo_eco/commands/\ngolangci"]
-        rust["Rust\ncargo_eco/commands/\ncargo_filters/"]
+        rust["Rust\ncargo_cmd.rs\ncargo_filters/"]
     end
 
     block:INFRA:4
@@ -182,13 +182,13 @@ block-beta
 |----------|-----------------|----------|---------|
 | **Git (VCS)** | `vcs/git/`, `vcs/git_filters/` | status, diff, log, add, commit, push | 85-99% |
 | **Code Search** | `fileops/grep_cmd.rs`, `diff_cmd.rs`, `find_cmd.rs` | grep, diff, find | 50-85% |
-| **File Ops** | `fileops/ls.rs`, `read.rs` | ls, read | 40-90% |
-| **Execution** | `runner_cmd.rs`, `summary_cmd.rs` | err, test, smart | 50-99% |
+| **File Ops** | `fileops/ls_cmd.rs`, `fileops/read_cmd.rs`, `local_llm.rs` | ls, read, peek | 40-95% |
+| **Execution** | `runner_cmd.rs`, `summary_cmd.rs` | err, test, summary | 50-99% |
 | **Logs/Data** | `streaming.rs`, `json_cmd.rs` | log, json | 70-95% |
 | **JS/TS** | `js/`, `lint_cmd/` | tsc, next, vitest, lint, prettier, playwright, prisma, pnpm | 70-99% |
 | **Python** | `python/` | ruff, pytest, pip, mypy | 70-90% |
 | **Go** | `go_eco/` | go test/build/vet, golangci-lint | 75-90% |
-| **Rust** | `cargo_eco/`, `cargo_filters/` | cargo build/test/clippy/check | 80-90% |
+| **Rust** | `cargo_cmd.rs`, `cargo_filters/` | cargo build/test/clippy/check/install/nextest | 80-90% |
 | **Containers** | `container_cmd/` | docker, kubectl | 60-80% |
 | **Network** | `wget_cmd.rs`, `curl_cmd.rs` | wget, curl | 70-95% |
 | **Infra** | `aws_cmd/`, `psql_cmd.rs`, `terraform_cmd.rs` | aws, psql, terraform | 75-80% |
@@ -212,6 +212,8 @@ block-beta
 ---
 
 ## Filtering Strategies
+
+README and FEATURES describe 5 core user-facing filtering strategies. The matrix below breaks those into the lower-level implementation patterns used across command families.
 
 ### Strategy Matrix
 
@@ -241,7 +243,7 @@ flowchart LR
 | 3 | **Grouping by Pattern** | Group by rule, count/summarize | 80-90% | lint, tsc, grep (by file/rule/error code) |
 | 4 | **Deduplication** | Unique lines + count | 70-85% | log_cmd (pattern identification) |
 | 5 | **Structure Only** | Keys + types, strip values | 80-95% | json_cmd (schema extraction) |
-| 6 | **Code Filtering** | none/minimal/aggressive levels | 0-90% | read, smart (language-aware via filter.rs) |
+| 6 | **Code Filtering** | none/minimal/aggressive levels | 0-90% | read, peek (language-aware via filter.rs) |
 | 7 | **Failure Focus** | Failures only, hide passing | 94-99% | vitest, playwright, runner (test mode) |
 | 8 | **Tree Compression** | Tree hierarchy, aggregate dirs | 50-70% | ls (directory tree with counts) |
 | 9 | **Progress Filtering** | Strip ANSI bars, final result | 85-95% | wget, pnpm install |

@@ -262,7 +262,7 @@ fn result_is_error(result: &serde_json::Value) -> bool {
         .unwrap_or(false)
 }
 
-fn first_tool_result_text<'a>(result: &'a serde_json::Value) -> Option<&'a str> {
+fn first_tool_result_text(result: &serde_json::Value) -> Option<&str> {
     result
         .get("content")
         .and_then(|content| content.as_array())

@@ -332,7 +332,7 @@ pub fn store_output(command: &str, output: &str, project: Option<&str>) -> Resul
 
 **Why persistent connection?**
 - `hyphae serve` startup takes ~100ms
-- Mycelium targets <10ms execution
+- Mycelium targets low double-digit millisecond overhead on the common path
 - Persistent subprocess amortizes startup cost
 
 ---
@@ -737,7 +737,7 @@ src/
 
 | Metric | Target | Mechanism |
 |--------|--------|-----------|
-| Startup time | <10ms | Single binary, zero runtime dependencies |
+| Startup time | ~5-15ms | Single binary, no external runtime dependencies |
 | Memory usage | <5MB | Minimal allocations, streaming where possible |
 | Binary size | <5MB | Release profile: LTO, single codegen, stripped |
 | Filter overhead | <2ms | Regex compilation cached in `OnceLock` |

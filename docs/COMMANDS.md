@@ -1,6 +1,6 @@
 # Mycelium Command Reference
 
-> Complete reference for all 45+ commands. For an overview of filtering strategies and savings, see [FEATURES.md](FEATURES.md).
+> Reference for the public Mycelium command surface. Hidden/internal commands such as `wc`, `parse-health`, `hook-audit`, and `rewrite` are intentionally omitted. For an overview of filtering strategies and savings, see [FEATURES.md](FEATURES.md).
 
 ---
 
@@ -10,13 +10,14 @@
 2. [Git Commands](#git-commands)
 3. [GitHub CLI Commands](#github-cli-commands)
 4. [Test Commands](#test-commands)
-5. [Build and Lint Commands](#build-and-lint-commands)
-6. [Formatting Commands](#formatting-commands)
-7. [Package Managers](#package-managers)
-8. [Containers and Orchestration](#containers-and-orchestration)
-9. [Data and Network](#data-and-network)
-10. [Cloud and Databases](#cloud-and-databases)
-11. [Stacked PRs (Graphite)](#stacked-prs-graphite)
+5. [Build, Lint, and Formatting Commands](#build-lint-and-formatting-commands)
+6. [Package Managers](#package-managers)
+7. [Containers and Orchestration](#containers-and-orchestration)
+8. [Data and Network](#data-and-network)
+9. [Cloud and Databases](#cloud-and-databases)
+10. [Stacked PRs (Graphite)](#stacked-prs-graphite)
+11. [Analytics and Context](#analytics-and-context)
+12. [Setup and Utilities](#setup-and-utilities)
 
 ---
 
@@ -106,20 +107,20 @@ fn main() -> Result<()> {                   fn main() -> Result<()> { ... }
 
 ---
 
-### `mycelium smart` -- Heuristic Summary
+### `mycelium peek` -- Heuristic Summary
 
 **Purpose:** Generates a 2-line technical summary of a source file.
 
 **Syntax:**
 ```bash
-mycelium smart <file> [--model heuristic] [--force-download]
+mycelium peek <file> [--model heuristic] [--force-download]
 ```
 
 **Savings:** ~95%
 
 **Example:**
 ```
-$ mycelium smart src/tracking.rs
+$ mycelium peek src/tracking.rs
 SQLite-based token tracking system for command executions.
 Records input/output tokens, savings %, execution times with 90-day retention.
 ```
@@ -200,19 +201,6 @@ mycelium diff <file1>              # Stdin as second file
 ```
 
 **Savings:** ~60%
-
----
-
-### `mycelium wc` -- Compact Word Count
-
-**Purpose:** Replaces `wc` with compact output (removes paths and padding).
-
-**Syntax:**
-```bash
-mycelium wc [args...]
-```
-
-Supports all native `wc` flags (`-l`, `-w`, `-c`, etc.).
 
 ---
 
@@ -539,7 +527,7 @@ mycelium vitest run [args...]
 
 ---
 
-### `mycelium playwright test` -- Playwright E2E Tests
+### `mycelium playwright` -- Playwright E2E Tests
 
 **Savings:** ~94%
 
@@ -559,19 +547,17 @@ mycelium pytest [args...]
 
 ---
 
-### `mycelium go test` -- Go Tests
+### `mycelium go` -- Go Tooling
 
-**Savings:** ~90%
-
-```bash
-mycelium go test [args...]
-```
-
-Uses Go's NDJSON streaming for precise filtering.
+| Command | Description | Savings |
+|---------|-------------|---------|
+| `mycelium go test [args...]` | Compact test output via NDJSON streaming | ~90% |
+| `mycelium go build [args...]` | Errors-focused build output | ~75% |
+| `mycelium go vet [args...]` | Filtered vet diagnostics | ~75% |
 
 ---
 
-## Build and Lint Commands
+## Build, Lint, and Formatting Commands
 
 ### `mycelium cargo build` -- Rust Build
 
@@ -676,7 +662,7 @@ Auto-detects the project formatter (prettier, black, ruff format) and applies a 
 
 ---
 
-### `mycelium next build` -- Next.js Build
+### `mycelium next` -- Next.js Build
 
 **Savings:** ~87%
 
@@ -720,27 +706,6 @@ mycelium golangci-lint run [args...]
 ```
 
 Compressed JSON output.
-
----
-
-## Formatting Commands
-
-### `mycelium prettier` -- Prettier
-
-```bash
-mycelium prettier --check .
-mycelium prettier --write src/
-```
-
----
-
-### `mycelium format` -- Universal Detector
-
-```bash
-mycelium format [args...]
-```
-
-Auto-detects: prettier, black, ruff format, rustfmt. Applies a unified compact filter.
 
 ---
 
@@ -963,13 +928,49 @@ Useful for debugging: compare raw output with filtered output.
 
 ## Cloud and Databases
 
+### `mycelium terraform` -- Terraform
+
+| Command | Description |
+|---------|-------------|
+| `mycelium terraform plan [args...]` | Compact plan output |
+| `mycelium terraform apply [args...]` | Compact apply output |
+| `mycelium terraform init [args...]` | Progress-filtered init output |
+
+Unsupported subcommands are passed directly (passthrough).
+
+---
+
 ### `mycelium aws` -- AWS CLI
 
 ```bash
 mycelium aws <service> [args...]
 ```
 
-Forces JSON output and compresses the result. Supports all AWS services (sts, s3, ec2, ecs, rds, cloudformation, etc.).
+| Service | Description |
+|---------|-------------|
+| `mycelium aws sts [args...]` | Compact identity and caller output |
+| `mycelium aws s3 [args...]` | Compact bucket and object summaries |
+| `mycelium aws ec2 [args...]` | Compact instance summaries |
+| `mycelium aws ecs [args...]` | Compact cluster, service, and task summaries |
+| `mycelium aws rds [args...]` | Compact database summaries |
+| `mycelium aws cloudformation [args...]` | Compact stack summaries |
+| `mycelium aws <other-service> [args...]` | Generic JSON compression passthrough |
+
+Known services get service-specific formatting; unsupported services still run through the generic JSON compressor.
+
+---
+
+### `mycelium atmos` -- Atmos
+
+| Command | Description |
+|---------|-------------|
+| `mycelium atmos terraform [args...]` | Compact `atmos terraform` flows |
+| `mycelium atmos describe [args...]` | Truncated structured output |
+| `mycelium atmos validate [args...]` | Filtered validation issues |
+| `mycelium atmos workflow [args...]` | Truncated workflow output |
+| `mycelium atmos version [args...]` | Compact version output |
+
+Unsupported subcommands are passed directly (passthrough).
 
 ---
 
@@ -997,3 +998,75 @@ Removes table borders and compresses the output.
 | `mycelium gt branch` | Compact branch info |
 
 Unrecognized subcommands are passed directly or detected as git passthrough.
+
+---
+
+## Analytics and Context
+
+### `mycelium gain` -- Token Savings Analytics
+
+```bash
+mycelium gain [--graph] [--history] [--daily|--weekly|--monthly|--all]
+mycelium gain --format json
+mycelium gain --diagnostics
+mycelium gain --compare "git status"
+```
+
+Shows aggregate savings, history, exports, diagnostics, and side-by-side comparisons.
+
+---
+
+### `mycelium discover` -- Missed Opportunity Discovery
+
+```bash
+mycelium discover [--project PATH] [--all] [--since N] [--format text|json]
+```
+
+Scans Claude Code and Codex history for commands that could have used a Mycelium rewrite.
+
+---
+
+### `mycelium learn` -- CLI Correction Mining
+
+```bash
+mycelium learn [--project PATH] [--all] [--since N] [--write-rules]
+```
+
+Extracts recurring CLI correction patterns and can write `.claude/rules/cli-corrections.md`.
+
+---
+
+### `mycelium context` -- Hyphae Context Gathering
+
+```bash
+mycelium context <task...> [--project NAME] [--budget TOKENS] [--include SOURCES]
+```
+
+Pulls scoped context from Hyphae-backed sources such as memories, errors, sessions, and code.
+
+---
+
+### `mycelium economics` -- Spend vs Savings
+
+```bash
+mycelium economics [--project] [--daily|--weekly|--monthly|--all] [--format text|json|csv]
+```
+
+Compares Claude Code spend with Mycelium savings. `cc-economics` remains an alias.
+
+---
+
+## Setup and Utilities
+
+| Command | Description |
+|---------|-------------|
+| `mycelium init [options]` | Install, inspect, or remove Mycelium-managed hook and guidance files |
+| `mycelium config [--create]` | Show or create the config file |
+| `mycelium doctor` | Run health checks |
+| `mycelium verify` | Verify hook integrity |
+| `mycelium self-update [--check]` | Check for or install updates |
+| `mycelium completions <shell>` | Generate shell completions |
+| `mycelium proxy <command...>` | Run a command raw while still tracking usage |
+| `mycelium invoke <command...>` | Resolve and execute a shell command through rewrite logic |
+| `mycelium benchmark [--ci]` | Measure savings across command fixtures |
+| `mycelium plugin list|install` | Manage shipped filter plugins |

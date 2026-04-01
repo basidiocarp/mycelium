@@ -1,6 +1,6 @@
 # Mycelium
 
-Token-optimized CLI proxy. Filters and compresses command output before it reaches your LLM context. Single Rust binary, zero dependencies, <10ms overhead. 60-90% token savings on 70+ command types.
+Token-optimized CLI proxy. Filters and compresses command output before it reaches your LLM context. Single Rust binary with no external runtime dependencies, typically ~5-15ms proxy overhead. 60-90% token savings on common developer workflows.
 
 Part of the [Basidiocarp ecosystem](https://github.com/basidiocarp) — see the [Technical Overview](https://github.com/basidiocarp/.github/blob/main/profile/README.md#technical-overview) for how Mycelium fits with Hyphae, Rhizome, Cap, and Lamella.
 
@@ -61,15 +61,17 @@ flowchart LR
     end
 ```
 
-### Filtering Strategies
+### Core Filtering and Routing
 
 1. **Smart filtering** — Removes noise (comments, whitespace, boilerplate)
 2. **Grouping** — Aggregates similar items (files by directory, errors by type)
 3. **Truncation** — Keeps relevant context, cuts redundancy
 4. **Deduplication** — Collapses repeated log lines with counts
 5. **Adaptive sizing** — Small (<50 lines) pass through, medium get filtered, large (>500 lines) get full compression
-6. **Hyphae routing** — Large outputs stored as retrievable chunks in Hyphae (when installed)
-7. **Rhizome code intelligence** — `mycelium read` uses tree-sitter structural outlines for large code files (when installed)
+
+Optional integrations:
+- **Hyphae routing** — Large outputs stored as retrievable chunks in Hyphae (when installed)
+- **Rhizome code intelligence** — `mycelium read` uses tree-sitter structural outlines for large code files (when installed)
 
 ### Mycelium Setup Surface
 
@@ -92,7 +94,7 @@ When installed, Mycelium can work with Hyphae and Rhizome for:
 ## Documentation
 
 - [FEATURES.md](docs/FEATURES.md) — Feature overview and savings summary
-- [COMMANDS.md](docs/COMMANDS.md) — Complete command reference (70+ commands)
+- [COMMANDS.md](docs/COMMANDS.md) — Public command reference
 - [ANALYTICS.md](docs/ANALYTICS.md) — Token savings analytics and hooks
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) — Technical architecture
 - [EXTENDING.md](docs/EXTENDING.md) — Adding new commands

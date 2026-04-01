@@ -77,6 +77,27 @@
 - Better error messages and diagnostics
 - Deeper host-neutral runtime integration so Claude, Codex, and future hosts map cleanly into the same measurement model
 
+### Adaptive Filtering Roadmap
+
+#### Near-Term: Outer-Loop Token Optimization
+- Replace mostly line/byte-based routing with token-budget-aware routing using existing token estimation and command-family heuristics
+- Add salience-aware compaction for diffs, logs, and test output so truncation preserves the most actionable context instead of only applying fixed caps
+- Expand the shared parser degradation model (`Full`, `Degraded`, `Passthrough`) across more command families so fallback behavior is more consistent
+- Tune compaction thresholds from tracking and parse-failure telemetry instead of relying only on static profile defaults
+- Improve Hyphae summaries so large-output chunking returns structured retrieval hints, not just a generic summary line
+- Add task-shaped compression modes for common intents such as debug, review, fix, and status
+
+#### Later: Local Summarization and Retrieval
+- Add a lightweight local reranker or summarizer for large outputs before chunking when heuristic filters are not specific enough
+- Attach richer metadata to chunked output so follow-up retrieval can target failures, changed files, warnings, or hot sections directly
+- Keep these additions outside the model runtime itself unless local inference becomes a primary Mycelium feature
+
+#### Conditional: Only If Mycelium Becomes a Local Model Runtime
+- Evaluate plug-and-play KV cache compression techniques such as FastGen before attempting deeper runtime changes
+- Consider dynamic layer execution techniques only after local inference is real, profiled, and bottlenecked on model execution rather than output shaping
+- Treat multimodal token-compression work such as ACT-IN-LLM or AdaTok as out of scope unless image or screenshot workflows become a core product path
+- Ignore token-level pretraining data filtering unless Mycelium starts training or fine-tuning its own models
+
 ### Competitive Priorities
 
 #### Copy

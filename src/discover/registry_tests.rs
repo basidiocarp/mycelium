@@ -1810,3 +1810,30 @@ fn test_rewrite_alt_tools() {
         Some("mycelium terraform apply".to_string())
     );
 }
+
+// --- Piped diagnostic passthrough commands ---
+
+#[test]
+fn test_rewrite_stat_piped_head_returns_none() {
+    // `stat x | head -3` — first segment is a diagnostic passthrough, so skip rewriting
+    assert_eq!(rewrite_command("stat x | head -3", &[]), None);
+}
+
+#[test]
+fn test_rewrite_which_piped_grep_returns_none() {
+    // `which git | grep usr` — first segment is a diagnostic passthrough
+    assert_eq!(rewrite_command("which git | grep usr", &[]), None);
+}
+
+#[test]
+fn test_rewrite_echo_piped_returns_none() {
+    // `echo hello | cat` — first segment is a diagnostic passthrough
+    assert_eq!(rewrite_command("echo hello | cat", &[]), None);
+}
+
+#[test]
+fn test_rewrite_non_diagnostic_pipe_still_blocked() {
+    // `git log | head -3` — first segment is NOT a diagnostic passthrough;
+    // the pipe blocks rewriting via has_unsafe_shell_syntax
+    assert_eq!(rewrite_command("git log | head -3", &[]), None);
+}
