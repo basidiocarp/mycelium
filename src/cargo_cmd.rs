@@ -92,24 +92,24 @@ where
         .status
         .code()
         .unwrap_or(if output.status.success() { 0 } else { 1 });
-    let filtered = crate::hyphae::route_or_filter(
+    let result = crate::hyphae::route_or_filter(
         &format!("cargo {} {}", subcommand, restored_args.join(" ")),
         &raw,
-        filter_fn,
+        |r| crate::filter::FilterResult::full(r, filter_fn(r)),
     );
 
     if let Some(hint) = crate::tee::tee_and_hint(&raw, &format!("cargo_{}", subcommand), exit_code)
     {
-        println!("{}\n{}", filtered, hint);
+        println!("{}\n{}", result.output, hint);
     } else {
-        println!("{}", filtered);
+        println!("{}", result.output);
     }
 
     timer.track(
         &format!("cargo {} {}", subcommand, restored_args.join(" ")),
         &format!("mycelium cargo {} {}", subcommand, restored_args.join(" ")),
         &raw,
-        &filtered,
+        &result.output,
     );
 
     if !output.status.success() {
@@ -160,17 +160,17 @@ fn run_test(args: &[String], verbose: u8) -> Result<()> {
     }
 
     // Route through Hyphae for very large test output
-    let output = crate::hyphae::route_or_filter(
+    let filter_result = crate::hyphae::route_or_filter(
         &format!("cargo test {}", restored.join(" ")),
         &result.raw,
-        |_| result.filtered.clone(),
+        |r| crate::filter::FilterResult::full(r, result.filtered.clone()),
     );
 
     timer.track(
         &format!("cargo test {}", restored.join(" ")),
         &format!("mycelium cargo test {}", restored.join(" ")),
         &result.raw,
-        &output,
+        &filter_result.output,
     );
 
     if result.exit_code != 0 {

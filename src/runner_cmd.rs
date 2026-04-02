@@ -22,9 +22,9 @@ pub fn run_err(command: &str, verbose: u8) -> Result<()> {
     let stderr = String::from_utf8_lossy(&output.stderr);
     let raw = format!("{}\n{}", stdout, stderr);
     let exit_status = output.status;
-    let out = crate::hyphae::route_or_filter(command, &raw, |r| {
+    let result = crate::hyphae::route_or_filter(command, &raw, |r| {
         let filtered = filter_errors(r);
-        if filtered.is_empty() {
+        let output = if filtered.is_empty() {
             if exit_status.success() {
                 "ok: Command completed successfully (no errors)".to_string()
             } else {
@@ -40,7 +40,8 @@ pub fn run_err(command: &str, verbose: u8) -> Result<()> {
             }
         } else {
             filtered
-        }
+        };
+        crate::filter::FilterResult::full(r, output)
     });
 
     let exit_code = output
@@ -48,11 +49,11 @@ pub fn run_err(command: &str, verbose: u8) -> Result<()> {
         .code()
         .unwrap_or(if output.status.success() { 0 } else { 1 });
     if let Some(hint) = crate::tee::tee_and_hint(&raw, "err", exit_code) {
-        println!("{}\n{}", out, hint);
+        println!("{}\n{}", result.output, hint);
     } else {
-        println!("{}", out);
+        println!("{}", result.output);
     }
-    timer.track(command, "mycelium run-err", &raw, &out);
+    timer.track(command, "mycelium run-err", &raw, &result.output);
     Ok(())
 }
 
@@ -78,14 +79,14 @@ pub fn run_test(command: &str, verbose: u8) -> Result<()> {
         .status
         .code()
         .unwrap_or(if output.status.success() { 0 } else { 1 });
-    let summary =
-        crate::hyphae::route_or_filter(command, &raw, |r| extract_test_summary(r, command));
+    let result =
+        crate::hyphae::route_or_filter(command, &raw, |r| crate::filter::FilterResult::full(r, extract_test_summary(r, command)));
     if let Some(hint) = crate::tee::tee_and_hint(&raw, "test", exit_code) {
-        println!("{}\n{}", summary, hint);
+        println!("{}\n{}", result.output, hint);
     } else {
-        println!("{}", summary);
+        println!("{}", result.output);
     }
-    timer.track(command, "mycelium run-test", &raw, &summary);
+    timer.track(command, "mycelium run-test", &raw, &result.output);
     Ok(())
 }
 

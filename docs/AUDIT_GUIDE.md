@@ -243,9 +243,7 @@ EOF
 
 ### Token Estimation
 
-mycelium estimates tokens using `text.len() / 4` (4 characters per token average).
-
-Accuracy: ±10% compared to actual LLM tokenization. Sufficient for trends.
+mycelium estimates tokens using `text.len() / 4` (4 characters per token average). Accuracy is ±10% compared to actual LLM tokenization—sufficient for trend analysis.
 
 ### Savings Calculation
 

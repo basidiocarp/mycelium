@@ -244,7 +244,7 @@ fn test_vitest_regex_fallback() {
 
 ## Trade-offs
 
-Tool version changes break gracefully via tier fallback instead of hard failures. Degradation markers in verbose mode make it visible when parsing drops to a lower tier. Structured data from Tier 1 parses enables better compression than raw text truncation. The unified `OutputParser` trait means all tool modules follow the same pattern, which simplifies fixture-based regression testing across tool versions.
+Tool version changes break gracefully—tier fallback handles parse failures without hard errors. Degradation markers in verbose mode make it visible when parsing drops to a lower tier. Structured data from a Tier 1 parse enables tighter compression than raw text truncation, and the unified `OutputParser` trait means all tool modules follow the same pattern, which simplifies fixture-based regression testing across tool versions.
 
 ## Roadmap
 

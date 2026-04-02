@@ -14,6 +14,7 @@ Part of the [Basidiocarp ecosystem](https://github.com/basidiocarp) — see the 
 - **[cap](https://github.com/basidiocarp/cap)** — Web dashboard for memory browsing, token analytics, and code exploration.
 - **[lamella](https://github.com/basidiocarp/lamella)** — Skills, hooks, and [feedback capture](https://github.com/basidiocarp/.github/blob/main/profile/README.md#feedback-loop--lesson-extraction--hyphae--lamella) for Claude Code.
 
+
 ## Savings (30-min Claude Code Session)
 
 | Operation                 | Frequency | Standard     | mycelium    | Savings  |

@@ -168,7 +168,7 @@ Mycelium is compatible with these Hyphae and Rhizome versions:
 | 0.4.x | 0.2.0 | 0.3.0 | Earlier version |
 | 0.3.x | 0.1.0 | 0.2.0 | Deprecated |
 
-In practice, you don't need to match exact versions. Just keep all tools within the last 2-3 releases.
+Exact version matching is not required. Keeping all tools within the last 2-3 releases is sufficient.
 
 To check compatibility:
 
@@ -363,12 +363,12 @@ Report the issue on GitHub so it can be fixed.
 
 ## What to Expect After Update
 
-After updating and re-running `stipe init` plus any needed Mycelium hook refresh, you should see:
+After updating and re-running `stipe init` plus any needed Mycelium hook refresh:
 
-1. **Improved token savings** — New filter logic usually means better compression
-2. **New Hyphae features** — Latest memory recall features, better full-text search
-3. **Better code intelligence** — Rhizome updates usually add support for more languages/features
-4. **No breaking changes** — The update script maintains backward compatibility
+1. Token savings improve—new filter logic typically produces tighter compression.
+2. Hyphae gains the latest memory recall and full-text search improvements.
+3. Rhizome adds support for more languages and LSP features.
+4. The update script maintains backward compatibility; no config changes are required.
 
 If you notice degraded performance or missing features, check GitHub issues or run:
 

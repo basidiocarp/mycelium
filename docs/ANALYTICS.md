@@ -93,7 +93,7 @@ Top commands:
 
 ### `mycelium discover` -- Missed Opportunities
 
-**Purpose:** Analyzes Claude Code history to find commands that could have been optimized by mycelium.
+Analyzes Claude Code history to find commands that could have been optimized by mycelium.
 
 ```bash
 mycelium discover                          # Current project, last 30 days
@@ -117,7 +117,7 @@ mycelium discover --format json            # JSON export
 
 ### `mycelium learn` -- Learn from Errors
 
-**Purpose:** Analyzes Claude Code CLI error history to detect recurring corrections.
+Analyzes Claude Code CLI error history to detect recurring corrections.
 
 ```bash
 mycelium learn                             # Current project
@@ -132,7 +132,7 @@ mycelium learn --format json               # JSON export
 
 ### `mycelium economics` -- Claude Code Economic Analysis
 
-**Purpose:** Compares Claude Code spending (via ccusage) with Mycelium savings.
+Compares Claude Code spending (via ccusage) with Mycelium savings.
 
 ```bash
 mycelium economics                         # Summary
@@ -155,7 +155,7 @@ mycelium cc-economics                      # Compatibility alias
 
 ### `mycelium hook-audit` -- Hook Metrics
 
-**Prerequisite:** Requires `MYCELIUM_HOOK_AUDIT=1` in the environment.
+Requires `MYCELIUM_HOOK_AUDIT=1` in the environment.
 
 ```bash
 mycelium hook-audit                        # Last 7 days (default)
@@ -169,9 +169,8 @@ mycelium hook-audit --since 0              # Full history
 
 ### How It Works
 
-The Mycelium hook intercepts shell commands in Claude Code **before execution** and automatically rewrites them into their Mycelium equivalent.
+The Mycelium hook intercepts shell commands in Claude Code before execution and rewrites them into their Mycelium equivalent.
 
-**Flow:**
 ```mermaid
 sequenceDiagram
     participant CC as Claude Code
@@ -188,13 +187,12 @@ sequenceDiagram
     MY-->>CC: Filtered output (~10 tokens vs ~200)
 ```
 
-**Key points:**
-- Claude never sees the rewrite -- it simply receives optimized output
-- The hook is a thin delegator that calls `mycelium rewrite`
-- Rewrite decisions live in the Rust registry modules (`src/discover/registry.rs` and `src/discover/registry_parser.rs`)
-- Commands already prefixed with `mycelium` pass through unchanged
-- Commands with risky shell syntax like pipes, redirects, command substitution, subshells, or process substitution pass through unchanged
-- Unrecognized commands pass through unchanged
+- Claude never sees the rewrite—it receives optimized output directly.
+- The hook is a thin delegator that calls `mycelium rewrite`.
+- Rewrite decisions live in the Rust registry modules (`src/discover/registry.rs` and `src/discover/registry_parser.rs`).
+- Commands already prefixed with `mycelium` pass through unchanged.
+- Commands with risky shell syntax like pipes, redirects, command substitution, subshells, or process substitution pass through unchanged.
+- Unrecognized commands pass through unchanged.
 
 ### Installation
 
@@ -326,21 +324,19 @@ exclude_commands = []       # Commands to exclude from automatic rewriting
 
 ### Raw Output Recovery
 
-When a command fails, Mycelium automatically saves the complete raw output to a log file. This allows the LLM to read the output without re-executing the command.
+When a command exits non-zero, Mycelium saves the complete raw output to a log file so the LLM can read it without re-executing the command. The sequence is:
 
-**How it works:**
-1. The command fails (exit code != 0)
-2. Mycelium saves the raw output to the resolved tee directory (platform data dir by default, or `MYCELIUM_TEE_DIR`)
-3. The file path is displayed in the filtered output
-4. The LLM can read the file if more details are needed
+1. Save raw output to the resolved tee directory (platform data dir by default, or `MYCELIUM_TEE_DIR`).
+2. Display the file path in the filtered output.
+3. Leave the file available for the LLM to read if more details are needed.
 
-**Output:**
+Example output:
 ```
 FAILED: 2/15 tests
 [full output: <resolved tee dir>/1707753600_cargo_test.log]
 ```
 
-**Configuration:**
+Configuration:
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|

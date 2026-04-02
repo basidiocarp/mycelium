@@ -62,30 +62,30 @@ pub fn decide_action(output: &str) -> OutputAction {
 /// 1. Never return empty from non-empty input.
 /// 2. If savings < 20%, filtering isn't worth the information loss.
 /// 3. If >95% reduction on output <200 lines, the result is suspiciously aggressive.
-fn validate_filter_output(raw: &str, filtered: &str) -> String {
+fn validate_filter_output(raw: &str, result: crate::filter::FilterResult) -> crate::filter::FilterResult {
+    use crate::filter::FilterResult;
+
     // Rule 1: Never return empty from non-empty input.
-    if filtered.trim().is_empty() && !raw.trim().is_empty() {
-        return raw.to_string();
+    if result.output.trim().is_empty() && !raw.trim().is_empty() {
+        return FilterResult::passthrough(raw);
     }
 
-    let raw_tokens = crate::tracking::utils::estimate_tokens(raw);
-    if raw_tokens > 0 {
-        let filtered_tokens = crate::tracking::utils::estimate_tokens(filtered);
-        let savings = 1.0 - (filtered_tokens as f64 / raw_tokens as f64);
+    if result.input_tokens > 0 {
+        let savings = 1.0 - (result.output_tokens as f64 / result.input_tokens as f64);
 
         // Rule 2: If savings < 20%, not worth the information loss.
         if savings < 0.20 {
-            return raw.to_string();
+            return FilterResult::passthrough(raw);
         }
 
         // Rule 3: Suspiciously aggressive — >95% reduction on small output.
         let raw_lines = raw.lines().count();
         if raw_lines < 200 && savings > 0.95 {
-            return raw.to_string();
+            return FilterResult::passthrough(raw);
         }
     }
 
-    filtered.to_string()
+    result
 }
 
 /// Check if the filter header should be shown.
@@ -101,30 +101,33 @@ fn should_show_filter_header() -> bool {
 /// - Large outputs are sent to Hyphae for chunked storage (if available).
 /// - On Hyphae failure or medium outputs, `filter_fn` is applied.
 /// - All filter results pass through `validate_filter_output` before returning.
-pub fn route_or_filter(command: &str, raw: &str, filter_fn: impl FnOnce(&str) -> String) -> String {
+pub fn route_or_filter(command: &str, raw: &str, filter_fn: impl FnOnce(&str) -> crate::filter::FilterResult) -> crate::filter::FilterResult {
+    use crate::filter::{FilterQuality, FilterResult};
+
     match decide_action(raw) {
-        OutputAction::Passthrough => raw.to_string(),
+        OutputAction::Passthrough => FilterResult::passthrough(raw),
         OutputAction::Filter => {
-            let filtered = filter_fn(raw);
-            let validated = validate_filter_output(raw, &filtered);
-            // If validation kept the filtered output (not raw fallback), add header
-            if validated != raw && should_show_filter_header() {
-                add_filter_header(command, raw, &validated)
+            let result = filter_fn(raw);
+            let validated = validate_filter_output(raw, result);
+            if validated.quality != FilterQuality::Passthrough && should_show_filter_header() {
+                let output = add_filter_header(command, raw, &validated.output);
+                FilterResult { output, ..validated }
             } else {
                 validated
             }
         }
         OutputAction::Chunk => match crate::hyphae_client::store_output(command, raw, None) {
-            Ok(summary) => format_chunk_summary(command, &summary),
+            Ok(summary) => FilterResult::full(raw, format_chunk_summary(command, &summary)),
             Err(e) => {
                 eprintln!(
                     "[mycelium] Hyphae chunking failed, falling back to filter: {}",
                     e
                 );
-                let filtered = filter_fn(raw);
-                let validated = validate_filter_output(raw, &filtered);
-                if validated != raw && should_show_filter_header() {
-                    add_filter_header(command, raw, &validated)
+                let result = filter_fn(raw);
+                let validated = validate_filter_output(raw, result);
+                if validated.quality != FilterQuality::Passthrough && should_show_filter_header() {
+                    let output = add_filter_header(command, raw, &validated.output);
+                    FilterResult { output, ..validated }
                 } else {
                     validated
                 }
@@ -206,8 +209,9 @@ mod tests {
     #[test]
     fn test_route_or_filter_passthrough() {
         let small = "hello\n";
-        let result = route_or_filter("test", small, |_| "FILTERED".to_string());
-        assert_eq!(result, small);
+        let result = route_or_filter("test", small, |r| crate::filter::FilterResult::full(r, "FILTERED".to_string()));
+        assert_eq!(result.output, small);
+        assert_eq!(result.quality, crate::filter::FilterQuality::Passthrough);
     }
 
     #[test]
@@ -217,10 +221,10 @@ mod tests {
         // Using 100 lines so it routes through Filter action (token count > 500).
         let medium = format!("{}\n", "a".repeat(24)).repeat(100); // ~600 tokens, 100 lines
         let filtered_output = format!("{}\n", "a".repeat(24)).repeat(50); // ~300 tokens, 50% savings
-        let result = route_or_filter("test", &medium, move |_| filtered_output);
+        let result = route_or_filter("test", &medium, move |r| crate::filter::FilterResult::full(r, filtered_output));
         // Result should contain filtered output (possibly with header prepended)
-        assert!(result.contains(&"a".repeat(24)), "Filter output should be present");
-        assert_ne!(result, medium, "Should not be raw passthrough");
+        assert!(result.output.contains(&"a".repeat(24)), "Filter output should be present");
+        assert_ne!(result.output, medium, "Should not be raw passthrough");
     }
 
     #[test]
@@ -228,18 +232,18 @@ mod tests {
         // Large output (>2000 tokens) — routes through Hyphae if available,
         // otherwise falls back to filter (which may itself be validated back to raw).
         let large = format!("{}\n", "a".repeat(100)).repeat(120); // ~3000 tokens, 120 lines
-        let result = route_or_filter("test", &large, |_| "FILTERED".to_string());
+        let result = route_or_filter("test", &large, |r| crate::filter::FilterResult::full(r, "FILTERED".to_string()));
         if is_available() {
             // Hyphae available: either a Hyphae summary, or filter output (or raw on
             // validation fallback if Hyphae fails internally)
             assert!(
-                result.contains("[mycelium→hyphae]") || !result.is_empty(),
+                result.output.contains("[mycelium→hyphae]") || !result.output.is_empty(),
                 "Expected non-empty result from Hyphae or filter fallback"
             );
         } else {
             // No Hyphae: filter runs, then validate_filter_output fires.
             // "FILTERED" has >95% reduction on <200 lines → raw fallback.
-            assert_eq!(result, large, "Large output without Hyphae: validation returns raw");
+            assert_eq!(result.output, large, "Large output without Hyphae: validation returns raw");
         }
     }
 
@@ -248,16 +252,16 @@ mod tests {
         // A filter that returns empty should fall back to raw output.
         // Use content above the 500-token passthrough threshold so it routes through Filter.
         let medium = format!("{}\n", "a".repeat(24)).repeat(100); // ~600 tokens, 100 lines
-        let result = route_or_filter("test", &medium, |_| String::new());
-        assert_eq!(result, medium, "Empty filter output should fall back to raw");
+        let result = route_or_filter("test", &medium, |r| crate::filter::FilterResult::full(r, String::new()));
+        assert_eq!(result.output, medium, "Empty filter output should fall back to raw");
     }
 
     #[test]
     fn test_route_or_filter_whitespace_filter_falls_back_to_raw() {
         // Use content above the 500-token passthrough threshold.
         let medium = format!("{}\n", "a".repeat(24)).repeat(100); // ~600 tokens, 100 lines
-        let result = route_or_filter("test", &medium, |_| "   \n  ".to_string());
-        assert_eq!(result, medium, "Whitespace-only filter output should fall back to raw");
+        let result = route_or_filter("test", &medium, |r| crate::filter::FilterResult::full(r, "   \n  ".to_string()));
+        assert_eq!(result.output, medium, "Whitespace-only filter output should fall back to raw");
     }
 
     // ── validate_filter_output: rule-by-rule tests ────────────────────────────
@@ -265,22 +269,22 @@ mod tests {
     #[test]
     fn test_validate_rule1_empty_filtered_returns_raw() {
         let raw = "some output\nwith content\n";
-        let result = validate_filter_output(raw, "");
-        assert_eq!(result, raw, "Rule 1: empty filtered should return raw");
+        let result = validate_filter_output(raw, crate::filter::FilterResult::full(raw, String::new()));
+        assert_eq!(result.output, raw, "Rule 1: empty filtered should return raw");
     }
 
     #[test]
     fn test_validate_rule1_whitespace_filtered_returns_raw() {
         let raw = "some output\nwith content\n";
-        let result = validate_filter_output(raw, "   \n  ");
-        assert_eq!(result, raw, "Rule 1: whitespace-only filtered should return raw");
+        let result = validate_filter_output(raw, crate::filter::FilterResult::full(raw, "   \n  ".to_string()));
+        assert_eq!(result.output, raw, "Rule 1: whitespace-only filtered should return raw");
     }
 
     #[test]
     fn test_validate_rule1_empty_raw_returns_empty_filtered() {
         // When raw is empty, filtering empty to empty is fine
-        let result = validate_filter_output("", "");
-        assert_eq!(result, "", "Rule 1: empty filtered from empty raw is ok");
+        let result = validate_filter_output("", crate::filter::FilterResult::full("", String::new()));
+        assert_eq!(result.output, "", "Rule 1: empty filtered from empty raw is ok");
     }
 
     #[test]
@@ -288,8 +292,8 @@ mod tests {
         // Raw: 100 tokens, filtered: 90 tokens → 10% savings — below 20% threshold
         let raw = "a".repeat(400);    // ~100 tokens
         let filtered = "a".repeat(360); // ~90 tokens (10% savings)
-        let result = validate_filter_output(&raw, &filtered);
-        assert_eq!(result, raw, "Rule 2: <20% savings should return raw");
+        let result = validate_filter_output(&raw, crate::filter::FilterResult::full(&raw, filtered));
+        assert_eq!(result.output, raw, "Rule 2: <20% savings should return raw");
     }
 
     #[test]
@@ -297,17 +301,17 @@ mod tests {
         // Raw: 100 tokens, filtered: 70 tokens → 30% savings — above 20% threshold
         let raw = "a".repeat(400);    // ~100 tokens
         let filtered = "a".repeat(280); // ~70 tokens (30% savings)
-        let result = validate_filter_output(&raw, &filtered);
-        assert_eq!(result, filtered, "Rule 2: ≥20% savings should return filtered");
+        let result = validate_filter_output(&raw, crate::filter::FilterResult::full(&raw, filtered.clone()));
+        assert_eq!(result.output, filtered, "Rule 2: ≥20% savings should return filtered");
     }
 
     #[test]
     fn test_validate_rule3_aggressive_small_output_returns_raw() {
         // Raw: 50 lines, filtered: 1 line → >95% reduction on <200 lines
         let raw = "line of content here\n".repeat(50); // 50 lines, substantial tokens
-        let filtered = "x"; // essentially empty — >95% reduction
-        let result = validate_filter_output(&raw, filtered);
-        assert_eq!(result, raw, "Rule 3: >95% reduction on <200 lines should return raw");
+        let filtered = "x".to_string(); // essentially empty — >95% reduction
+        let result = validate_filter_output(&raw, crate::filter::FilterResult::full(&raw, filtered));
+        assert_eq!(result.output, raw, "Rule 3: >95% reduction on <200 lines should return raw");
     }
 
     #[test]
@@ -315,12 +319,12 @@ mod tests {
         // Raw: 200+ lines → rule 3 does not apply (raw_lines >= 200)
         let raw = "line of content here\n".repeat(200); // exactly 200 lines
         // filtered: just 1 token — >95% savings, but raw_lines is not < 200
-        let filtered = "x";
+        let filtered = "x".to_string();
         // With 200 lines, rule 3 doesn't fire; rule 2 might fire if savings > 0.20
         // ~200*5=1000 tokens raw, 1 token filtered → 99.9% savings > 20%
         // Rule 3: raw_lines < 200 is false (200 is not < 200), so filtered passes
-        let result = validate_filter_output(&raw, filtered);
-        assert_eq!(result, filtered, "Rule 3: ≥200 lines allows aggressive reduction");
+        let result = validate_filter_output(&raw, crate::filter::FilterResult::full(&raw, filtered.clone()));
+        assert_eq!(result.output, filtered, "Rule 3: ≥200 lines allows aggressive reduction");
     }
 
     #[test]
@@ -328,8 +332,8 @@ mod tests {
         // 50 lines, 40% savings, not suspiciously aggressive
         let raw = "word word word word\n".repeat(50); // ~250 tokens
         let filtered = "word word word word\n".repeat(30); // ~150 tokens → 40% savings
-        let result = validate_filter_output(&raw, &filtered);
-        assert_eq!(result, filtered, "All rules pass: should return filtered output");
+        let result = validate_filter_output(&raw, crate::filter::FilterResult::full(&raw, filtered.clone()));
+        assert_eq!(result.output, filtered, "All rules pass: should return filtered output");
     }
 
     #[test]

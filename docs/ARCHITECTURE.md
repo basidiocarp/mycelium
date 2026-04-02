@@ -302,8 +302,7 @@ Thresholds are configurable in `config.toml` under `[filter.adaptive]`.
 
 ### Design Rationale
 
-**Added**: 2026-02-12 (v0.15.1)
-**Motivation**: Complete language ecosystem coverage beyond JS/TS
+Added in v0.15.1 (2026-02-12) to complete language ecosystem coverage beyond JS/TS.
 
 Python and Go modules follow distinct architectural patterns optimized for their ecosystems:
 
@@ -585,7 +584,7 @@ panic = "abort"        # Smaller binary size
 
 Binary: ~4.1 MB stripped, ~5-10ms cold start, ~2-5 MB memory.
 
-**Runtime overhead (estimated):**
+Runtime overhead (estimated):
 
 | Operation | Mycelium Overhead | Total Time |
 |-----------|-------------------|------------|

@@ -82,11 +82,11 @@ pub(super) fn run_diff(
         let compacted = crate::hyphae::route_or_filter(
             &format!("git diff {}", args.join(" ")),
             &diff_stdout,
-            |d| compact_diff(d, max_lines.unwrap_or(500)),
+            |d| crate::filter::FilterResult::full(d, compact_diff(d, max_lines.unwrap_or(500))),
         );
-        println!("{}", compacted);
+        println!("{}", compacted.output);
         final_output.push_str("\n--- Changes ---\n");
-        final_output.push_str(&compacted);
+        final_output.push_str(&compacted.output);
     }
 
     timer.track(
@@ -211,10 +211,10 @@ pub(super) fn run_show(
         let compacted = crate::hyphae::route_or_filter(
             &format!("git show {}", args.join(" ")),
             diff_text,
-            |d| compact_diff(d, max_lines.unwrap_or(500)),
+            |d| crate::filter::FilterResult::full(d, compact_diff(d, max_lines.unwrap_or(500))),
         );
-        println!("{}", compacted);
-        final_output.push_str(&format!("\n{}", compacted));
+        println!("{}", compacted.output);
+        final_output.push_str(&format!("\n{}", compacted.output));
     }
 
     timer.track(

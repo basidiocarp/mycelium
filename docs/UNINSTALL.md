@@ -476,7 +476,7 @@ Once Mycelium is uninstalled:
 - Commands run without filtering (no token savings)
 - No automatic error/correction capture
 - Hyphae/Rhizome work independently (if you kept them)
-- Claude Code performance might be unaffected (hooks have minimal overhead)
+- Claude Code itself is unaffected—the hooks added negligible overhead
 
 You can reinstall anytime:
 

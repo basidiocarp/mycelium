@@ -170,7 +170,7 @@ pub(crate) fn docker_logs(args: &[String], _verbose: u8) -> Result<()> {
     let stderr = String::from_utf8_lossy(&output.stderr);
     let raw = format!("{}\n{}", stdout, stderr);
 
-    let out = crate::hyphae::route_or_filter(&format!("docker logs {}", container), &raw, |r| {
+    let result = crate::hyphae::route_or_filter(&format!("docker logs {}", container), &raw, |r| {
         let raw_line_count = r.lines().count();
         let analyzed = crate::log_cmd::run_stdin_str(r);
         let dedup_count = raw_line_count.saturating_sub(analyzed.lines().count());
@@ -178,14 +178,14 @@ pub(crate) fn docker_logs(args: &[String], _verbose: u8) -> Result<()> {
         if dedup_count > 0 {
             out.push_str(&format!("\n({} lines deduplicated)", dedup_count));
         }
-        out
+        crate::filter::FilterResult::full(r, out)
     });
-    println!("{}", out);
+    println!("{}", result.output);
     timer.track(
         &format!("docker logs {}", container),
         "mycelium docker logs",
         &raw,
-        &out,
+        &result.output,
     );
     Ok(())
 }

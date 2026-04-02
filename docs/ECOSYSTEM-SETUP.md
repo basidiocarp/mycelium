@@ -134,13 +134,9 @@ Run:
 mycelium config
 ```
 
-## What Happens Next
+## After Setup
 
-Once setup is complete, Mycelium continues doing its core job:
-
-- filtering and compressing command output for lower token usage
-- routing large output to Hyphae when available
-- using Rhizome structural reads for large code files when available
+With setup complete, Mycelium filters and compresses command output, routes large output to Hyphae when available, and uses Rhizome structural reads for large code files when available.
 
 Example session improvements:
 

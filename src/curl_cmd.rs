@@ -34,16 +34,16 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
     let raw = stdout.to_string();
 
     // Auto-detect JSON and pipe through filter (or route to Hyphae for large output)
-    let filtered = crate::hyphae::route_or_filter(&format!("curl {}", args.join(" ")), &raw, |r| {
-        filter_curl_output(r)
+    let result = crate::hyphae::route_or_filter(&format!("curl {}", args.join(" ")), &raw, |r| {
+        crate::filter::FilterResult::full(r, filter_curl_output(r))
     });
-    println!("{}", filtered);
+    println!("{}", result.output);
 
     timer.track(
         &format!("curl {}", args.join(" ")),
         &format!("mycelium curl {}", args.join(" ")),
         &raw,
-        &filtered,
+        &result.output,
     );
 
     Ok(())
