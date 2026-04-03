@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.8.7
+
+### Features
+- Wire FilterQuality through route_or_filter pipeline for honest quality tracking
+- Add honest quality detection and Degraded validation rule
+- Add FilterResult quality tracking to gh command handlers
+- Route gh output through validation and Hyphae chunking
+
 ## v0.8.3
 
 ### Fixed
