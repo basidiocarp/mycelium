@@ -1,5 +1,6 @@
 //! GitHub CLI issue sub-command handlers.
 
+use crate::filter::FilterResult;
 use crate::parser::{FormatMode, OutputParser, ParseResult, TokenFormatter};
 use crate::tracking;
 use anyhow::{Context, Result};
@@ -73,15 +74,20 @@ fn list_issues(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()>
         ParseResult::Passthrough(_) => 3,
     };
 
-    let filtered = match parse_result {
-        ParseResult::Full(list) | ParseResult::Degraded(list, _) => {
+    let (filtered, _filter_result) = match parse_result {
+        ParseResult::Full(list) => {
             let out = list.format(mode);
             println!("{}", out);
-            out
+            (out.clone(), FilterResult::full(&raw, out))
+        }
+        ParseResult::Degraded(list, _) => {
+            let out = list.format(mode);
+            println!("{}", out);
+            (out.clone(), FilterResult::degraded(&raw, out))
         }
         ParseResult::Passthrough(raw_out) => {
             print!("{}", raw_out);
-            raw_out
+            (raw_out.clone(), FilterResult::passthrough(&raw_out))
         }
     };
 
@@ -148,15 +154,20 @@ fn view_issue(args: &[String], _verbose: u8) -> Result<()> {
         ParseResult::Passthrough(_) => 3,
     };
 
-    let filtered = match parse_result {
-        ParseResult::Full(detail) | ParseResult::Degraded(detail, _) => {
+    let (filtered, _filter_result) = match parse_result {
+        ParseResult::Full(detail) => {
             let out = detail.format_compact();
             println!("{}", out);
-            out
+            (out.clone(), FilterResult::full(&raw, out))
+        }
+        ParseResult::Degraded(detail, _) => {
+            let out = detail.format_compact();
+            println!("{}", out);
+            (out.clone(), FilterResult::degraded(&raw, out))
         }
         ParseResult::Passthrough(raw_out) => {
             print!("{}", raw_out);
-            raw_out
+            (raw_out.clone(), FilterResult::passthrough(&raw_out))
         }
     };
 

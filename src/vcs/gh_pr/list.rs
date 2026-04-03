@@ -1,5 +1,6 @@
 //! PR list subcommand handler.
 
+use crate::filter::FilterResult;
 use crate::{tracking, utils::truncate};
 use anyhow::{Context, Result};
 use serde_json::Value;
@@ -94,6 +95,9 @@ pub fn list_prs(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()
             print!("{}", more_line);
         }
     }
+
+    // JSON parse succeeded → Full quality.
+    let _filter_result = FilterResult::full(&raw, filtered.clone());
 
     timer.track("gh pr list", "mycelium gh pr list", &raw, &filtered);
     Ok(())

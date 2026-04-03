@@ -1,5 +1,6 @@
 //! PR view subcommand handlers.
 
+use crate::filter::FilterResult;
 use crate::tracking;
 use crate::vcs::gh_cmd::{
     extract_optional_identifier_and_extra_args, filter_markdown_body, run_passthrough_with_extra,
@@ -180,6 +181,9 @@ pub fn view_pr(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()>
             }
         }
     }
+
+    // Validate and track quality: structured JSON parse succeeded → Full quality.
+    let _filter_result = FilterResult::full(&raw, filtered.clone());
 
     let pr_label = pr_number
         .as_deref()

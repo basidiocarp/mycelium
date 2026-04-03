@@ -1,5 +1,6 @@
 //! PR create, merge, diff, and generic action subcommand handlers.
 
+use crate::filter::FilterResult;
 use crate::vcs::gh_cmd::run_passthrough_with_extra;
 use crate::{tracking, utils::ok_confirmation, vcs::git_filters};
 use anyhow::{Context, Result};
@@ -40,6 +41,9 @@ pub fn pr_create(args: &[String], _verbose: u8) -> Result<()> {
 
     let filtered = ok_confirmation("created", &detail);
     println!("{}", filtered);
+
+    // Successful create always produces a URL → Full quality.
+    let _filter_result = FilterResult::full(&stdout, filtered.clone());
 
     timer.track("gh pr create", "mycelium gh pr create", &stdout, &filtered);
     Ok(())
@@ -85,6 +89,9 @@ pub fn pr_merge(args: &[String], _verbose: u8) -> Result<()> {
         detail.clone()
     };
 
+    // Successful merge always produces a confirmation → Full quality.
+    let _filter_result = FilterResult::full(&raw, filtered.clone());
+
     timer.track("gh pr merge", "mycelium gh pr merge", &raw, &filtered);
     Ok(())
 }
@@ -129,6 +136,9 @@ pub fn pr_diff(args: &[String], _verbose: u8) -> Result<()> {
         println!("{}", compacted);
         compacted
     };
+
+    // Diff compaction succeeded → Full quality.
+    let _filter_result = FilterResult::full(&raw, filtered.clone());
 
     timer.track("gh pr diff", "mycelium gh pr diff", &raw, &filtered);
     Ok(())
@@ -176,6 +186,9 @@ pub fn pr_action(action: &str, args: &[String], _verbose: u8) -> Result<()> {
     } else {
         pr_num.clone()
     };
+
+    // Action confirmation → Full quality.
+    let _filter_result = FilterResult::full(&raw, filtered.clone());
 
     timer.track(
         &format!("gh pr {}", subcmd),

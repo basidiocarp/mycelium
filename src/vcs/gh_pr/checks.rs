@@ -1,5 +1,6 @@
 //! PR checks and status subcommand handlers.
 
+use crate::filter::FilterResult;
 use crate::{tracking, utils::truncate};
 use anyhow::{Context, Result};
 use std::process::Command;
@@ -104,6 +105,13 @@ pub fn pr_checks(args: &[String], _verbose: u8, _ultra_compact: bool) -> Result<
         }
     }
 
+    // Checks output is always parsed from text lines → Full quality when we found structure.
+    let _filter_result = if passed > 0 || failed > 0 || pending > 0 {
+        FilterResult::full(&raw, filtered.clone())
+    } else {
+        FilterResult::passthrough(&raw)
+    };
+
     let pr_label = pr_number
         .as_deref()
         .map(|n| format!("gh pr checks {}", n))
@@ -162,6 +170,9 @@ pub fn pr_status(args: &[String], _verbose: u8, _ultra_compact: bool) -> Result<
             print!("{}", line);
         }
     }
+
+    // JSON parse succeeded → Full quality.
+    let _filter_result = FilterResult::full(&raw, filtered.clone());
 
     timer.track("gh pr status", "mycelium gh pr status", &raw, &filtered);
     Ok(())

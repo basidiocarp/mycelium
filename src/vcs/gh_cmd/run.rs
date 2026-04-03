@@ -1,5 +1,6 @@
 //! GitHub CLI workflow run sub-command handlers.
 
+use crate::filter::FilterResult;
 use crate::parser::{
     FormatMode, OutputParser, ParseResult, TokenFormatter, emit_passthrough_warning,
 };
@@ -81,15 +82,20 @@ fn list_runs(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()> {
         ParseResult::Passthrough(_) => 3,
     };
 
-    let filtered = match parse_result {
-        ParseResult::Full(list) | ParseResult::Degraded(list, _) => {
+    let (filtered, _filter_result) = match parse_result {
+        ParseResult::Full(list) => {
             let out = list.format(mode);
             println!("{}", out);
-            out
+            (out.clone(), FilterResult::full(&raw, out))
+        }
+        ParseResult::Degraded(list, _) => {
+            let out = list.format(mode);
+            println!("{}", out);
+            (out.clone(), FilterResult::degraded(&raw, out))
         }
         ParseResult::Passthrough(raw_out) => {
             print!("{}", raw_out);
-            raw_out
+            (raw_out.clone(), FilterResult::passthrough(&raw_out))
         }
     };
 
@@ -107,30 +113,39 @@ fn list_runs(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()> {
 struct RunViewAnalysis {
     filtered: String,
     parse_tier: u8,
+    _filter_result: FilterResult,
 }
 
 fn filter_run_view_output(raw: &str, run_id: Option<&str>) -> RunViewAnalysis {
     match GhRunViewParser::parse(raw) {
         ParseResult::Full(mut summary) => {
             summary.run_id = run_id.map(ToOwned::to_owned);
+            let filtered = summary.format_compact();
+            let filter_result = FilterResult::full(raw, filtered.clone());
             RunViewAnalysis {
-                filtered: summary.format_compact(),
+                filtered,
                 parse_tier: 1,
+                _filter_result: filter_result,
             }
         }
         ParseResult::Degraded(mut summary, warnings) => {
             summary.run_id = run_id.map(ToOwned::to_owned);
             emit_passthrough_warning("gh run view", &warnings.join(", "));
+            let filtered = summary.format_compact();
+            let filter_result = FilterResult::degraded(raw, filtered.clone());
             RunViewAnalysis {
-                filtered: summary.format_compact(),
+                filtered,
                 parse_tier: 2,
+                _filter_result: filter_result,
             }
         }
         ParseResult::Passthrough(raw_out) => {
             emit_passthrough_warning("gh run view", "No parseable summary lines found");
+            let filter_result = FilterResult::passthrough(&raw_out);
             RunViewAnalysis {
                 filtered: raw_out,
                 parse_tier: 3,
+                _filter_result: filter_result,
             }
         }
     }

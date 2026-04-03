@@ -1,5 +1,6 @@
 //! GitHub CLI repo and api sub-command handlers.
 
+use crate::filter::FilterResult;
 use crate::parser::{FormatMode, OutputParser, ParseResult, TokenFormatter};
 use crate::tracking;
 use anyhow::{Context, Result};
@@ -74,15 +75,20 @@ pub(super) fn dispatch_repo(args: &[String], _verbose: u8, ultra_compact: bool) 
         ParseResult::Passthrough(_) => 3,
     };
 
-    let filtered = match parse_result {
-        ParseResult::Full(repo) | ParseResult::Degraded(repo, _) => {
+    let (filtered, _filter_result) = match parse_result {
+        ParseResult::Full(repo) => {
             let out = repo.format(mode);
             println!("{}", out);
-            out
+            (out.clone(), FilterResult::full(&raw, out))
+        }
+        ParseResult::Degraded(repo, _) => {
+            let out = repo.format(mode);
+            println!("{}", out);
+            (out.clone(), FilterResult::degraded(&raw, out))
         }
         ParseResult::Passthrough(raw_out) => {
             print!("{}", raw_out);
-            raw_out
+            (raw_out.clone(), FilterResult::passthrough(&raw_out))
         }
     };
 
