@@ -39,7 +39,6 @@ pub enum FilterQuality {
     /// Filter understood the output format and produced structured compression.
     Full,
     /// Filter partially matched — some structure extracted, some raw passthrough.
-    #[allow(dead_code)] // Available for filters that detect partial matches
     Degraded,
     /// Filter didn't understand the output — raw passthrough returned.
     Passthrough,
@@ -61,6 +60,18 @@ impl FilterResult {
         Self {
             output,
             quality: FilterQuality::Full,
+            input_tokens,
+            output_tokens,
+        }
+    }
+
+    /// Build a result when the filter partially matched the input format.
+    pub fn degraded(input: &str, output: String) -> Self {
+        let input_tokens = crate::tracking::utils::estimate_tokens(input);
+        let output_tokens = crate::tracking::utils::estimate_tokens(&output);
+        Self {
+            output,
+            quality: FilterQuality::Degraded,
             input_tokens,
             output_tokens,
         }

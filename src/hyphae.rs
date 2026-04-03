@@ -56,14 +56,15 @@ pub fn decide_action(output: &str) -> OutputAction {
 
 /// Validate a filter's output against the raw input.
 ///
-/// Three rules determine whether the filtered output is returned or the raw
+/// Four rules determine whether the filtered output is returned or the raw
 /// input is used as a fallback:
 ///
 /// 1. Never return empty from non-empty input.
 /// 2. If savings < 20%, filtering isn't worth the information loss.
-/// 3. If >95% reduction on output <200 lines, the result is suspiciously aggressive.
+/// 3. If filter reported Degraded quality and savings < 40%, prefer raw.
+/// 4. If >95% reduction on output <200 lines, the result is suspiciously aggressive.
 fn validate_filter_output(raw: &str, result: crate::filter::FilterResult) -> crate::filter::FilterResult {
-    use crate::filter::FilterResult;
+    use crate::filter::{FilterQuality, FilterResult};
 
     // Rule 1: Never return empty from non-empty input.
     if result.output.trim().is_empty() && !raw.trim().is_empty() {
@@ -78,7 +79,12 @@ fn validate_filter_output(raw: &str, result: crate::filter::FilterResult) -> cra
             return FilterResult::passthrough(raw);
         }
 
-        // Rule 3: Suspiciously aggressive — >95% reduction on small output.
+        // Rule 3: Degraded filter with modest savings — not worth the risk.
+        if result.quality == FilterQuality::Degraded && savings < 0.40 {
+            return FilterResult::passthrough(raw);
+        }
+
+        // Rule 4: Suspiciously aggressive — >95% reduction on small output.
         let raw_lines = raw.lines().count();
         if raw_lines < 200 && savings > 0.95 {
             return FilterResult::passthrough(raw);
@@ -305,26 +311,57 @@ mod tests {
         assert_eq!(result.output, filtered, "Rule 2: ≥20% savings should return filtered");
     }
 
+    // ── Rule 3: Degraded quality with <40% savings → raw fallback ──────────
+
     #[test]
-    fn test_validate_rule3_aggressive_small_output_returns_raw() {
+    fn test_validate_rule3_degraded_low_savings_returns_raw() {
+        // Degraded filter with 30% savings (<40% threshold) → raw fallback
+        let raw = "word word word word\n".repeat(50); // ~250 tokens
+        let filtered = "word word word word\n".repeat(35); // ~175 tokens → 30% savings
+        let result = validate_filter_output(&raw, crate::filter::FilterResult::degraded(&raw, filtered));
+        assert_eq!(result.output, raw, "Rule 3: Degraded + <40% savings should return raw");
+    }
+
+    #[test]
+    fn test_validate_rule3_degraded_high_savings_passes() {
+        // Degraded filter with 50% savings (≥40% threshold) → keep filtered
+        let raw = "word word word word\n".repeat(50); // ~250 tokens
+        let filtered = "word word word word\n".repeat(25); // ~125 tokens → 50% savings
+        let result = validate_filter_output(&raw, crate::filter::FilterResult::degraded(&raw, filtered.clone()));
+        assert_eq!(result.output, filtered, "Rule 3: Degraded + ≥40% savings should keep filtered");
+    }
+
+    #[test]
+    fn test_validate_rule3_full_quality_low_savings_passes() {
+        // Full quality with 25% savings — Rule 3 only applies to Degraded
+        let raw = "word word word word\n".repeat(50); // ~250 tokens
+        let filtered = "word word word word\n".repeat(37); // ~185 tokens → ~26% savings
+        let result = validate_filter_output(&raw, crate::filter::FilterResult::full(&raw, filtered.clone()));
+        assert_eq!(result.output, filtered, "Rule 3: Full quality bypasses degraded check");
+    }
+
+    // ── Rule 4: Suspiciously aggressive on small output ──────────────────
+
+    #[test]
+    fn test_validate_rule4_aggressive_small_output_returns_raw() {
         // Raw: 50 lines, filtered: 1 line → >95% reduction on <200 lines
         let raw = "line of content here\n".repeat(50); // 50 lines, substantial tokens
         let filtered = "x".to_string(); // essentially empty — >95% reduction
         let result = validate_filter_output(&raw, crate::filter::FilterResult::full(&raw, filtered));
-        assert_eq!(result.output, raw, "Rule 3: >95% reduction on <200 lines should return raw");
+        assert_eq!(result.output, raw, "Rule 4: >95% reduction on <200 lines should return raw");
     }
 
     #[test]
-    fn test_validate_rule3_aggressive_large_output_passes() {
-        // Raw: 200+ lines → rule 3 does not apply (raw_lines >= 200)
+    fn test_validate_rule4_aggressive_large_output_passes() {
+        // Raw: 200+ lines → rule 4 does not apply (raw_lines >= 200)
         let raw = "line of content here\n".repeat(200); // exactly 200 lines
         // filtered: just 1 token — >95% savings, but raw_lines is not < 200
         let filtered = "x".to_string();
-        // With 200 lines, rule 3 doesn't fire; rule 2 might fire if savings > 0.20
+        // With 200 lines, rule 4 doesn't fire; rule 2 might fire if savings > 0.20
         // ~200*5=1000 tokens raw, 1 token filtered → 99.9% savings > 20%
-        // Rule 3: raw_lines < 200 is false (200 is not < 200), so filtered passes
+        // Rule 4: raw_lines < 200 is false (200 is not < 200), so filtered passes
         let result = validate_filter_output(&raw, crate::filter::FilterResult::full(&raw, filtered.clone()));
-        assert_eq!(result.output, filtered, "Rule 3: ≥200 lines allows aggressive reduction");
+        assert_eq!(result.output, filtered, "Rule 4: ≥200 lines allows aggressive reduction");
     }
 
     #[test]

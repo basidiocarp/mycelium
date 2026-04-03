@@ -3,6 +3,16 @@ use crate::tracking;
 use crate::vcs::git_filters::{compact_diff, is_blob_show_arg};
 use anyhow::{Context, Result};
 
+/// Check whether input looks like unified diff output.
+fn looks_like_diff(input: &str) -> bool {
+    input.lines().any(|line| {
+        line.starts_with("diff --git")
+            || line.starts_with("--- a/")
+            || line.starts_with("+++ b/")
+            || line.starts_with("@@ ")
+    })
+}
+
 pub(super) fn run_diff(
     args: &[String],
     max_lines: Option<usize>,
@@ -82,7 +92,14 @@ pub(super) fn run_diff(
         let compacted = crate::hyphae::route_or_filter(
             &format!("git diff {}", args.join(" ")),
             &diff_stdout,
-            |d| crate::filter::FilterResult::full(d, compact_diff(d, max_lines.unwrap_or(500))),
+            |d| {
+                let output = compact_diff(d, max_lines.unwrap_or(500));
+                if looks_like_diff(d) {
+                    crate::filter::FilterResult::full(d, output)
+                } else {
+                    crate::filter::FilterResult::degraded(d, output)
+                }
+            },
         );
         println!("{}", compacted.output);
         final_output.push_str("\n--- Changes ---\n");
@@ -211,7 +228,14 @@ pub(super) fn run_show(
         let compacted = crate::hyphae::route_or_filter(
             &format!("git show {}", args.join(" ")),
             diff_text,
-            |d| crate::filter::FilterResult::full(d, compact_diff(d, max_lines.unwrap_or(500))),
+            |d| {
+                let output = compact_diff(d, max_lines.unwrap_or(500));
+                if looks_like_diff(d) {
+                    crate::filter::FilterResult::full(d, output)
+                } else {
+                    crate::filter::FilterResult::degraded(d, output)
+                }
+            },
         );
         println!("{}", compacted.output);
         final_output.push_str(&format!("\n{}", compacted.output));

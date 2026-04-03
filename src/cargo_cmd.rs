@@ -95,7 +95,14 @@ where
     let result = crate::hyphae::route_or_filter(
         &format!("cargo {} {}", subcommand, restored_args.join(" ")),
         &raw,
-        |r| crate::filter::FilterResult::full(r, filter_fn(r)),
+        |r| {
+            let output = filter_fn(r);
+            if crate::cargo_filters::looks_like_cargo_output(r) {
+                crate::filter::FilterResult::full(r, output)
+            } else {
+                crate::filter::FilterResult::degraded(r, output)
+            }
+        },
     );
 
     if let Some(hint) = crate::tee::tee_and_hint(&raw, &format!("cargo_{}", subcommand), exit_code)
@@ -163,7 +170,14 @@ fn run_test(args: &[String], verbose: u8) -> Result<()> {
     let filter_result = crate::hyphae::route_or_filter(
         &format!("cargo test {}", restored.join(" ")),
         &result.raw,
-        |r| crate::filter::FilterResult::full(r, result.filtered.clone()),
+        |r| {
+            let output = result.filtered.clone();
+            if crate::cargo_filters::looks_like_cargo_output(r) {
+                crate::filter::FilterResult::full(r, output)
+            } else {
+                crate::filter::FilterResult::degraded(r, output)
+            }
+        },
     );
 
     timer.track(

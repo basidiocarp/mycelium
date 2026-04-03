@@ -24,8 +24,9 @@ pub fn run_err(command: &str, verbose: u8) -> Result<()> {
     let exit_status = output.status;
     let result = crate::hyphae::route_or_filter(command, &raw, |r| {
         let filtered = filter_errors(r);
-        let output = if filtered.is_empty() {
-            if exit_status.success() {
+        if filtered.is_empty() {
+            // No error patterns matched — filter didn't understand the format
+            let output = if exit_status.success() {
                 "ok: Command completed successfully (no errors)".to_string()
             } else {
                 let mut msg = format!(
@@ -37,11 +38,17 @@ pub fn run_err(command: &str, verbose: u8) -> Result<()> {
                     msg.push_str(&format!("  {}\n", line));
                 }
                 msg
+            };
+            // Success with no errors is still a valid parse; failure with no
+            // error patterns is degraded (we're guessing at the tail lines).
+            if exit_status.success() {
+                crate::filter::FilterResult::full(r, output)
+            } else {
+                crate::filter::FilterResult::degraded(r, output)
             }
         } else {
-            filtered
-        };
-        crate::filter::FilterResult::full(r, output)
+            crate::filter::FilterResult::full(r, filtered)
+        }
     });
 
     let exit_code = output
@@ -80,7 +87,16 @@ pub fn run_test(command: &str, verbose: u8) -> Result<()> {
         .code()
         .unwrap_or(if output.status.success() { 0 } else { 1 });
     let result =
-        crate::hyphae::route_or_filter(command, &raw, |r| crate::filter::FilterResult::full(r, extract_test_summary(r, command)));
+        crate::hyphae::route_or_filter(command, &raw, |r| {
+            let summary = extract_test_summary(r, command);
+            // If the summary only contains the fallback "OUTPUT (last 5 lines):" section,
+            // the filter didn't recognize the test framework output format.
+            if summary.starts_with("OUTPUT (last") {
+                crate::filter::FilterResult::degraded(r, summary)
+            } else {
+                crate::filter::FilterResult::full(r, summary)
+            }
+        });
     if let Some(hint) = crate::tee::tee_and_hint(&raw, "test", exit_code) {
         println!("{}\n{}", result.output, hint);
     } else {

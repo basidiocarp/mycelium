@@ -35,7 +35,16 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
 
     // Auto-detect JSON and pipe through filter (or route to Hyphae for large output)
     let result = crate::hyphae::route_or_filter(&format!("curl {}", args.join(" ")), &raw, |r| {
-        crate::filter::FilterResult::full(r, filter_curl_output(r))
+        let output = filter_curl_output(r);
+        let trimmed = r.trim();
+        // JSON responses are well-understood; non-JSON gets line-capped (degraded)
+        let is_json = (trimmed.starts_with('{') || trimmed.starts_with('['))
+            && (trimmed.ends_with('}') || trimmed.ends_with(']'));
+        if is_json {
+            crate::filter::FilterResult::full(r, output)
+        } else {
+            crate::filter::FilterResult::degraded(r, output)
+        }
     });
     println!("{}", result.output);
 
