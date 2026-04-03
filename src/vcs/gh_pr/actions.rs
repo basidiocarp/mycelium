@@ -127,20 +127,18 @@ pub fn pr_diff(args: &[String], _verbose: u8) -> Result<()> {
         std::process::exit(output.status.code().unwrap_or(1));
     }
 
-    let filtered = if raw.trim().is_empty() {
-        let msg = "No diff\n";
-        print!("{}", msg);
-        msg.to_string()
-    } else {
-        let compacted = git_filters::compact_diff(&raw, 500);
-        println!("{}", compacted);
-        compacted
-    };
+    // Route through Hyphae for large diffs.
+    let filtered = crate::hyphae::route_or_filter("gh pr diff", &raw, |r| {
+        if r.trim().is_empty() {
+            FilterResult::full(r, "No diff\n".to_string())
+        } else {
+            let compacted = git_filters::compact_diff(r, 500);
+            FilterResult::full(r, compacted)
+        }
+    });
+    print!("{}", filtered.output);
 
-    // Diff compaction succeeded → Full quality.
-    let _filter_result = FilterResult::full(&raw, filtered.clone());
-
-    timer.track("gh pr diff", "mycelium gh pr diff", &raw, &filtered);
+    timer.track("gh pr diff", "mycelium gh pr diff", &raw, &filtered.output);
     Ok(())
 }
 

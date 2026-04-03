@@ -82,28 +82,26 @@ fn list_runs(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()> {
         ParseResult::Passthrough(_) => 3,
     };
 
-    let (filtered, _filter_result) = match parse_result {
+    let filter_result = match parse_result {
         ParseResult::Full(list) => {
             let out = list.format(mode);
-            println!("{}", out);
-            (out.clone(), FilterResult::full(&raw, out))
+            FilterResult::full(&raw, out)
         }
         ParseResult::Degraded(list, _) => {
             let out = list.format(mode);
-            println!("{}", out);
-            (out.clone(), FilterResult::degraded(&raw, out))
+            FilterResult::degraded(&raw, out)
         }
-        ParseResult::Passthrough(raw_out) => {
-            print!("{}", raw_out);
-            (raw_out.clone(), FilterResult::passthrough(&raw_out))
-        }
+        ParseResult::Passthrough(raw_out) => FilterResult::passthrough(&raw_out),
     };
+
+    let validated = crate::hyphae::validate_filter_output(&raw, filter_result);
+    print!("{}", validated.output);
 
     timer.track_with_parse_info(
         "gh run list",
         "mycelium gh run list",
         &raw,
-        &filtered,
+        &validated.output,
         parse_tier,
         format_mode_str,
     );
@@ -208,17 +206,33 @@ fn view_run(args: &[String], _verbose: u8) -> Result<()> {
         .as_deref()
         .map(|id| format!("mycelium gh run view {}", id))
         .unwrap_or_else(|| "mycelium gh run view".to_string());
-    let analysis = filter_run_view_output(&raw, run_id.as_deref());
-    print!("{}", analysis.filtered);
+
+    // Route through Hyphae for large run views (workflows with many jobs/steps).
+    let run_id_clone = run_id.clone();
+    let filtered = crate::hyphae::route_or_filter(&run_label, &raw, |r| {
+        filter_run_view_output_as_result(r, run_id_clone.as_deref())
+    });
+    print!("{}", filtered.output);
+
+    let parse_tier = filter_run_view_output(&raw, run_id.as_deref()).parse_tier;
     timer.track_with_parse_info(
         &run_label,
         &mycelium_label,
         &raw,
-        &analysis.filtered,
-        analysis.parse_tier,
+        &filtered.output,
+        parse_tier,
         "compact",
     );
     Ok(())
+}
+
+fn filter_run_view_output_as_result(raw: &str, run_id: Option<&str>) -> FilterResult {
+    let analysis = filter_run_view_output(raw, run_id);
+    match GhRunViewParser::parse(raw) {
+        ParseResult::Full(_) => FilterResult::full(raw, analysis.filtered),
+        ParseResult::Degraded(_, _) => FilterResult::degraded(raw, analysis.filtered),
+        ParseResult::Passthrough(_) => FilterResult::passthrough(&analysis.filtered),
+    }
 }
 
 #[cfg(test)]

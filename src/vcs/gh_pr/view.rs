@@ -59,8 +59,32 @@ pub fn view_pr(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()>
         std::process::exit(output.status.code().unwrap_or(1));
     }
 
-    let json: Value =
-        serde_json::from_slice(&output.stdout).context("Failed to parse gh pr view output")?;
+    let pr_label = pr_number
+        .as_deref()
+        .map(|n| format!("gh pr view {}", n))
+        .unwrap_or_else(|| "gh pr view".to_string());
+    let mycelium_label = pr_number
+        .as_deref()
+        .map(|n| format!("mycelium gh pr view {}", n))
+        .unwrap_or_else(|| "mycelium gh pr view".to_string());
+
+    // Route through Hyphae for large PR views (many comments/checks).
+    // Small/medium output is filtered locally with validation.
+    let filtered = crate::hyphae::route_or_filter(&pr_label, &raw, |r| {
+        format_pr_view(r, ultra_compact)
+    });
+    print!("{}", filtered.output);
+
+    timer.track(&pr_label, &mycelium_label, &raw, &filtered.output);
+    Ok(())
+}
+
+/// Format gh pr view JSON output into a compact summary.
+fn format_pr_view(raw: &str, ultra_compact: bool) -> FilterResult {
+    let json: Value = match serde_json::from_str(raw) {
+        Ok(v) => v,
+        Err(_) => return FilterResult::passthrough(raw),
+    };
 
     let mut filtered = String::new();
 
@@ -87,22 +111,15 @@ pub fn view_pr(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()>
         }
     };
 
-    let line = format!("{} PR #{}: {}\n", state_icon, number, title);
-    filtered.push_str(&line);
-    print!("{}", line);
-
-    let line = format!("  {}\n", author);
-    filtered.push_str(&line);
-    print!("{}", line);
+    filtered.push_str(&format!("{} PR #{}: {}\n", state_icon, number, title));
+    filtered.push_str(&format!("  {}\n", author));
 
     let mergeable_str = match mergeable {
         "MERGEABLE" => "✓",
         "CONFLICTING" => "✗",
         _ => "?",
     };
-    let line = format!("  {} | {}\n", state, mergeable_str);
-    filtered.push_str(&line);
-    print!("{}", line);
+    filtered.push_str(&format!("  {} | {}\n", state, mergeable_str));
 
     if let Some(reviews) = json["reviews"]["nodes"].as_array() {
         let approved = reviews
@@ -115,12 +132,10 @@ pub fn view_pr(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()>
             .count();
 
         if approved > 0 || changes > 0 {
-            let line = format!(
+            filtered.push_str(&format!(
                 "  Reviews: {} approved, {} changes requested\n",
                 approved, changes
-            );
-            filtered.push_str(&line);
-            print!("{}", line);
+            ));
         }
     }
 
@@ -143,29 +158,19 @@ pub fn view_pr(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()>
 
         if ultra_compact {
             if failed > 0 {
-                let line = format!("  ✗{}/{}  {} fail\n", passed, total, failed);
-                filtered.push_str(&line);
-                print!("{}", line);
+                filtered.push_str(&format!("  ✗{}/{}  {} fail\n", passed, total, failed));
             } else {
-                let line = format!("  ✓{}/{}\n", passed, total);
-                filtered.push_str(&line);
-                print!("{}", line);
+                filtered.push_str(&format!("  ✓{}/{}\n", passed, total));
             }
         } else {
-            let line = format!("  Checks: {}/{} passed\n", passed, total);
-            filtered.push_str(&line);
-            print!("{}", line);
+            filtered.push_str(&format!("  Checks: {}/{} passed\n", passed, total));
             if failed > 0 {
-                let line = format!("  {} checks failed\n", failed);
-                filtered.push_str(&line);
-                print!("{}", line);
+                filtered.push_str(&format!("  {} checks failed\n", failed));
             }
         }
     }
 
-    let line = format!("  {}\n", url);
-    filtered.push_str(&line);
-    print!("{}", line);
+    filtered.push_str(&format!("  {}\n", url));
 
     if let Some(body) = json["body"].as_str()
         && !body.is_empty()
@@ -173,28 +178,13 @@ pub fn view_pr(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()>
         let body_filtered = filter_markdown_body(body);
         if !body_filtered.is_empty() {
             filtered.push('\n');
-            println!();
             for line in body_filtered.lines() {
-                let formatted = format!("  {}\n", line);
-                filtered.push_str(&formatted);
-                print!("{}", formatted);
+                filtered.push_str(&format!("  {}\n", line));
             }
         }
     }
 
-    // Validate and track quality: structured JSON parse succeeded → Full quality.
-    let _filter_result = FilterResult::full(&raw, filtered.clone());
-
-    let pr_label = pr_number
-        .as_deref()
-        .map(|n| format!("gh pr view {}", n))
-        .unwrap_or_else(|| "gh pr view".to_string());
-    let mycelium_label = pr_number
-        .as_deref()
-        .map(|n| format!("mycelium gh pr view {}", n))
-        .unwrap_or_else(|| "mycelium gh pr view".to_string());
-    timer.track(&pr_label, &mycelium_label, &raw, &filtered);
-    Ok(())
+    FilterResult::full(raw, filtered)
 }
 
 #[cfg(test)]

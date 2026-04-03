@@ -75,28 +75,26 @@ pub(super) fn dispatch_repo(args: &[String], _verbose: u8, ultra_compact: bool) 
         ParseResult::Passthrough(_) => 3,
     };
 
-    let (filtered, _filter_result) = match parse_result {
+    let filter_result = match parse_result {
         ParseResult::Full(repo) => {
             let out = repo.format(mode);
-            println!("{}", out);
-            (out.clone(), FilterResult::full(&raw, out))
+            FilterResult::full(&raw, out)
         }
         ParseResult::Degraded(repo, _) => {
             let out = repo.format(mode);
-            println!("{}", out);
-            (out.clone(), FilterResult::degraded(&raw, out))
+            FilterResult::degraded(&raw, out)
         }
-        ParseResult::Passthrough(raw_out) => {
-            print!("{}", raw_out);
-            (raw_out.clone(), FilterResult::passthrough(&raw_out))
-        }
+        ParseResult::Passthrough(raw_out) => FilterResult::passthrough(&raw_out),
     };
+
+    let validated = crate::hyphae::validate_filter_output(&raw, filter_result);
+    print!("{}", validated.output);
 
     timer.track_with_parse_info(
         "gh repo view",
         "mycelium gh repo view",
         &raw,
-        &filtered,
+        &validated.output,
         parse_tier,
         format_mode_str,
     );
@@ -104,10 +102,46 @@ pub(super) fn dispatch_repo(args: &[String], _verbose: u8, ultra_compact: bool) 
 }
 
 pub(super) fn dispatch_api(args: &[String], _verbose: u8) -> Result<()> {
-    // gh api is an explicit/advanced command — the user knows what they asked for.
-    // Converting JSON to a schema destroys all values and forces Claude to re-fetch.
-    // Passthrough preserves the full response and tracks metrics at 0% savings.
-    run_passthrough("gh", "api", args)
+    let timer = tracking::TimedExecution::start();
+
+    let mut cmd = Command::new("gh");
+    cmd.arg("api");
+    for arg in args {
+        cmd.arg(arg);
+    }
+
+    let output = cmd.output().context("Failed to run gh api")?;
+    let raw = String::from_utf8_lossy(&output.stdout).to_string();
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        timer.track(
+            &format!("gh api {}", args.join(" ")),
+            &format!("mycelium gh api {}", args.join(" ")),
+            &stderr,
+            &stderr,
+        );
+        eprintln!("{}", stderr.trim());
+        std::process::exit(output.status.code().unwrap_or(1));
+    }
+
+    let cmd_label = format!("gh api {}", args.join(" "));
+
+    // Route through Hyphae for large API responses — they can be arbitrarily big.
+    // The filter closure returns raw unchanged (gh api is explicit/advanced, so
+    // we don't compress the content, but Hyphae can chunk very large responses).
+    let filtered = crate::hyphae::route_or_filter(&cmd_label, &raw, |r| {
+        FilterResult::full(r, r.to_string())
+    });
+    print!("{}", filtered.output);
+
+    timer.track(
+        &cmd_label,
+        &format!("mycelium {}", cmd_label),
+        &raw,
+        &filtered.output,
+    );
+    Ok(())
 }
 
 #[cfg(test)]

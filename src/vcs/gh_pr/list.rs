@@ -45,15 +45,13 @@ pub fn list_prs(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()
     let json: Value =
         serde_json::from_slice(&output.stdout).context("Failed to parse gh pr list output")?;
 
-    let mut filtered = String::new();
+    let mut formatted = String::new();
 
     if let Some(prs) = json.as_array() {
         if ultra_compact {
-            filtered.push_str("PRs\n");
-            println!("PRs");
+            formatted.push_str("PRs\n");
         } else {
-            filtered.push_str("Pull Requests\n");
-            println!("Pull Requests");
+            formatted.push_str("Pull Requests\n");
         }
 
         for pr in prs.iter().take(20) {
@@ -78,28 +76,30 @@ pub fn list_prs(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()
                 }
             };
 
-            let line = format!(
+            formatted.push_str(&format!(
                 "  {} #{} {} ({})\n",
                 state_icon,
                 number,
                 truncate(title, 60),
                 author
-            );
-            filtered.push_str(&line);
-            print!("{}", line);
+            ));
         }
 
         if prs.len() > 20 {
-            let more_line = format!("  ... {} more (use gh pr list for all)\n", prs.len() - 20);
-            filtered.push_str(&more_line);
-            print!("{}", more_line);
+            formatted.push_str(&format!(
+                "  ... {} more (use gh pr list for all)\n",
+                prs.len() - 20
+            ));
         }
     }
 
     // JSON parse succeeded → Full quality.
-    let _filter_result = FilterResult::full(&raw, filtered.clone());
+    let filter_result = FilterResult::full(&raw, formatted);
 
-    timer.track("gh pr list", "mycelium gh pr list", &raw, &filtered);
+    let validated = crate::hyphae::validate_filter_output(&raw, filter_result);
+    print!("{}", validated.output);
+
+    timer.track("gh pr list", "mycelium gh pr list", &raw, &validated.output);
     Ok(())
 }
 

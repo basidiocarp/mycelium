@@ -63,7 +63,7 @@ pub fn decide_action(output: &str) -> OutputAction {
 /// 2. If savings < 20%, filtering isn't worth the information loss.
 /// 3. If filter reported Degraded quality and savings < 40%, prefer raw.
 /// 4. If >95% reduction on output <200 lines, the result is suspiciously aggressive.
-fn validate_filter_output(raw: &str, result: crate::filter::FilterResult) -> crate::filter::FilterResult {
+pub(crate) fn validate_filter_output(raw: &str, result: crate::filter::FilterResult) -> crate::filter::FilterResult {
     use crate::filter::{FilterQuality, FilterResult};
 
     // Rule 1: Never return empty from non-empty input.

@@ -74,43 +74,32 @@ pub fn pr_checks(args: &[String], _verbose: u8, _ultra_compact: bool) -> Result<
         }
     }
 
-    let mut filtered = String::new();
+    let mut formatted = String::new();
 
-    let line = "CI Checks Summary:\n";
-    filtered.push_str(line);
-    print!("{}", line);
-
-    let line = format!("  Passed: {}\n", passed);
-    filtered.push_str(&line);
-    print!("{}", line);
-
-    let line = format!("  Failed: {}\n", failed);
-    filtered.push_str(&line);
-    print!("{}", line);
+    formatted.push_str("CI Checks Summary:\n");
+    formatted.push_str(&format!("  Passed: {}\n", passed));
+    formatted.push_str(&format!("  Failed: {}\n", failed));
 
     if pending > 0 {
-        let line = format!("  Pending: {}\n", pending);
-        filtered.push_str(&line);
-        print!("{}", line);
+        formatted.push_str(&format!("  Pending: {}\n", pending));
     }
 
     if !failed_checks.is_empty() {
-        let line = "\n  Failed checks:\n";
-        filtered.push_str(line);
-        print!("{}", line);
+        formatted.push_str("\n  Failed checks:\n");
         for check in failed_checks {
-            let line = format!("    {}\n", check);
-            filtered.push_str(&line);
-            print!("{}", line);
+            formatted.push_str(&format!("    {}\n", check));
         }
     }
 
     // Checks output is always parsed from text lines → Full quality when we found structure.
-    let _filter_result = if passed > 0 || failed > 0 || pending > 0 {
-        FilterResult::full(&raw, filtered.clone())
+    let filter_result = if passed > 0 || failed > 0 || pending > 0 {
+        FilterResult::full(&raw, formatted)
     } else {
         FilterResult::passthrough(&raw)
     };
+
+    let validated = crate::hyphae::validate_filter_output(&raw, filter_result);
+    print!("{}", validated.output);
 
     let pr_label = pr_number
         .as_deref()
@@ -120,7 +109,7 @@ pub fn pr_checks(args: &[String], _verbose: u8, _ultra_compact: bool) -> Result<
         .as_deref()
         .map(|n| format!("mycelium gh pr checks {}", n))
         .unwrap_or_else(|| "mycelium gh pr checks".to_string());
-    timer.track(&pr_label, &mycelium_label, &raw, &filtered);
+    timer.track(&pr_label, &mycelium_label, &raw, &validated.output);
     Ok(())
 }
 
@@ -155,26 +144,25 @@ pub fn pr_status(args: &[String], _verbose: u8, _ultra_compact: bool) -> Result<
     let json: serde_json::Value =
         serde_json::from_slice(&output.stdout).context("Failed to parse gh pr status output")?;
 
-    let mut filtered = String::new();
+    let mut formatted = String::new();
 
     if let Some(created_by) = json["createdBy"].as_array() {
-        let line = format!("Your PRs ({}):\n", created_by.len());
-        filtered.push_str(&line);
-        print!("{}", line);
+        formatted.push_str(&format!("Your PRs ({}):\n", created_by.len()));
         for pr in created_by.iter().take(5) {
             let number = pr["number"].as_i64().unwrap_or(0);
             let title = pr["title"].as_str().unwrap_or("???");
             let reviews = pr["reviewDecision"].as_str().unwrap_or("PENDING");
-            let line = format!("  #{} {} [{}]\n", number, truncate(title, 50), reviews);
-            filtered.push_str(&line);
-            print!("{}", line);
+            formatted.push_str(&format!("  #{} {} [{}]\n", number, truncate(title, 50), reviews));
         }
     }
 
     // JSON parse succeeded → Full quality.
-    let _filter_result = FilterResult::full(&raw, filtered.clone());
+    let filter_result = FilterResult::full(&raw, formatted);
 
-    timer.track("gh pr status", "mycelium gh pr status", &raw, &filtered);
+    let validated = crate::hyphae::validate_filter_output(&raw, filter_result);
+    print!("{}", validated.output);
+
+    timer.track("gh pr status", "mycelium gh pr status", &raw, &validated.output);
     Ok(())
 }
 

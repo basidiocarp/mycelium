@@ -74,28 +74,26 @@ fn list_issues(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()>
         ParseResult::Passthrough(_) => 3,
     };
 
-    let (filtered, _filter_result) = match parse_result {
+    let filter_result = match parse_result {
         ParseResult::Full(list) => {
             let out = list.format(mode);
-            println!("{}", out);
-            (out.clone(), FilterResult::full(&raw, out))
+            FilterResult::full(&raw, out)
         }
         ParseResult::Degraded(list, _) => {
             let out = list.format(mode);
-            println!("{}", out);
-            (out.clone(), FilterResult::degraded(&raw, out))
+            FilterResult::degraded(&raw, out)
         }
-        ParseResult::Passthrough(raw_out) => {
-            print!("{}", raw_out);
-            (raw_out.clone(), FilterResult::passthrough(&raw_out))
-        }
+        ParseResult::Passthrough(raw_out) => FilterResult::passthrough(&raw_out),
     };
+
+    let validated = crate::hyphae::validate_filter_output(&raw, filter_result);
+    print!("{}", validated.output);
 
     timer.track_with_parse_info(
         "gh issue list",
         "mycelium gh issue list",
         &raw,
-        &filtered,
+        &validated.output,
         parse_tier,
         format_mode_str,
     );
@@ -147,39 +145,43 @@ fn view_issue(args: &[String], _verbose: u8) -> Result<()> {
         std::process::exit(output.status.code().unwrap_or(1));
     }
 
-    let parse_result = GhIssueViewParser::parse(&raw);
-    let parse_tier: u8 = match &parse_result {
-        ParseResult::Full(_) => 1,
-        ParseResult::Degraded(_, _) => 2,
-        ParseResult::Passthrough(_) => 3,
-    };
+    let cmd_label = format!("gh issue view {}", issue_number);
 
-    let (filtered, _filter_result) = match parse_result {
-        ParseResult::Full(detail) => {
-            let out = detail.format_compact();
-            println!("{}", out);
-            (out.clone(), FilterResult::full(&raw, out))
-        }
-        ParseResult::Degraded(detail, _) => {
-            let out = detail.format_compact();
-            println!("{}", out);
-            (out.clone(), FilterResult::degraded(&raw, out))
-        }
-        ParseResult::Passthrough(raw_out) => {
-            print!("{}", raw_out);
-            (raw_out.clone(), FilterResult::passthrough(&raw_out))
-        }
-    };
+    // Route through Hyphae for large issues (many comments can be huge).
+    // Small/medium output is filtered locally with validation.
+    let filtered = crate::hyphae::route_or_filter(&cmd_label, &raw, |r| {
+        format_issue_view(r)
+    });
+    print!("{}", filtered.output);
 
     timer.track_with_parse_info(
-        &format!("gh issue view {}", issue_number),
+        &cmd_label,
         &format!("mycelium gh issue view {}", issue_number),
         &raw,
-        &filtered,
-        parse_tier,
+        &filtered.output,
+        parse_tier_from_raw(&raw),
         "compact",
     );
     Ok(())
+}
+
+/// Format gh issue view JSON output into a compact summary.
+fn format_issue_view(raw: &str) -> FilterResult {
+    let parse_result = GhIssueViewParser::parse(raw);
+    match parse_result {
+        ParseResult::Full(detail) => FilterResult::full(raw, detail.format_compact()),
+        ParseResult::Degraded(detail, _) => FilterResult::degraded(raw, detail.format_compact()),
+        ParseResult::Passthrough(raw_out) => FilterResult::passthrough(&raw_out),
+    }
+}
+
+/// Determine parse tier from raw output (for tracking).
+fn parse_tier_from_raw(raw: &str) -> u8 {
+    match GhIssueViewParser::parse(raw) {
+        ParseResult::Full(_) => 1,
+        ParseResult::Degraded(_, _) => 2,
+        ParseResult::Passthrough(_) => 3,
+    }
 }
 
 #[cfg(test)]
