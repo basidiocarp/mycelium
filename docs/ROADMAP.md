@@ -1,125 +1,67 @@
 # Mycelium Roadmap
 
-## Completed
+This page is the Mycelium-specific backlog. The workspace [ROADMAP.md](../../docs/ROADMAP.md) keeps the ecosystem sequencing and cross-repo priorities.
 
-### Language Ecosystem Coverage
-- **VCS**: Git, GitHub CLI (gh), Graphite (gt) stacked PRs
-- **Rust**: cargo test/build/clippy/check/install/nextest
-- **JavaScript/TypeScript**: vitest, playwright, tsc, eslint, biome, prettier, next.js, prisma, pnpm, npm, npx
-- **Python**: ruff check/format, pytest, pip/uv, mypy
-- **Go**: go test/build/vet, golangci-lint
-- **Infrastructure**: docker, kubectl, aws (sts/s3/ec2/ecs/rds/cloudformation), terraform (plan/apply/init), atmos (terraform/describe/validate/workflow/version)
-- **Databases & APIs**: psql, curl (auto-JSON + schema), wget
-- **General**: ls, tree, read, peek, find, grep, diff, json, log, err, summary, env, deps, wc, format
+## Recently Shipped
 
-### Architecture
-- Hook-based transparent command rewriting (PreToolUse)
-- Parser framework (`OutputParser` trait, `ParseResult<T>`, `TokenFormatter`)
-- SQLite token tracking with daily/weekly/monthly breakdowns + JSON/CSV export
-- Tee system for raw output recovery on failure
-- Discover: analyze Claude Code history for missed optimization opportunities
-- Learn: detect recurring CLI error patterns and generate correction rules
-- CC-Economics: compare Claude Code spending with Mycelium savings
-- Modular directory structure (vcs/, js/, python/, go_eco/, fileops/)
-- Categorized CLI help output (11 command groups)
-- Self-update from GitHub releases (archive extraction, cross-platform)
-- Release script for version bumping + quality gates (`scripts/release.sh`)
-- Rewrite command (single source of truth for hook rewrites)
-- Proxy command with metric tracking
-- JSON envelope output mode (`--json` global flag)
-- Ultra-compact mode (`-u` flag)
-- Shell completions (bash, zsh, fish)
-- Shared platform-aware path and shell helpers instead of scattered Unix-only assumptions
-- More host-neutral onboarding and runtime wording across Claude and Codex flows
-- `spore`-backed editor/config registration for the shared host overlap set
+- Mycelium already covers a broad slice of the command surface people actually use. Git, Rust, JavaScript and TypeScript, Python, Go, infrastructure tooling, database clients, and general file and shell workflows all land behind one filtering and rewrite layer.
+- The core architecture is in place. Hook-based transparent rewrites, parser-backed output shaping, token formatting, raw-output recovery, JSON envelopes, compact modes, and the shared rewrite command all now work as one system instead of separate utilities.
+- Analytics and diagnostics are real product surfaces, not side notes. SQLite-backed tracking, parse-health, doctor, discover, learn, and CC-economics give operators a way to inspect quality and savings instead of trusting a black box.
+- Distribution is mature enough for routine use. Mycelium ships cross-platform binaries, release automation, shell completions, and host-neutral onboarding and runtime wording across Claude and Codex.
+- Platform convergence is farther along than it used to be. Shared path and shell helpers plus `spore`-backed config registration removed a large chunk of the old Unix-only assumptions.
 
-### Quality
-- 1000+ unit tests across 25+ files
-- Smoke test suite (scripts/test-all.sh, 600+ lines)
-- Hook integrity verification (SHA-256)
-- Parse-health command for parser diagnostics
-- Doctor command for installation health checks
+## Next
 
-### Distribution
-- Pre-compiled binaries for all platforms (macOS x86/ARM, Linux x86/ARM, Windows)
-- GitHub Actions release pipeline (DEB/RPM packages, checksums)
-- Quick install script (`install.sh`)
+### Codebase health
 
----
+The codebase still needs the planned large-file split and a few more module boundaries. This is not cosmetic work; it keeps the rewrite and parser stack understandable enough to keep changing safely.
 
-## In Progress
+### Parser-backed consistency
 
-### Codebase Health
-- Splitting large files (>400 lines) into focused modules (see `.plans/split-large-files-v2.md`)
-- Keep tightening parser-backed consistency where older formatter logic or bespoke output shaping still bypasses shared `OutputParser` types and formatters
+Older formatter paths and bespoke output shaping still bypass the shared `OutputParser` model in places. Tightening that consistency is the fastest way to make rewrites more predictable and easier to verify.
 
-### Portability and Runtime
-- Finish removing residual Unix-shaped runtime behavior from less common command paths
-- Keep aligning host setup flows behind `stipe` while preserving Mycelium-specific diagnostics and explainability
+### Project-scoped analytics
 
----
+Mycelium should keep extending project-level tracking and push the operator-facing analytics into `cap` instead of growing a separate local dashboard. This item should stay aligned with the ecosystem roadmap because it affects how Cap explains savings and usage.
 
-## Planned
+### Token-aware filtering
 
-### Tool Coverage
-- Keep `rg` alias-backed through `mycelium grep`; only add a separate first-class `rg` command if grouped grep output proves materially worse than true ripgrep semantics in practice
-- Keep supported `bun run ...` / `bunx ...` wrappers and `podman` alias-backed unless their output diverges enough from the current rewrite targets to justify dedicated built-in commands
-- Keep `diffsitter` alias-backed to `mycelium diff` for now; only add dedicated semantic-diff handling if real usage shows plain diff-style condensation is not good enough
+The next material quality jump is moving from mostly line and byte caps toward token-budget-aware routing, salience-aware compaction, and better task-shaped compression for debug, review, fix, and status workflows.
 
-### Analytics
-- Extend per-project tracking beyond the current rewrite and parse-failure diagnostics so more analytics views can be scoped cleanly by workspace
-- Feed Mycelium diagnostics and trend views into `cap` instead of maintaining a separate local dashboard
+### Host-neutral runtime completion
 
-### Developer Experience
-- Plugin system for user-defined filters and experimental adapters
-- Keep the plugin system as a custom fallback layer, not the primary implementation path for built-in integrations
-- Config-driven filter customization
-- Better error messages and diagnostics
-- Deeper host-neutral runtime integration so Claude, Codex, and future hosts map cleanly into the same measurement model
+Residual platform-specific and Unix-shaped behavior still shows up in less common command paths. The near-term goal is to finish the portability pass so rewrite, proxy, config discovery, and analytics collection behave the same way across hosts and operating systems.
 
-### Adaptive Filtering Roadmap
+## Later
 
-#### Near-Term: Outer-Loop Token Optimization
-- Replace mostly line/byte-based routing with token-budget-aware routing using existing token estimation and command-family heuristics
-- Add salience-aware compaction for diffs, logs, and test output so truncation preserves the most actionable context instead of only applying fixed caps
-- Expand the shared parser degradation model (`Full`, `Degraded`, `Passthrough`) across more command families so fallback behavior is more consistent
-- Tune compaction thresholds from tracking and parse-failure telemetry instead of relying only on static profile defaults
-- Improve Hyphae summaries so large-output chunking returns structured retrieval hints, not just a generic summary line
-- Add task-shaped compression modes for common intents such as debug, review, fix, and status
+### Plugin and customization layer
 
-#### Later: Local Summarization and Retrieval
-- Add a lightweight local reranker or summarizer for large outputs before chunking when heuristic filters are not specific enough
-- Attach richer metadata to chunked output so follow-up retrieval can target failures, changed files, warnings, or hot sections directly
-- Keep these additions outside the model runtime itself unless local inference becomes a primary Mycelium feature
+Mycelium can support user-defined filters and experimental adapters, but that layer should remain a fallback for extension. Built-in integrations still need to own the common paths.
 
-#### Conditional: Only If Mycelium Becomes a Local Model Runtime
-- Evaluate plug-and-play KV cache compression techniques such as FastGen before attempting deeper runtime changes
-- Consider dynamic layer execution techniques only after local inference is real, profiled, and bottlenecked on model execution rather than output shaping
-- Treat multimodal token-compression work such as ACT-IN-LLM or AdaTok as out of scope unless image or screenshot workflows become a core product path
-- Ignore token-level pretraining data filtering unless Mycelium starts training or fine-tuning its own models
+### Selective tool expansion
 
-### Competitive Priorities
+Some commands should stay alias-backed until real usage proves otherwise. `rg`, `bun`, `bunx`, `podman`, and `diffsitter` only need first-class handling if their raw semantics diverge enough that the current rewrite path becomes misleading.
 
-#### Copy
-- Add operator-facing quality metrics for rewrites and passthroughs, not just token savings
-- Improve onboarding and setup ergonomics across supported hosts
-- Expand ecosystem coverage selectively where CLI parity and raw-output semantics are well understood
-- Track missed-opportunity and passthrough cases explicitly so rewrite rules can be tuned from real usage
+### Richer diagnostics
 
-#### Avoid
-- Do not trade semantic fidelity for headline token savings
-- Do not broaden hook or rewrite behavior faster than it can be verified with regression tests
-- Do not infer shell safety from string matching alone when parser-backed validation is available
-- Do not expand host and tool support faster than exact-output and exit-code parity can be preserved
+Better error messages, explain mode, and stronger rewrite-quality scoring belong here once the base parser consistency work is farther along. Those features are most useful when the underlying decision path is already stable.
 
-#### Watch
-- Cross-agent host support, where the integration value is high but the hook and permission surface grows quickly
-- Windows support, where installation and runtime compatibility tend to regress first
-- User-configurable rewrite and filter policy, especially where trust boundaries are unclear
-- Release velocity around core rewrite logic, so rapid iteration does not reintroduce semantic-loss bugs
+### Local summarization and retrieval
 
-#### Near-Term Order
-1. Add rewrite quality scoring and passthrough diagnostics
-2. Improve onboarding, install, and init flows
-3. Expand ecosystem coverage only after command-parity tests exist
-4. Keep growing the semantic-fidelity regression suite for rewritten commands
+A lightweight local reranker or summarizer plus richer chunk metadata may become worthwhile for very large outputs. That work should wait until the outer-loop token optimization path proves where the heuristics still fall short.
+
+## Research
+
+### Local model runtime support
+
+If Mycelium ever becomes a local model runtime, the roadmap changes. KV-cache work, dynamic layer execution, and deeper runtime optimization only matter under that condition, not before it.
+
+### Compression beyond heuristics
+
+Heuristic compression has a lot of runway left. The open question is when a local summarizer or reranker starts paying for itself enough to justify the extra complexity in the filtering path.
+
+## Not Planned
+
+- A separate long-term analytics UI inside Mycelium: Cap is the operator surface for the ecosystem.
+- First-class built-in coverage for every alias-backed tool before output semantics justify it: broad coverage is useful, but semantic fidelity matters more than command count.
+- Model training, fine-tuning, or multimodal token-compression work under the current product shape: that only becomes relevant if Mycelium turns into a local inference runtime.

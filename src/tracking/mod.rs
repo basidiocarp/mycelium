@@ -341,6 +341,7 @@ impl Tracker {
         }
 
         let conn = Connection::open(&db_path)?;
+        conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; PRAGMA foreign_keys=ON;")?;
         schema::init_schema(&conn)?;
 
         Ok(Self { conn })

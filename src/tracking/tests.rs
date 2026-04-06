@@ -80,6 +80,30 @@ fn test_tracker_record_and_recent() {
 }
 
 #[test]
+fn test_tracker_applies_sqlite_pragmas() {
+    with_test_db("test_tracker_applies_sqlite_pragmas", |db_path| {
+        let tracker = Tracker::new_with_override(Some(db_path)).expect("Failed to create tracker");
+
+        let journal_mode: String = tracker
+            .conn
+            .query_row("PRAGMA journal_mode;", [], |row| row.get(0))
+            .expect("Failed to read journal_mode");
+        let busy_timeout: i64 = tracker
+            .conn
+            .query_row("PRAGMA busy_timeout;", [], |row| row.get(0))
+            .expect("Failed to read busy_timeout");
+        let foreign_keys: i64 = tracker
+            .conn
+            .query_row("PRAGMA foreign_keys;", [], |row| row.get(0))
+            .expect("Failed to read foreign_keys");
+
+        assert_eq!(journal_mode.to_lowercase(), "wal");
+        assert_eq!(busy_timeout, 5000);
+        assert_eq!(foreign_keys, 1);
+    });
+}
+
+#[test]
 fn test_tracker_recent_detailed_includes_token_counts_and_project_path() {
     with_test_db(
         "test_tracker_recent_detailed_includes_token_counts_and_project_path",
