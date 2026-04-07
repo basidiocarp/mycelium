@@ -412,6 +412,7 @@ pub fn dispatch(cli: Cli) -> Result<()> {
         Commands::Init {
             global,
             show,
+            onboard,
             claude_md,
             hook_only,
             auto_patch,
@@ -421,6 +422,7 @@ pub fn dispatch(cli: Cli) -> Result<()> {
             dispatch_init_commands(
                 global,
                 show,
+                onboard,
                 claude_md,
                 hook_only,
                 auto_patch,
@@ -1067,6 +1069,7 @@ fn dispatch_gt_commands(command: GtCommands, verbose: u8) -> Result<()> {
 fn dispatch_init_commands(
     global: bool,
     show: bool,
+    onboard: bool,
     claude_md: bool,
     hook_only: bool,
     auto_patch: bool,
@@ -1078,6 +1081,8 @@ fn dispatch_init_commands(
         init::show_config()?;
     } else if uninstall {
         init::uninstall(global, verbose)?;
+    } else if onboard {
+        init::onboard(global, verbose)?;
     } else {
         let patch_mode = if auto_patch {
             init::PatchMode::Auto

@@ -3,6 +3,7 @@ mod claude_md;
 mod hook;
 pub(crate) mod host_status;
 mod json_patch;
+mod onboard;
 
 use anyhow::Result;
 use std::fs;
@@ -38,6 +39,10 @@ pub fn run(
         (false, true) => run_hook_only_mode(global, patch_mode, verbose),
         (false, false) => run_default_mode(global, patch_mode, verbose),
     }
+}
+
+pub fn onboard(global: bool, verbose: u8) -> Result<()> {
+    onboard::run(global, verbose)
 }
 
 /// Full uninstall: remove hooks, MYCELIUM.md, @MYCELIUM.md reference, settings.json entry
@@ -654,7 +659,9 @@ fn report_settings_patch_result(patch_result: crate::init::json_patch::PatchResu
 #[cfg(unix)]
 fn remove_legacy_session_summary_artifacts(verbose: u8) -> Result<()> {
     let claude_dir = resolve_claude_dir()?;
-    let legacy_hook_path = claude_dir.join("hooks").join(LEGACY_SESSION_SUMMARY_HOOK_NAME);
+    let legacy_hook_path = claude_dir
+        .join("hooks")
+        .join(LEGACY_SESSION_SUMMARY_HOOK_NAME);
     let removed_hook = if legacy_hook_path.exists() {
         fs::remove_file(&legacy_hook_path).with_context(|| {
             format!(

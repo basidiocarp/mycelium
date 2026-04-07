@@ -621,6 +621,10 @@ pub enum Commands {
         #[arg(long)]
         show: bool,
 
+        /// Run the interactive ecosystem onboarding wizard
+        #[arg(long, group = "mode", conflicts_with_all = ["show", "uninstall"])]
+        onboard: bool,
+
         /// Inject full instructions into CLAUDE.md (legacy/docs-only mode)
         #[arg(long = "claude-md", group = "mode")]
         claude_md: bool,
@@ -1556,6 +1560,7 @@ mod tests {
                 global,
                 hook_only,
                 claude_md,
+                onboard,
                 show,
                 uninstall,
                 ..
@@ -1563,6 +1568,7 @@ mod tests {
                 assert!(global);
                 assert!(hook_only);
                 assert!(!claude_md);
+                assert!(!onboard);
                 assert!(!show);
                 assert!(!uninstall);
             }
@@ -1575,11 +1581,37 @@ mod tests {
                 global,
                 hook_only,
                 claude_md,
+                onboard,
                 ..
             } => {
                 assert!(!global);
                 assert!(!hook_only);
                 assert!(claude_md);
+                assert!(!onboard);
+            }
+            _ => panic!("Expected Init command"),
+        }
+    }
+
+    #[test]
+    fn test_init_onboard_parses() {
+        let cli = Cli::try_parse_from(["mycelium", "init", "--onboard"]).unwrap();
+        match cli.command {
+            Commands::Init {
+                global,
+                hook_only,
+                claude_md,
+                onboard,
+                show,
+                uninstall,
+                ..
+            } => {
+                assert!(!global);
+                assert!(!hook_only);
+                assert!(!claude_md);
+                assert!(onboard);
+                assert!(!show);
+                assert!(!uninstall);
             }
             _ => panic!("Expected Init command"),
         }
@@ -1589,7 +1621,6 @@ mod tests {
     fn test_removed_init_setup_flags_are_rejected() {
         for argv in [
             ["mycelium", "init", "--ecosystem"].as_slice(),
-            ["mycelium", "init", "--onboard"].as_slice(),
             ["mycelium", "init", "--client", "codex"].as_slice(),
         ] {
             let err = match Cli::try_parse_from(argv) {
