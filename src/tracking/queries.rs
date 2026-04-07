@@ -4,7 +4,6 @@
 //! command history from the tracking database.
 
 use anyhow::Result;
-use jiff::Timestamp;
 use rusqlite::params;
 
 use super::{
@@ -459,10 +458,7 @@ impl Tracker {
 
         let rows = stmt.query_map(params![project_exact, project_glob, limit as i64], |row| {
             Ok(CommandRecord {
-                timestamp: row
-                    .get::<_, String>(0)?
-                    .parse::<Timestamp>()
-                    .unwrap_or_else(|_| Timestamp::now()),
+                timestamp: row.get(0)?,
                 mycelium_cmd: row.get(1)?,
                 saved_tokens: row.get::<_, i64>(2)? as usize,
                 savings_pct: row.get(3)?,

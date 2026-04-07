@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use jiff::civil::Date;
+use chrono::{Duration, NaiveDate};
 
 use crate::ccusage::CcusagePeriod;
 use crate::tracking::{DayStats, MonthStats, WeekStats};
@@ -120,11 +120,11 @@ pub fn merge_monthly(
 /// Convert Saturday week_start (legacy tracking) to ISO Monday
 /// Example: "2026-01-18" (Sat) -> "2026-01-20" (Mon)
 pub fn convert_saturday_to_monday(saturday: &str) -> Option<String> {
-    let sat_date: Date = saturday.parse().ok()?;
+    let sat_date: NaiveDate = saturday.parse().ok()?;
 
     // tracking uses Saturday as week start, ISO uses Monday
     // Saturday + 2 days = Monday
-    let monday = sat_date.checked_add(jiff::Span::new().days(2)).ok()?;
+    let monday = sat_date.checked_add_signed(Duration::days(2))?;
 
     Some(monday.to_string())
 }

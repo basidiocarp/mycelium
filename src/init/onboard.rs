@@ -137,10 +137,7 @@ pub(super) fn run(global: bool, verbose: u8) -> Result<()> {
         PromptDecision::Yes => {
             summary.claude_setup =
                 match super::run_default_mode(global, super::PatchMode::Auto, verbose) {
-                    Ok(()) => format!(
-                        "configured {} Claude integration",
-                        setup_plan.scope_label
-                    ),
+                    Ok(()) => format!("configured {} Claude integration", setup_plan.scope_label),
                     Err(error) => format!("warning: Claude setup failed: {error}"),
                 };
 

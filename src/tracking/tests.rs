@@ -562,7 +562,7 @@ fn test_get_by_project() {
         let tracker = Tracker::new_with_override(Some(db_path)).expect("Failed to create tracker");
         let pid = std::process::id();
 
-        let ts = jiff::Timestamp::now().to_string();
+        let ts = chrono::Utc::now().to_rfc3339();
         for (project, saved) in &[
             (format!("/tmp/proj_a_{}", pid), 500),
             (format!("/tmp/proj_a_{}", pid), 300),

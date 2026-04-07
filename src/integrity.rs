@@ -306,10 +306,7 @@ pub fn runtime_check() -> Result<()> {
                     actual.get(..16).unwrap_or(&actual)
                 );
                 eprintln!();
-                eprintln!(
-                    "  The hook at {} has been modified.",
-                    hook_path.display()
-                );
+                eprintln!("  The hook at {} has been modified.", hook_path.display());
                 eprintln!("  This may indicate tampering. Mycelium will not execute.");
                 eprintln!();
                 eprintln!("  To restore:  mycelium init -g --auto-patch");

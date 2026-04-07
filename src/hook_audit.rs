@@ -1,6 +1,8 @@
 //! Shared hook audit log parsing and summarization.
 use anyhow::{Context, Result};
+use chrono::{Duration, Utc};
 use std::collections::HashMap;
+use std::convert::TryFrom;
 use std::path::PathBuf;
 
 /// Default log file location (aligned with the platform data directory).
@@ -79,9 +81,7 @@ pub(crate) fn filter_since_days(entries: &[AuditEntry], days: u64) -> Vec<&Audit
         return entries.iter().collect();
     }
 
-    let cutoff = jiff::Timestamp::now()
-        .checked_sub(jiff::SignedDuration::from_hours(days as i64 * 24))
-        .expect("timestamp subtraction should not overflow");
+    let cutoff = Utc::now() - Duration::days(i64::try_from(days).expect("days fits in i64"));
     let cutoff_str = cutoff.to_string();
 
     entries

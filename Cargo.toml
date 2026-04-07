@@ -32,7 +32,7 @@ colored = "3"
 dirs = "6"
 rusqlite = { version = "0.39", features = ["bundled"] }
 toml = "1.1"
-jiff = "0.2"
+chrono = "0.4"
 tempfile = "3"
 sha2 = "0.10"
 ureq = "3"

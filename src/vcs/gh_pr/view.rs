@@ -70,9 +70,8 @@ pub fn view_pr(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()>
 
     // Route through Hyphae for large PR views (many comments/checks).
     // Small/medium output is filtered locally with validation.
-    let filtered = crate::hyphae::route_or_filter(&pr_label, &raw, |r| {
-        format_pr_view(r, ultra_compact)
-    });
+    let filtered =
+        crate::hyphae::route_or_filter(&pr_label, &raw, |r| format_pr_view(r, ultra_compact));
     print!("{}", filtered.output);
 
     timer.track(&pr_label, &mycelium_label, &raw, &filtered.output);

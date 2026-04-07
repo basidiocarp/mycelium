@@ -281,8 +281,7 @@ pub(crate) fn hook_already_present(
     event: &str,
     hook_command: &str,
 ) -> bool {
-    hook_commands(root, event)
-        .any(|command| same_hook_command(event, command, hook_command))
+    hook_commands(root, event).any(|command| same_hook_command(event, command, hook_command))
 }
 
 fn hook_command_present_exact(root: &serde_json::Value, event: &str, hook_command: &str) -> bool {
@@ -346,10 +345,12 @@ fn equivalent_hook_commands(event: &str, hook_command: &str) -> Vec<String> {
     let mut commands = vec![normalized.clone()];
 
     if event == STOP_EVENT {
-        if let Some(current_command) = sibling_hook_command(&normalized, SESSION_SUMMARY_HOOK_FILE) {
+        if let Some(current_command) = sibling_hook_command(&normalized, SESSION_SUMMARY_HOOK_FILE)
+        {
             commands.push(current_command);
         }
-        if let Some(legacy_command) = sibling_hook_command(&normalized, LEGACY_SESSION_SUMMARY_HOOK_FILE)
+        if let Some(legacy_command) =
+            sibling_hook_command(&normalized, LEGACY_SESSION_SUMMARY_HOOK_FILE)
         {
             commands.push(legacy_command);
         }
@@ -577,7 +578,11 @@ mod tests {
         });
 
         let hook_command = "~/.claude/hooks/mycelium-session-summary.sh";
-        assert!(hook_already_present(&json_content, STOP_EVENT, hook_command));
+        assert!(hook_already_present(
+            &json_content,
+            STOP_EVENT,
+            hook_command
+        ));
         assert!(!hook_command_present_exact(
             &json_content,
             STOP_EVENT,
@@ -817,7 +822,10 @@ mod tests {
 
         let stop_hooks = json_content["hooks"]["Stop"].as_array().unwrap();
         assert_eq!(stop_hooks.len(), 1);
-        assert_eq!(stop_hooks[0]["hooks"][0]["command"], "/some/other/stop-hook.sh");
+        assert_eq!(
+            stop_hooks[0]["hooks"][0]["command"],
+            "/some/other/stop-hook.sh"
+        );
     }
 
     #[test]
@@ -846,7 +854,10 @@ mod tests {
 
         let stop_hooks = json_content["hooks"]["Stop"].as_array().unwrap();
         assert_eq!(stop_hooks.len(), 1);
-        assert_eq!(stop_hooks[0]["hooks"][0]["command"], "/some/other/stop-hook.sh");
+        assert_eq!(
+            stop_hooks[0]["hooks"][0]["command"],
+            "/some/other/stop-hook.sh"
+        );
     }
 
     #[test]

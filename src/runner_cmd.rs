@@ -86,17 +86,16 @@ pub fn run_test(command: &str, verbose: u8) -> Result<()> {
         .status
         .code()
         .unwrap_or(if output.status.success() { 0 } else { 1 });
-    let result =
-        crate::hyphae::route_or_filter(command, &raw, |r| {
-            let summary = extract_test_summary(r, command);
-            // If the summary only contains the fallback "OUTPUT (last 5 lines):" section,
-            // the filter didn't recognize the test framework output format.
-            if summary.starts_with("OUTPUT (last") {
-                crate::filter::FilterResult::degraded(r, summary)
-            } else {
-                crate::filter::FilterResult::full(r, summary)
-            }
-        });
+    let result = crate::hyphae::route_or_filter(command, &raw, |r| {
+        let summary = extract_test_summary(r, command);
+        // If the summary only contains the fallback "OUTPUT (last 5 lines):" section,
+        // the filter didn't recognize the test framework output format.
+        if summary.starts_with("OUTPUT (last") {
+            crate::filter::FilterResult::degraded(r, summary)
+        } else {
+            crate::filter::FilterResult::full(r, summary)
+        }
+    });
     if let Some(hint) = crate::tee::tee_and_hint(&raw, "test", exit_code) {
         println!("{}\n{}", result.output, hint);
     } else {

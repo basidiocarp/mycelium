@@ -149,9 +149,7 @@ fn view_issue(args: &[String], _verbose: u8) -> Result<()> {
 
     // Route through Hyphae for large issues (many comments can be huge).
     // Small/medium output is filtered locally with validation.
-    let filtered = crate::hyphae::route_or_filter(&cmd_label, &raw, |r| {
-        format_issue_view(r)
-    });
+    let filtered = crate::hyphae::route_or_filter(&cmd_label, &raw, |r| format_issue_view(r));
     print!("{}", filtered.output);
 
     timer.track_with_parse_info(

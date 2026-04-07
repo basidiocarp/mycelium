@@ -34,7 +34,7 @@ mod timer;
 pub(crate) mod utils;
 
 use anyhow::Result;
-use jiff::{SignedDuration, Timestamp};
+use chrono::{Duration, Utc};
 use rusqlite::{Connection, params};
 use serde::Serialize;
 
@@ -88,7 +88,7 @@ pub struct Tracker {
 #[derive(Debug)]
 pub struct CommandRecord {
     /// UTC timestamp when command was executed
-    pub timestamp: Timestamp,
+    pub timestamp: String,
     /// Mycelium command that was executed (e.g., "mycelium ls")
     pub mycelium_cmd: String,
     /// Number of tokens saved (input - output)
@@ -341,7 +341,9 @@ impl Tracker {
         }
 
         let conn = Connection::open(&db_path)?;
-        conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; PRAGMA foreign_keys=ON;")?;
+        conn.execute_batch(
+            "PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; PRAGMA foreign_keys=ON;",
+        )?;
         schema::init_schema(&conn)?;
 
         Ok(Self { conn })
@@ -391,7 +393,7 @@ impl Tracker {
             "INSERT INTO commands (timestamp, original_cmd, mycelium_cmd, project_path, session_id, input_tokens, output_tokens, saved_tokens, savings_pct, exec_time_ms, execution_kind)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
             params![
-                Timestamp::now().to_string(),
+                Utc::now().to_rfc3339(),
                 original_cmd,
                 mycelium_cmd,
                 project_path,
@@ -443,7 +445,7 @@ impl Tracker {
             "INSERT INTO commands (timestamp, original_cmd, mycelium_cmd, project_path, session_id, input_tokens, output_tokens, saved_tokens, savings_pct, exec_time_ms, parse_tier, format_mode, execution_kind)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
             params![
-                Timestamp::now().to_string(),
+                Utc::now().to_rfc3339(),
                 original_cmd,
                 mycelium_cmd,
                 project_path,
@@ -477,7 +479,7 @@ impl Tracker {
             "INSERT INTO commands (timestamp, original_cmd, mycelium_cmd, project_path, session_id, input_tokens, output_tokens, saved_tokens, savings_pct, exec_time_ms, execution_kind)
              VALUES (?1, ?2, ?3, ?4, ?5, 0, 0, 0, 0.0, ?6, 'passthrough')",
             params![
-                Timestamp::now().to_string(),
+                Utc::now().to_rfc3339(),
                 original_cmd,
                 mycelium_cmd,
                 project_path,
@@ -491,16 +493,14 @@ impl Tracker {
     }
 
     fn cleanup_old(&self) -> Result<()> {
-        let cutoff = Timestamp::now()
-            .checked_sub(SignedDuration::from_hours(HISTORY_DAYS * 24))
-            .map_err(|e| anyhow::anyhow!("timestamp overflow in cleanup: {}", e))?;
+        let cutoff = Utc::now() - Duration::days(HISTORY_DAYS);
         self.conn.execute(
             "DELETE FROM commands WHERE timestamp < ?1",
-            params![cutoff.to_string()],
+            params![cutoff.to_rfc3339()],
         )?;
         self.conn.execute(
             "DELETE FROM parse_failures WHERE timestamp < ?1",
-            params![cutoff.to_string()],
+            params![cutoff.to_rfc3339()],
         )?;
         Ok(())
     }
@@ -518,7 +518,7 @@ impl Tracker {
             "INSERT INTO parse_failures (timestamp, raw_command, error_message, fallback_succeeded, project_path)
              VALUES (?1, ?2, ?3, ?4, ?5)",
             params![
-                Timestamp::now().to_string(),
+                Utc::now().to_rfc3339(),
                 raw_command,
                 error_message,
                 fallback_succeeded as i32,

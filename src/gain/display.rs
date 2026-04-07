@@ -166,7 +166,12 @@ pub(crate) fn show_summary(
             println!("{}", styled("Recent Commands", true));
             println!("──────────────────────────────────────────────────────────");
             for rec in recent {
-                let time = rec.timestamp.strftime("%m-%d %H:%M");
+                let time = rec
+                    .timestamp
+                    .get(5..10)
+                    .zip(rec.timestamp.get(11..16))
+                    .map(|(date, clock)| format!("{date} {clock}"))
+                    .unwrap_or_else(|| rec.timestamp.clone());
                 let cmd_short = if rec.mycelium_cmd.len() > 25 {
                     format!("{}...", &rec.mycelium_cmd[..22])
                 } else {

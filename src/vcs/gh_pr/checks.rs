@@ -152,7 +152,12 @@ pub fn pr_status(args: &[String], _verbose: u8, _ultra_compact: bool) -> Result<
             let number = pr["number"].as_i64().unwrap_or(0);
             let title = pr["title"].as_str().unwrap_or("???");
             let reviews = pr["reviewDecision"].as_str().unwrap_or("PENDING");
-            formatted.push_str(&format!("  #{} {} [{}]\n", number, truncate(title, 50), reviews));
+            formatted.push_str(&format!(
+                "  #{} {} [{}]\n",
+                number,
+                truncate(title, 50),
+                reviews
+            ));
         }
     }
 
@@ -162,7 +167,12 @@ pub fn pr_status(args: &[String], _verbose: u8, _ultra_compact: bool) -> Result<
     let validated = crate::hyphae::validate_filter_output(&raw, filter_result);
     print!("{}", validated.output);
 
-    timer.track("gh pr status", "mycelium gh pr status", &raw, &validated.output);
+    timer.track(
+        "gh pr status",
+        "mycelium gh pr status",
+        &raw,
+        &validated.output,
+    );
     Ok(())
 }
 

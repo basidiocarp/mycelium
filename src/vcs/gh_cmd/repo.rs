@@ -130,9 +130,8 @@ pub(super) fn dispatch_api(args: &[String], _verbose: u8) -> Result<()> {
     // Route through Hyphae for large API responses — they can be arbitrarily big.
     // The filter closure returns raw unchanged (gh api is explicit/advanced, so
     // we don't compress the content, but Hyphae can chunk very large responses).
-    let filtered = crate::hyphae::route_or_filter(&cmd_label, &raw, |r| {
-        FilterResult::full(r, r.to_string())
-    });
+    let filtered =
+        crate::hyphae::route_or_filter(&cmd_label, &raw, |r| FilterResult::full(r, r.to_string()));
     print!("{}", filtered.output);
 
     timer.track(
