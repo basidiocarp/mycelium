@@ -18,8 +18,11 @@ use claude_md::{MYCELIUM_SLIM, patch_claude_md};
 #[cfg(unix)]
 use hook::{extract_hook_version, extract_quoted_assignment};
 #[cfg(unix)]
-use hook::{prepare_hook_paths, write_if_changed};
+use hook::{prepare_hook_paths, prepare_session_summary_hook_path, write_if_changed};
 use json_patch::{clean_double_blanks, hook_already_present, remove_hook_from_settings};
+
+#[cfg(unix)]
+const LEGACY_SESSION_SUMMARY_HOOK_NAME: &str = "session-summary.sh";
 
 /// Main entry point for `mycelium init`
 pub fn run(
@@ -37,7 +40,7 @@ pub fn run(
     }
 }
 
-/// Full uninstall: remove hook, MYCELIUM.md, @MYCELIUM.md reference, settings.json entry
+/// Full uninstall: remove hooks, MYCELIUM.md, @MYCELIUM.md reference, settings.json entry
 pub fn uninstall(global: bool, verbose: u8) -> Result<()> {
     if !global {
         anyhow::bail!(
@@ -48,17 +51,52 @@ pub fn uninstall(global: bool, verbose: u8) -> Result<()> {
     let claude_dir = resolve_claude_dir()?;
     let mut removed = Vec::new();
 
-    // 1. Remove hook file
-    let hook_path = claude_dir.join("hooks").join("mycelium-rewrite.sh");
+    // 1. Remove hook files
+    let hook_dir = claude_dir.join("hooks");
+    let hook_path = hook_dir.join("mycelium-rewrite.sh");
     if hook_path.exists() {
         fs::remove_file(&hook_path)
             .with_context(|| format!("Failed to remove hook: {}", hook_path.display()))?;
         removed.push(format!("Hook: {}", hook_path.display()));
     }
 
+    let session_summary_hook_path = hook_dir.join("mycelium-session-summary.sh");
+    if session_summary_hook_path.exists() {
+        fs::remove_file(&session_summary_hook_path).with_context(|| {
+            format!(
+                "Failed to remove session hook: {}",
+                session_summary_hook_path.display()
+            )
+        })?;
+        removed.push(format!(
+            "Session hook: {}",
+            session_summary_hook_path.display()
+        ));
+    }
+
     // 1b. Remove integrity hash file
     if crate::integrity::remove_hash(&hook_path)? {
         removed.push("Integrity hash: removed".to_string());
+    }
+    if crate::integrity::remove_hash(&session_summary_hook_path)? {
+        removed.push("Session hook integrity hash: removed".to_string());
+    }
+
+    let legacy_session_summary_hook_path = hook_dir.join(LEGACY_SESSION_SUMMARY_HOOK_NAME);
+    if legacy_session_summary_hook_path.exists() {
+        fs::remove_file(&legacy_session_summary_hook_path).with_context(|| {
+            format!(
+                "Failed to remove legacy session hook: {}",
+                legacy_session_summary_hook_path.display()
+            )
+        })?;
+        removed.push(format!(
+            "Legacy session hook: {}",
+            legacy_session_summary_hook_path.display()
+        ));
+    }
+    if crate::integrity::remove_hash(&legacy_session_summary_hook_path)? {
+        removed.push("Legacy session hook integrity hash: removed".to_string());
     }
 
     // 2. Remove MYCELIUM.md
@@ -140,6 +178,7 @@ pub fn show_config() -> Result<()> {
     let claude_capabilities = host_status::claude_code_capabilities();
     let claude_dir = resolve_claude_dir()?;
     let hook_path = claude_dir.join("hooks").join("mycelium-rewrite.sh");
+    let session_summary_hook_path = claude_dir.join("hooks").join("mycelium-session-summary.sh");
     let mycelium_md_path = claude_dir.join("MYCELIUM.md");
     let global_claude_md = claude_dir.join("CLAUDE.md");
     let local_claude_md = PathBuf::from("CLAUDE.md");
@@ -164,7 +203,7 @@ pub fn show_config() -> Result<()> {
     );
     println!();
 
-    // Check hook
+    // Check rewrite hook
     if !claude_capabilities.hook_adapter.supported {
         println!("- Hook: unsupported on this platform");
     } else if hook_path.exists() {
@@ -304,6 +343,56 @@ pub fn show_config() -> Result<()> {
         println!("- Hook: not found");
     }
 
+    // Check session summary hook
+    if !claude_capabilities.hook_adapter.supported {
+        println!("- Session hook: unsupported on this platform");
+    } else if session_summary_hook_path.exists() {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let metadata = fs::metadata(&session_summary_hook_path)?;
+            if metadata.permissions().mode() & 0o111 != 0 {
+                println!("ok Session hook: {}", session_summary_hook_path.display());
+            } else {
+                println!(
+                    "[!] Session hook: {} (NOT executable - run: chmod +x)",
+                    session_summary_hook_path.display()
+                );
+            }
+        }
+
+        #[cfg(not(unix))]
+        {
+            println!(
+                "ok Session hook: {} (exists)",
+                session_summary_hook_path.display()
+            );
+        }
+    } else {
+        println!("- Session hook: not found");
+    }
+
+    if session_summary_hook_path.exists() {
+        match crate::integrity::verify_hook_at(&session_summary_hook_path) {
+            Ok(crate::integrity::IntegrityStatus::Verified) => {
+                println!("ok Session hook integrity: verified");
+            }
+            Ok(crate::integrity::IntegrityStatus::Tampered { .. }) => {
+                println!("[!] Session hook integrity: FAILED");
+                println!("    Run: mycelium init -g to restore the Stop hook");
+            }
+            Ok(crate::integrity::IntegrityStatus::NoBaseline) => {
+                println!("[!] Session hook integrity: no baseline hash");
+                println!("    Run: mycelium init -g to record a Stop hook baseline");
+            }
+            Ok(crate::integrity::IntegrityStatus::NotInstalled)
+            | Ok(crate::integrity::IntegrityStatus::OrphanedHash) => {}
+            Err(e) => {
+                println!("[!] Session hook integrity: error ({e})");
+            }
+        }
+    }
+
     // Check MYCELIUM.md
     if !claude_capabilities.slim_global_setup.supported {
         println!("- MYCELIUM.md: not used by the docs-only setup on this platform");
@@ -380,10 +469,24 @@ pub fn show_config() -> Result<()> {
         if !content.trim().is_empty() {
             if let Ok(root) = serde_json::from_str::<serde_json::Value>(&content) {
                 let hook_command = hook_path.display().to_string();
-                if hook_already_present(&root, &hook_command) {
-                    println!("ok settings.json: Mycelium hook configured");
+                let session_summary_hook_command = session_summary_hook_path.display().to_string();
+                let rewrite_registered = hook_already_present(&root, "PreToolUse", &hook_command);
+                let session_registered =
+                    hook_already_present(&root, "Stop", &session_summary_hook_command);
+
+                if rewrite_registered && session_registered {
+                    println!("ok settings.json: Mycelium hooks configured");
                 } else {
-                    println!("[!] settings.json: exists but Mycelium hook not configured");
+                    println!("[!] settings.json: exists but Mycelium hooks are incomplete");
+                    if !rewrite_registered {
+                        println!("    Missing PreToolUse hook: {}", hook_path.display());
+                    }
+                    if !session_registered {
+                        println!(
+                            "    Missing Stop hook: {}",
+                            session_summary_hook_path.display()
+                        );
+                    }
                     println!("    Run: mycelium init -g --auto-patch");
                 }
             } else {
@@ -437,25 +540,29 @@ pub fn show_config() -> Result<()> {
 #[cfg(unix)]
 fn install_claude_code_adapter(patch_mode: PatchMode, verbose: u8) -> Result<()> {
     use crate::init::json_patch::patch_settings_json;
-    use hook::ensure_hook_installed;
+    use hook::{ensure_hook_installed, ensure_session_summary_hook_installed};
 
     let claude_dir = resolve_claude_dir()?;
     let mycelium_md_path = claude_dir.join("MYCELIUM.md");
     let claude_md_path = claude_dir.join("CLAUDE.md");
 
     let (_hook_dir, hook_path) = prepare_hook_paths()?;
+    let (_session_hook_dir, session_summary_hook_path) = prepare_session_summary_hook_path()?;
     let hook_changed = ensure_hook_installed(&hook_path, verbose)?;
+    let session_hook_changed =
+        ensure_session_summary_hook_installed(&session_summary_hook_path, verbose)?;
 
     write_if_changed(&mycelium_md_path, MYCELIUM_SLIM, "MYCELIUM.md", verbose)?;
     let migrated = patch_claude_md(&claude_md_path, verbose)?;
 
-    let hook_status = if hook_changed {
+    let hook_status = if hook_changed || session_hook_changed {
         "installed/updated"
     } else {
         "already up to date"
     };
     println!("\nClaude Code adapter {} (global).\n", hook_status);
     println!("  Hook:           {}", hook_path.display());
+    println!("  Session hook:   {}", session_summary_hook_path.display());
     println!(
         "  MYCELIUM.md:    {} (10 lines)",
         mycelium_md_path.display()
@@ -467,7 +574,15 @@ fn install_claude_code_adapter(patch_mode: PatchMode, verbose: u8) -> Result<()>
         println!("              replaced with @MYCELIUM.md (10 lines)");
     }
 
-    let patch_result = patch_settings_json(&hook_path, patch_mode, verbose)?;
+    let patch_result =
+        patch_settings_json(&hook_path, &session_summary_hook_path, patch_mode, verbose)?;
+    if matches!(
+        patch_result,
+        crate::init::json_patch::PatchResult::Patched
+            | crate::init::json_patch::PatchResult::AlreadyPresent
+    ) {
+        remove_legacy_session_summary_artifacts(verbose)?;
+    }
     report_settings_patch_result(patch_result);
     println!();
 
@@ -482,23 +597,35 @@ fn install_claude_code_adapter(_patch_mode: PatchMode, _verbose: u8) -> Result<(
 #[cfg(unix)]
 fn install_claude_hook_only(patch_mode: PatchMode, verbose: u8) -> Result<()> {
     use crate::init::json_patch::patch_settings_json;
-    use hook::ensure_hook_installed;
+    use hook::{ensure_hook_installed, ensure_session_summary_hook_installed};
 
     let (_hook_dir, hook_path) = prepare_hook_paths()?;
+    let (_session_hook_dir, session_summary_hook_path) = prepare_session_summary_hook_path()?;
     let hook_changed = ensure_hook_installed(&hook_path, verbose)?;
+    let session_hook_changed =
+        ensure_session_summary_hook_installed(&session_summary_hook_path, verbose)?;
 
-    let hook_status = if hook_changed {
+    let hook_status = if hook_changed || session_hook_changed {
         "installed/updated"
     } else {
         "already up to date"
     };
     println!("\nClaude Code adapter {} (hook-only mode).\n", hook_status);
     println!("  Hook: {}", hook_path.display());
+    println!("  Session hook: {}", session_summary_hook_path.display());
     println!(
         "  Note: No MYCELIUM.md created. Claude Code will not see Mycelium meta commands (gain, discover, proxy, invoke)."
     );
 
-    let patch_result = patch_settings_json(&hook_path, patch_mode, verbose)?;
+    let patch_result =
+        patch_settings_json(&hook_path, &session_summary_hook_path, patch_mode, verbose)?;
+    if matches!(
+        patch_result,
+        crate::init::json_patch::PatchResult::Patched
+            | crate::init::json_patch::PatchResult::AlreadyPresent
+    ) {
+        remove_legacy_session_summary_artifacts(verbose)?;
+    }
     report_settings_patch_result(patch_result);
     println!();
 
@@ -517,11 +644,38 @@ fn report_settings_patch_result(patch_result: crate::init::json_patch::PatchResu
     match patch_result {
         PatchResult::Patched => {}
         PatchResult::AlreadyPresent => {
-            println!("\n  settings.json: Claude hook already present");
+            println!("\n  settings.json: Claude hooks already present");
             println!("  Restart Claude Code. Test with: git status");
         }
         PatchResult::Declined | PatchResult::Skipped => {}
     }
+}
+
+#[cfg(unix)]
+fn remove_legacy_session_summary_artifacts(verbose: u8) -> Result<()> {
+    let claude_dir = resolve_claude_dir()?;
+    let legacy_hook_path = claude_dir.join("hooks").join(LEGACY_SESSION_SUMMARY_HOOK_NAME);
+    let removed_hook = if legacy_hook_path.exists() {
+        fs::remove_file(&legacy_hook_path).with_context(|| {
+            format!(
+                "Failed to remove legacy session hook: {}",
+                legacy_hook_path.display()
+            )
+        })?;
+        true
+    } else {
+        false
+    };
+    let removed_hash = crate::integrity::remove_hash(&legacy_hook_path)?;
+
+    if verbose > 0 && (removed_hook || removed_hash) {
+        eprintln!(
+            "Removed legacy session hook artifacts: {}",
+            legacy_hook_path.display()
+        );
+    }
+
+    Ok(())
 }
 
 #[cfg(not(unix))]

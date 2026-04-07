@@ -14,7 +14,13 @@ use super::claude_md::resolve_claude_dir;
 // Embedded hook script (guards before set -euo pipefail) — Unix-only (bash)
 #[cfg(unix)]
 pub(crate) const REWRITE_HOOK: &str = include_str!("../../hooks/mycelium-rewrite.sh");
+#[cfg(unix)]
+pub(crate) const SESSION_SUMMARY_HOOK: &str = include_str!("../../hooks/session-summary.sh");
 
+#[cfg(unix)]
+const REWRITE_HOOK_NAME: &str = "mycelium-rewrite.sh";
+#[cfg(unix)]
+const SESSION_SUMMARY_HOOK_NAME: &str = "mycelium-session-summary.sh";
 #[cfg(unix)]
 const MYCELIUM_VERSION_PLACEHOLDER: &str = "__MYCELIUM_VERSION__";
 #[cfg(unix)]
@@ -108,13 +114,47 @@ fn resolve_hook_dependencies() -> (Option<PathBuf>, Option<PathBuf>) {
 
 /// Prepare hook directory and return paths (hook_dir, hook_path) — Unix-only
 #[cfg(unix)]
-pub(crate) fn prepare_hook_paths() -> Result<(PathBuf, PathBuf)> {
+fn prepare_named_hook_path(hook_name: &str) -> Result<(PathBuf, PathBuf)> {
     let claude_dir = resolve_claude_dir()?;
     let hook_dir = claude_dir.join("hooks");
     fs::create_dir_all(&hook_dir)
         .with_context(|| format!("Failed to create hook directory: {}", hook_dir.display()))?;
-    let hook_path = hook_dir.join("mycelium-rewrite.sh");
+    let hook_path = hook_dir.join(hook_name);
     Ok((hook_dir, hook_path))
+}
+
+/// Prepare rewrite hook path — Unix-only
+#[cfg(unix)]
+pub(crate) fn prepare_hook_paths() -> Result<(PathBuf, PathBuf)> {
+    prepare_named_hook_path(REWRITE_HOOK_NAME)
+}
+
+/// Prepare session summary hook path — Unix-only
+#[cfg(unix)]
+pub(crate) fn prepare_session_summary_hook_path() -> Result<(PathBuf, PathBuf)> {
+    prepare_named_hook_path(SESSION_SUMMARY_HOOK_NAME)
+}
+
+#[cfg(unix)]
+fn set_executable_permissions(hook_path: &Path) -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+
+    fs::set_permissions(hook_path, fs::Permissions::from_mode(0o755))
+        .with_context(|| format!("Failed to set hook permissions: {}", hook_path.display()))?;
+
+    Ok(())
+}
+
+#[cfg(unix)]
+fn ensure_static_hook_installed(
+    hook_path: &Path,
+    content: &str,
+    name: &str,
+    verbose: u8,
+) -> Result<bool> {
+    let changed = write_if_changed(hook_path, content, name, verbose)?;
+    set_executable_permissions(hook_path)?;
+    Ok(changed)
 }
 
 /// Write hook file if missing or outdated, return true if changed
@@ -122,37 +162,7 @@ pub(crate) fn prepare_hook_paths() -> Result<(PathBuf, PathBuf)> {
 pub(crate) fn ensure_hook_installed(hook_path: &Path, verbose: u8) -> Result<bool> {
     let (mycelium_bin, jq_bin) = resolve_hook_dependencies();
     let rendered_hook = render_rewrite_hook(mycelium_bin.as_deref(), jq_bin.as_deref());
-
-    let changed = if hook_path.exists() {
-        let existing = fs::read_to_string(hook_path)
-            .with_context(|| format!("Failed to read existing hook: {}", hook_path.display()))?;
-
-        if existing == rendered_hook {
-            if verbose > 0 {
-                eprintln!("Hook already up to date: {}", hook_path.display());
-            }
-            false
-        } else {
-            fs::write(hook_path, rendered_hook)
-                .with_context(|| format!("Failed to write hook to {}", hook_path.display()))?;
-            if verbose > 0 {
-                eprintln!("Updated hook: {}", hook_path.display());
-            }
-            true
-        }
-    } else {
-        fs::write(hook_path, rendered_hook)
-            .with_context(|| format!("Failed to write hook to {}", hook_path.display()))?;
-        if verbose > 0 {
-            eprintln!("Created hook: {}", hook_path.display());
-        }
-        true
-    };
-
-    // Set executable permissions
-    use std::os::unix::fs::PermissionsExt;
-    fs::set_permissions(hook_path, fs::Permissions::from_mode(0o755))
-        .with_context(|| format!("Failed to set hook permissions: {}", hook_path.display()))?;
+    let changed = ensure_static_hook_installed(hook_path, &rendered_hook, "hook", verbose)?;
 
     // Store SHA-256 hash for runtime integrity verification.
     // Always store (idempotent) to ensure baseline exists even for
@@ -162,6 +172,30 @@ pub(crate) fn ensure_hook_installed(hook_path: &Path, verbose: u8) -> Result<boo
         .with_context(|| format!("Failed to store integrity hash for {}", hook_path.display()))?;
     if verbose > 0 && changed {
         eprintln!("Stored integrity hash for hook");
+    }
+
+    Ok(changed)
+}
+
+/// Write session summary hook file if missing or outdated, return true if changed
+#[cfg(unix)]
+pub(crate) fn ensure_session_summary_hook_installed(hook_path: &Path, verbose: u8) -> Result<bool> {
+    let changed = ensure_static_hook_installed(
+        hook_path,
+        SESSION_SUMMARY_HOOK,
+        "session-summary hook",
+        verbose,
+    )?;
+
+    use crate::integrity;
+    integrity::store_hash(hook_path).with_context(|| {
+        format!(
+            "Failed to store integrity hash for session hook {}",
+            hook_path.display()
+        )
+    })?;
+    if verbose > 0 {
+        eprintln!("Stored integrity hash for session hook");
     }
 
     Ok(changed)
@@ -254,6 +288,14 @@ mod tests {
             jq_pos < mycelium_delegate_pos && mycelium_guard_pos < mycelium_delegate_pos,
             "Guards must appear before mycelium rewrite delegation"
         );
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_session_summary_hook_is_posix_sh() {
+        assert!(SESSION_SUMMARY_HOOK.starts_with("#!/bin/sh"));
+        assert!(!SESSION_SUMMARY_HOOK.contains("[["));
+        assert!(!SESSION_SUMMARY_HOOK.contains("local "));
     }
 
     #[test]

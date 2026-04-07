@@ -136,7 +136,8 @@ If you want to keep Mycelium but remove all hooks (command rewriting, error capt
 ```bash
 # Remove hook files
 rm -rf ~/.claude/hooks/mycelium-rewrite.sh
-rm -rf ~/.claude/hooks/session-summary.sh
+rm -rf ~/.claude/hooks/mycelium-session-summary.sh
+rm -rf ~/.claude/hooks/session-summary.sh  # legacy installs
 rm -rf ~/.claude/hooks/basidiocarp/
 
 # Remove hooks from settings.json manually
@@ -171,7 +172,7 @@ cp ~/.claude/settings.json ~/.claude/settings.json.backup
 
 # Edit and remove:
 # 1. All "PreToolUse" hooks (mycelium-rewrite.sh)
-# 2. All "Stop" hooks (session-summary.sh)
+# 2. All "Stop" hooks (mycelium-session-summary.sh, or legacy session-summary.sh)
 # 3. All "PostToolUse" hooks (capture-*.js)
 
 nano ~/.claude/settings.json
@@ -202,7 +203,7 @@ Example of what to remove:
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/alice/.claude/hooks/session-summary.sh"
+            "command": "/Users/alice/.claude/hooks/mycelium-session-summary.sh"
           }
         ]
       }
@@ -323,7 +324,8 @@ rm -rf ~/.rhizome
 rm -rf ~/.config/rhizome
 
 # Hooks
-rm -rf ~/.claude/hooks/session-summary.sh
+rm -rf ~/.claude/hooks/mycelium-session-summary.sh
+rm -rf ~/.claude/hooks/session-summary.sh  # legacy installs
 rm -rf ~/.claude/hooks/basidiocarp/
 ```
 
