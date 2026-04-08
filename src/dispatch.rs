@@ -4,6 +4,8 @@ mod families;
 mod routes;
 
 use anyhow::Result;
+use spore::logging::{SpanContext, subprocess_span, workflow_span};
+use tracing::warn;
 
 use crate::commands::{Cli, MYCELIUM_META_COMMANDS};
 use crate::{integrity, plugin, tracking, utils};
@@ -25,37 +27,71 @@ pub fn run_fallback(parse_error: clap::Error) -> Result<()> {
     let raw_command = args.join(" ");
     let error_message = utils::strip_ansi(&parse_error.to_string());
     let timer = tracking::TimedExecution::start();
+    let context = fallback_span_context(&args[0]);
+    let _workflow_span = workflow_span("fallback_dispatch", &context).entered();
 
     if let Some(plugin_path) = plugin::find_plugin(&args[0]) {
-        match std::process::Command::new(&args[0])
-            .args(&args[1..])
-            .output()
-        {
+        let output = {
+            let _subprocess_span = subprocess_span(&raw_command, &context).entered();
+            std::process::Command::new(&args[0])
+                .args(&args[1..])
+                .output()
+        };
+        match output {
             Ok(raw_output) => {
-                let raw = String::from_utf8_lossy(&raw_output.stdout).to_string();
-                match plugin::run_plugin(&plugin_path, &raw) {
-                    Ok(filtered) => {
-                        timer.track(
-                            &raw_command,
-                            &format!("mycelium plugin: {}", raw_command),
-                            &raw,
-                            &filtered,
-                        );
-                        tracking::record_parse_failure_silent(
-                            &raw_command,
-                            &error_message,
-                            true,
-                            None,
-                        );
-                        print!("{}", filtered);
-                        return Ok(());
+                let stdout = String::from_utf8_lossy(&raw_output.stdout).to_string();
+                let stderr = String::from_utf8_lossy(&raw_output.stderr).to_string();
+
+                if raw_output.status.success() {
+                    match plugin::run_plugin(&plugin_path, &stdout) {
+                        Ok(filtered) => {
+                            timer.track(
+                                &raw_command,
+                                &format!("mycelium plugin: {}", raw_command),
+                                &stdout,
+                                &filtered,
+                            );
+                            tracking::record_parse_failure_silent(
+                                &raw_command,
+                                &error_message,
+                                true,
+                                None,
+                            );
+                            print!("{filtered}");
+                            if !stderr.is_empty() {
+                                eprint!("{stderr}");
+                            }
+                            return Ok(());
+                        }
+                        Err(error) => {
+                            warn!(
+                                plugin = %plugin_path.display(),
+                                "Plugin filtering failed; replaying captured raw output: {error}"
+                            );
+                            eprintln!("[mycelium: plugin {:?} failed: {}]", plugin_path, error);
+                        }
                     }
-                    Err(error) => {
-                        eprintln!("[mycelium: plugin {:?} failed: {}]", plugin_path, error);
-                    }
+                } else {
+                    warn!(
+                        plugin = %plugin_path.display(),
+                        exit_code = raw_output.status.code().unwrap_or(-1),
+                        "Skipping plugin because the underlying command exited non-zero"
+                    );
                 }
+
+                timer.track_passthrough(
+                    &raw_command,
+                    &format!("mycelium fallback: {}", raw_command),
+                );
+                tracking::record_parse_failure_silent(&raw_command, &error_message, true, None);
+                replay_captured_output(&stdout, &stderr);
+                if !raw_output.status.success() {
+                    std::process::exit(raw_output.status.code().unwrap_or(1));
+                }
+                return Ok(());
             }
             Err(error) => {
+                warn!("Plugin fallback capture failed: {error}");
                 eprintln!("[mycelium: plugin raw capture failed: {}]", error);
             }
         }
@@ -84,6 +120,23 @@ pub fn run_fallback(parse_error: clap::Error) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn fallback_span_context(command: &str) -> SpanContext {
+    let context = SpanContext::for_app("mycelium").with_tool(command.to_string());
+    match std::env::current_dir() {
+        Ok(path) => context.with_workspace_root(path.display().to_string()),
+        Err(_) => context,
+    }
+}
+
+fn replay_captured_output(stdout: &str, stderr: &str) {
+    if !stdout.is_empty() {
+        print!("{stdout}");
+    }
+    if !stderr.is_empty() {
+        eprint!("{stderr}");
+    }
 }
 
 /// Dispatch a parsed CLI command to its handler module.

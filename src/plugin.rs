@@ -3,6 +3,9 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::process::Stdio;
+
+use spore::logging::{SpanContext, subprocess_span, tool_span};
 
 fn default_true() -> bool {
     true
@@ -111,15 +114,16 @@ fn find_plugin_in_dir_with_config(config: &PluginConfig, command: &str) -> Optio
 /// A 10-second timeout kills the plugin process if it hangs.
 pub fn run_plugin(plugin_path: &Path, raw_output: &str) -> Result<String> {
     use std::io::Write;
-    use std::process::Stdio;
     use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, Ordering};
 
+    let context = span_context(plugin_path);
+    let _tool_span = tool_span("plugin_filter", &context).entered();
     let mut command = plugin_command(plugin_path);
     let mut child = command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
+        .stderr(Stdio::piped())
         .spawn()
         .context("Failed to spawn plugin")?;
 
@@ -143,17 +147,49 @@ pub fn run_plugin(plugin_path: &Path, raw_output: &str) -> Result<String> {
         }
     });
 
-    let output = child
-        .wait_with_output()
-        .context("Failed to wait for plugin")?;
+    let output = {
+        let _subprocess_span =
+            subprocess_span(&plugin_path.display().to_string(), &context).entered();
+        child
+            .wait_with_output()
+            .context("Failed to wait for plugin")?
+    };
 
     // Signal the timeout thread that the plugin finished normally
     cancel.store(true, Ordering::Relaxed);
 
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    if !stderr.is_empty() {
+        eprint!("{stderr}");
+    }
+
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     } else {
-        anyhow::bail!("Plugin exited with non-zero status: {}", output.status)
+        let stderr = stderr.trim();
+        if stderr.is_empty() {
+            anyhow::bail!("Plugin exited with non-zero status: {}", output.status)
+        } else {
+            anyhow::bail!(
+                "Plugin exited with non-zero status {}: {}",
+                output.status,
+                stderr
+            )
+        }
+    }
+}
+
+fn span_context(plugin_path: &Path) -> SpanContext {
+    let context = SpanContext::for_app("mycelium").with_tool(
+        plugin_path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string(),
+    );
+    match std::env::current_dir() {
+        Ok(path) => context.with_workspace_root(path.display().to_string()),
+        Err(_) => context,
     }
 }
 

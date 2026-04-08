@@ -5,6 +5,8 @@
 
 use std::time::Instant;
 
+use spore::logging::{SpanContext, tool_span};
+
 use super::{Tracker, estimate_tokens};
 
 /// Helper for timing command execution and tracking results.
@@ -73,6 +75,7 @@ impl TimedExecution {
     /// timer.track("ls -la", "mycelium ls", input, output);
     /// ```
     pub fn track(&self, original_cmd: &str, mycelium_cmd: &str, input: &str, output: &str) {
+        let _tool_span = tool_span("tracking_record", &span_context(original_cmd)).entered();
         let elapsed_ms = self.start.elapsed().as_millis() as u64;
         let input_tokens = estimate_tokens(input);
         let output_tokens = estimate_tokens(output);
@@ -109,6 +112,8 @@ impl TimedExecution {
     /// timer.track_passthrough("git tag", "mycelium git tag");
     /// ```
     pub fn track_passthrough(&self, original_cmd: &str, mycelium_cmd: &str) {
+        let _tool_span =
+            tool_span("tracking_record_passthrough", &span_context(original_cmd)).entered();
         let elapsed_ms = self.start.elapsed().as_millis() as u64;
         if let Ok(tracker) = Tracker::new() {
             let _ = tracker.record_passthrough(original_cmd, mycelium_cmd, elapsed_ms);
@@ -134,6 +139,8 @@ impl TimedExecution {
         parse_tier: u8,
         format_mode: &str,
     ) {
+        let _tool_span =
+            tool_span("tracking_record_parse_info", &span_context(original_cmd)).entered();
         let elapsed_ms = self.start.elapsed().as_millis() as u64;
         let input_tokens = estimate_tokens(input);
         let output_tokens = estimate_tokens(output);
@@ -149,5 +156,13 @@ impl TimedExecution {
                 format_mode,
             );
         }
+    }
+}
+
+fn span_context(command: &str) -> SpanContext {
+    let context = SpanContext::for_app("mycelium").with_tool(command.to_string());
+    match std::env::current_dir() {
+        Ok(path) => context.with_workspace_root(path.display().to_string()),
+        Err(_) => context,
     }
 }

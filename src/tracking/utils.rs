@@ -8,6 +8,7 @@ use std::fmt;
 use std::path::PathBuf;
 
 use anyhow::Result;
+use spore::logging::{SpanContext, tool_span};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DbPathSource {
@@ -154,6 +155,7 @@ pub fn record_parse_failure_silent(
     succeeded: bool,
     tracker: Option<&super::Tracker>,
 ) {
+    let _tool_span = tool_span("tracking_parse_failure", &span_context(raw_command)).entered();
     let owned_tracker;
     let tracker_ref = if let Some(t) = tracker {
         t
@@ -168,6 +170,14 @@ pub fn record_parse_failure_silent(
     };
 
     let _ = tracker_ref.record_parse_failure(raw_command, error_message, succeeded);
+}
+
+fn span_context(command: &str) -> SpanContext {
+    let context = SpanContext::for_app("mycelium").with_tool(command.to_string());
+    match std::env::current_dir() {
+        Ok(path) => context.with_workspace_root(path.display().to_string()),
+        Err(_) => context,
+    }
 }
 
 /// Estimate token count from text using the ~4 chars = 1 token heuristic.

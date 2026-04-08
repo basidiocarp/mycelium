@@ -8,7 +8,10 @@ Mycelium plugins are user-defined filter scripts that extend mycelium to support
 Command runs → raw output captured → piped to plugin stdin → plugin stdout printed
 ```
 
-When mycelium encounters a command with no built-in handler, it checks the plugin directory for a matching script. If found, the raw command output is piped through the plugin before reaching the LLM.
+When mycelium encounters a command with no built-in handler, it checks the
+plugin directory for a matching script. If found, Mycelium executes the
+underlying command once, pipes the captured stdout through the plugin, and
+replays the original stdout/stderr if the plugin fails.
 
 ## Quick Start
 
@@ -82,9 +85,10 @@ The first match that passes all checks is used.
 |--------|----------|
 | **Input** | Raw command output piped to stdin |
 | **Output** | Filtered output written to stdout |
-| **Stderr** | Inherited — plugin stderr prints to the terminal |
-| **Exit code 0** | Success — plugin output is used |
-| **Exit code != 0** | Failure — mycelium falls back to raw output |
+| **Stderr** | Plugin stderr is forwarded to the terminal on stderr |
+| **Exit code 0** | Success — plugin output is used and original command stderr is replayed |
+| **Exit code != 0** | Failure — mycelium replays the already-captured raw stdout/stderr without rerunning the command |
+| **Original command exit != 0** | Plugin is skipped and the original stdout/stderr are replayed once |
 | **Timeout** | 10 seconds — plugin is killed if it exceeds this |
 | **Empty stdin** | Plugin must handle gracefully (exit 0, no output) |
 
@@ -94,7 +98,8 @@ Plugins must pass two security checks on Unix systems:
 
 1. **Not world-writable** — file permissions must not include the world-write bit (`o+w`). A plugin with mode `0777` is rejected; `0755` is accepted.
 
-2. **Owned by current user** — the file's UID must match the `UID` environment variable. If `UID` is not set, this check is skipped and only the world-writable check applies.
+2. **Owned by current user** — the file's UID must match the current process
+   user ID returned by `getuid(2)`.
 
 These checks prevent execution of plugins that may have been tampered with by other users on shared systems.
 
@@ -243,7 +248,7 @@ cat ~/.config/mycelium/config.toml
 | Plugin not found | Plugins disabled | Set `enabled = true` in config.toml |
 | Plugin rejected | World-writable | `chmod 755 plugin.sh` (not `777`) |
 | Plugin killed | Exceeded 10s timeout | Optimize filter logic or use simpler processing |
-| Fallback to raw | Plugin exited non-zero | Check stderr output, fix script errors |
+| Fallback to raw | Plugin exited non-zero | Check plugin stderr output; Mycelium replays the already-captured raw command output without rerunning the command |
 | Plugin hangs | Reading stdin with no input | Add `INPUT=$(cat)` at top, don't use interactive reads |
 
 ## Configuration Reference

@@ -11,8 +11,10 @@ use colored::Colorize;
 use serde::Deserialize;
 use serde_json::{Value, json};
 use spore::editors::{self, Editor};
+use spore::logging::{SpanContext, subprocess_span, tool_span, workflow_span};
 use spore::{Tool, discover, jsonrpc::Request};
 use toml::value::Table;
+use tracing::warn;
 
 static ONBOARD_CANCELLED: AtomicBool = AtomicBool::new(false);
 #[cfg(unix)]
@@ -96,6 +98,11 @@ pub(super) fn run(global: bool, verbose: u8) -> Result<()> {
     let setup_plan = host_setup_plan(global);
 
     let current_dir = std::env::current_dir().context("Failed to determine current directory")?;
+    let _workflow_span = workflow_span(
+        "interactive_onboarding",
+        &span_context("interactive_onboarding", Some(&current_dir)),
+    )
+    .entered();
     let hyphae = detect_binary_tool(Tool::Hyphae, "Hyphae");
     let rhizome = detect_binary_tool(Tool::Rhizome, "Rhizome");
     let cap = detect_cap(&current_dir);
@@ -492,14 +499,19 @@ fn fetch_rhizome_onboard() -> Result<RhizomeOnboardInfo> {
 
 fn run_rhizome_summary(project_root: &Path) -> Result<String> {
     let info = discover(Tool::Rhizome).context("Rhizome binary not found")?;
-    let output = Command::new(&info.binary_path)
-        .arg("summarize")
-        .arg("--project")
-        .arg(project_root)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .output()
-        .context("Failed to execute rhizome summarize")?;
+    let context = span_context("rhizome_summary", Some(project_root));
+    let _tool_span = tool_span("rhizome_summary", &context).entered();
+    let output = {
+        let _subprocess_span = subprocess_span("rhizome summarize --project", &context).entered();
+        Command::new(&info.binary_path)
+            .arg("summarize")
+            .arg("--project")
+            .arg(project_root)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+            .context("Failed to execute rhizome summarize")?
+    };
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -521,6 +533,9 @@ fn call_tool_text(
     timeout: Duration,
 ) -> Result<String> {
     let info = discover(tool).ok_or_else(|| anyhow!("{tool_name} requires {:?} on PATH", tool))?;
+    let workspace_root = std::env::current_dir().ok();
+    let context = span_context(tool_name, workspace_root.as_deref());
+    let _tool_span = tool_span(tool_name, &context).entered();
 
     let request = Request::new(
         "tools/call",
@@ -532,40 +547,58 @@ fn call_tool_text(
     let request_str =
         serde_json::to_string(&request).context("Failed to serialize JSON-RPC request")? + "\n";
 
-    let mut child = Command::new(&info.binary_path)
-        .args(serve_args)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .with_context(|| format!("Failed to spawn {}", info.binary_path.display()))?;
-
-    if let Some(mut stdin) = child.stdin.take() {
-        stdin
-            .write_all(request_str.as_bytes())
-            .context("Failed to write JSON-RPC request")?;
-    }
-
     let (tx, rx) = std::sync::mpsc::channel();
-    let mut stdout = child
-        .stdout
-        .take()
-        .context("Failed to capture MCP stdout")?;
+    let binary_path = info.binary_path.clone();
+    let serve_args = serve_args
+        .iter()
+        .map(|arg| (*arg).to_string())
+        .collect::<Vec<_>>();
+    let subprocess_label = format!("{} {}", binary_path.display(), serve_args.join(" "));
     std::thread::spawn(move || {
-        let mut response = String::new();
-        let _ = std::io::Read::read_to_string(&mut stdout, &mut response);
-        let _ = tx.send(response);
+        let result = (|| -> Result<std::process::Output> {
+            let mut child = Command::new(&binary_path)
+                .args(&serve_args)
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .with_context(|| format!("Failed to spawn {}", binary_path.display()))?;
+
+            if let Some(mut stdin) = child.stdin.take() {
+                stdin
+                    .write_all(request_str.as_bytes())
+                    .context("Failed to write JSON-RPC request")?;
+            }
+
+            child
+                .wait_with_output()
+                .with_context(|| format!("Failed to wait for {}", binary_path.display()))
+        })();
+        let _ = tx.send(result);
     });
 
-    let response = rx
-        .recv_timeout(timeout)
-        .with_context(|| format!("{tool_name} timed out"))?;
-    let _ = child.wait();
+    let output = {
+        let _subprocess_span = subprocess_span(&subprocess_label, &context).entered();
+        rx.recv_timeout(timeout)
+            .with_context(|| format!("{tool_name} timed out"))??
+    };
 
-    parse_tool_response(&response)
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    if !output.status.success() {
+        if !stderr.is_empty() {
+            warn!(tool_name, "MCP subprocess exited non-zero: {stderr}");
+        }
+        if stderr.is_empty() {
+            anyhow::bail!("{tool_name} exited non-zero");
+        }
+        anyhow::bail!("{tool_name} exited non-zero: {stderr}");
+    }
+
+    let response = String::from_utf8_lossy(&output.stdout).to_string();
+    parse_tool_response(tool_name, &response, &stderr)
 }
 
-fn parse_tool_response(response: &str) -> Result<String> {
+fn parse_tool_response(tool_name: &str, response: &str, stderr: &str) -> Result<String> {
     for line in response.lines() {
         let trimmed = line.trim();
         if trimmed.is_empty() {
@@ -609,7 +642,18 @@ fn parse_tool_response(response: &str) -> Result<String> {
         }
     }
 
-    anyhow::bail!("No valid JSON-RPC response received")
+    if !stderr.trim().is_empty() {
+        anyhow::bail!("No valid JSON-RPC response received from {tool_name}: {stderr}");
+    }
+    anyhow::bail!("No valid JSON-RPC response received from {tool_name}")
+}
+
+fn span_context(operation: &str, workspace_root: Option<&Path>) -> SpanContext {
+    let context = SpanContext::for_app("mycelium").with_tool(operation.to_string());
+    match workspace_root {
+        Some(path) => context.with_workspace_root(path.display().to_string()),
+        None => context,
+    }
 }
 
 fn prompt_yes_no(prompt: &str, default_yes: bool) -> Result<PromptDecision> {

@@ -9,6 +9,23 @@ All notable changes to Mycelium are documented in this file.
 - **Changelog format**: Release headings and entry structure now follow the
   shared ecosystem changelog template.
 
+## [0.8.9] - 2026-04-08
+
+### Fixed
+
+- **Safe plugin fallback semantics**: plugin-backed fallback commands now run
+  the underlying command once, replay captured stdout/stderr on plugin failure,
+  and no longer risk masking real failures or executing side-effecting commands
+  twice.
+- **Broader shared tracing coverage**: Rhizome calls, onboarding MCP flows,
+  fallback dispatch, and tracking writes now enter shared workflow, tool, or
+  subprocess spans instead of stopping at startup and Hyphae chunking.
+- **Better subprocess diagnostics**: onboarding and plugin/runtime subprocesses
+  preserve child stderr at useful failure points instead of silently dropping it.
+- **Plugin docs now match the implementation**: the plugin contract and command
+  reference now describe the real ownership checks, shipped-template behavior,
+  and raw replay semantics.
+
 ## [0.8.8] - 2026-04-08
 
 ### Changed

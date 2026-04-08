@@ -1069,4 +1069,4 @@ Compares Claude Code spend with Mycelium savings. `cc-economics` remains an alia
 | `mycelium proxy <command...>` | Run a command raw while still tracking usage |
 | `mycelium invoke <command...>` | Resolve and execute a shell command through rewrite logic |
 | `mycelium benchmark [--ci]` | Measure savings across command fixtures |
-| `mycelium plugin list|install` | Manage shipped filter plugins |
+| `mycelium plugin list|install` | Inspect the plugin directory and install shipped templates when a release includes them |

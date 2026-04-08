@@ -44,7 +44,11 @@ The code filter (`filter.rs`) preserves actionable comments (TODO, FIXME, HACK, 
 
 ### Fallback mechanism
 
-If mycelium does not recognize a subcommand, it executes the raw command unchanged and records the event in the tracking database.
+If mycelium does not recognize a subcommand, it records the parse miss and
+falls back to the raw command path. When a matching plugin exists, Mycelium
+captures the raw command once, runs the plugin against that captured stdout,
+and replays the original stdout/stderr if the plugin declines or fails. It
+does not rerun side-effecting commands just because a plugin failed.
 
 ---
 
