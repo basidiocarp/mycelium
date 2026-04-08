@@ -56,6 +56,7 @@ fn run_mycelium(home: &Path, args: &[&str]) -> std::process::Output {
     Command::new(binary_path())
         .args(args)
         .env("HOME", home)
+        .env("XDG_CONFIG_HOME", config_dir(home))
         .current_dir(home)
         .output()
         .expect("run mycelium")
