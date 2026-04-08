@@ -40,7 +40,9 @@ that gives a better result than dumping raw text.
 | **[volva](https://github.com/basidiocarp/volva)** | Execution-host runtime layer |
 
 > **Boundary:** `mycelium` owns token optimization, command filtering, and its
-> local guidance surfaces. `stipe` owns onboarding and shared repair.
+> local guidance surfaces. `stipe` owns onboarding and shared repair. `hyphae`
+> and `rhizome` stay isolated behind their own adapters; `dispatch` stays a
+> router, not a policy dump.
 
 ---
 
@@ -125,7 +127,8 @@ large code     ─►    ask Rhizome          ─►     structural summary
 
 ```text
 mycelium (single binary)
-├── src/parser/       command parsing and dispatch
+├── src/dispatch.rs   routing shell and fallback orchestration
+├── src/parser/       command parsing and dispatch helpers
 ├── src/gain/         savings and economics output
 ├── src/init/         setup and uninstall flows
 ├── src/tracking/     capture and session-related tracking
@@ -135,6 +138,11 @@ mycelium (single binary)
 ├── src/js/           JavaScript and Node-oriented filters
 └── tests/            fixture and snapshot coverage
 ```
+
+One package does not mean one file. The router stays intentionally thin, the
+command-family modules own their own behavior, and sibling integrations such as
+Hyphae and Rhizome remain in their dedicated surfaces instead of being folded
+into dispatch.
 
 ---
 

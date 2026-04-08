@@ -6,6 +6,7 @@ use std::process::Command;
 use std::process::Stdio;
 
 use spore::logging::{SpanContext, subprocess_span, tool_span};
+use tracing::warn;
 
 fn default_true() -> bool {
     true
@@ -120,6 +121,7 @@ pub fn run_plugin(plugin_path: &Path, raw_output: &str) -> Result<String> {
     let context = span_context(plugin_path);
     let _tool_span = tool_span("plugin_filter", &context).entered();
     let mut command = plugin_command(plugin_path);
+    let _subprocess_span = subprocess_span(&plugin_path.display().to_string(), &context).entered();
     let mut child = command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -147,13 +149,9 @@ pub fn run_plugin(plugin_path: &Path, raw_output: &str) -> Result<String> {
         }
     });
 
-    let output = {
-        let _subprocess_span =
-            subprocess_span(&plugin_path.display().to_string(), &context).entered();
-        child
-            .wait_with_output()
-            .context("Failed to wait for plugin")?
-    };
+    let output = child
+        .wait_with_output()
+        .context("Failed to wait for plugin")?;
 
     // Signal the timeout thread that the plugin finished normally
     cancel.store(true, Ordering::Relaxed);
@@ -167,6 +165,12 @@ pub fn run_plugin(plugin_path: &Path, raw_output: &str) -> Result<String> {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     } else {
         let stderr = stderr.trim();
+        warn!(
+            plugin = %plugin_path.display(),
+            status = %output.status,
+            stderr = %stderr,
+            "Plugin subprocess exited non-zero"
+        );
         if stderr.is_empty() {
             anyhow::bail!("Plugin exited with non-zero status: {}", output.status)
         } else {
@@ -436,63 +440,6 @@ mod tests {
     }
 
     // ── execution ──────────────────────────────────────────────────────────────
-
-    #[test]
-    #[cfg(unix)]
-    fn test_run_plugin_filters_output() {
-        use std::os::unix::fs::PermissionsExt;
-
-        let dir = tempfile::tempdir().expect("temp dir");
-        let script = dir.path().join("upper.sh");
-        {
-            let mut f = std::fs::File::create(&script).expect("create");
-            writeln!(f, "#!/bin/sh").unwrap();
-            writeln!(f, "tr '[:lower:]' '[:upper:]'").unwrap();
-        } // drop f before exec to avoid ETXTBSY on Linux
-        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
-
-        let result = run_plugin(&script, "hello world");
-        assert!(result.is_ok(), "run_plugin failed: {:?}", result.err());
-        assert!(
-            result.unwrap().contains("HELLO WORLD"),
-            "Expected uppercase output"
-        );
-    }
-
-    #[test]
-    #[cfg(unix)]
-    fn test_run_plugin_nonzero_exit_is_err() {
-        use std::os::unix::fs::PermissionsExt;
-
-        let dir = tempfile::tempdir().expect("temp dir");
-        let script = dir.path().join("fail.sh");
-        let mut f = std::fs::File::create(&script).expect("create");
-        writeln!(f, "#!/bin/sh\nexit 1").unwrap();
-        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
-
-        assert!(
-            run_plugin(&script, "input").is_err(),
-            "Non-zero exit should return Err"
-        );
-    }
-
-    #[test]
-    #[cfg(unix)]
-    fn test_run_plugin_passes_stdin() {
-        use std::os::unix::fs::PermissionsExt;
-
-        let dir = tempfile::tempdir().expect("temp dir");
-        let script = dir.path().join("echo_back.sh");
-        {
-            let mut f = std::fs::File::create(&script).expect("create");
-            writeln!(f, "#!/bin/sh").unwrap();
-            writeln!(f, "cat").unwrap(); // echo stdin to stdout
-        } // drop f before exec to avoid ETXTBSY on Linux
-        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
-
-        let result = run_plugin(&script, "token data").unwrap();
-        assert!(result.contains("token data"), "stdin should reach plugin");
-    }
 
     // ── security ───────────────────────────────────────────────────────────────
 

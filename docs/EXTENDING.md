@@ -92,6 +92,10 @@ mod tests {
 }
 ```
 
+Keep orchestration in the owning module. `dispatch.rs` should stay focused on
+choosing the right command family or fallback path, while command modules own
+the real policy and transformation work.
+
 ---
 
 ## Adding a New Command
@@ -183,6 +187,9 @@ match cli.command {
 }
 ```
 
+Keep this match arm thin. If the command needs substantial policy, put that
+policy in the command module or a sibling adapter, not in dispatch.
+
 ### Step 6: Test Your Command
 
 ```bash
@@ -209,6 +216,9 @@ Update FEATURES.md or COMMANDS.md:
 - Savings: X-Y%
 - Used by: [workflow description]
 ```
+
+If the new behavior needs broad end-to-end coverage, add it under `tests/`
+instead of growing the hotspot module with a large inline behavior test.
 
 ---
 

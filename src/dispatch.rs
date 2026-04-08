@@ -4,7 +4,7 @@ mod families;
 mod routes;
 
 use anyhow::Result;
-use spore::logging::{SpanContext, subprocess_span, workflow_span};
+use spore::logging::{SpanContext, subprocess_span, tool_span, workflow_span};
 use tracing::warn;
 
 use crate::commands::{Cli, MYCELIUM_META_COMMANDS};
@@ -30,7 +30,12 @@ pub fn run_fallback(parse_error: clap::Error) -> Result<()> {
     let context = fallback_span_context(&args[0]);
     let _workflow_span = workflow_span("fallback_dispatch", &context).entered();
 
-    if let Some(plugin_path) = plugin::find_plugin(&args[0]) {
+    let plugin_path = {
+        let _tool_span = tool_span("plugin_discovery", &context).entered();
+        plugin::find_plugin(&args[0])
+    };
+
+    if let Some(plugin_path) = plugin_path {
         let output = {
             let _subprocess_span = subprocess_span(&raw_command, &context).entered();
             std::process::Command::new(&args[0])
@@ -66,6 +71,8 @@ pub fn run_fallback(parse_error: clap::Error) -> Result<()> {
                         Err(error) => {
                             warn!(
                                 plugin = %plugin_path.display(),
+                                status = %raw_output.status,
+                                stderr = %stderr.trim(),
                                 "Plugin filtering failed; replaying captured raw output: {error}"
                             );
                             eprintln!("[mycelium: plugin {:?} failed: {}]", plugin_path, error);
@@ -75,6 +82,7 @@ pub fn run_fallback(parse_error: clap::Error) -> Result<()> {
                     warn!(
                         plugin = %plugin_path.display(),
                         exit_code = raw_output.status.code().unwrap_or(-1),
+                        stderr = %stderr.trim(),
                         "Skipping plugin because the underlying command exited non-zero"
                     );
                 }
@@ -91,8 +99,13 @@ pub fn run_fallback(parse_error: clap::Error) -> Result<()> {
                 return Ok(());
             }
             Err(error) => {
-                warn!("Plugin fallback capture failed: {error}");
+                warn!(
+                    plugin = %plugin_path.display(),
+                    "Plugin fallback capture failed; not rerunning command: {error}"
+                );
+                tracking::record_parse_failure_silent(&raw_command, &error_message, false, None);
                 eprintln!("[mycelium: plugin raw capture failed: {}]", error);
+                parse_error.exit();
             }
         }
     }

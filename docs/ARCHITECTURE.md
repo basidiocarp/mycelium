@@ -6,6 +6,10 @@ lower-token summaries while preserving command behavior and exit codes. This
 document covers the routing pipeline, parser and filter seams, and the parts of
 the system that affect extension work.
 
+One package does not mean one file. The router is deliberately small, the
+command-family modules own the concrete behavior, and sibling integrations stay
+behind dedicated adapters so they do not become hidden policy in dispatch.
+
 ---
 
 ## Design Principles
@@ -32,6 +36,9 @@ the system that affect extension work.
 - Tracking and savings analytics
 - Rewrite guidance and local init flows
 - Optional routing of oversized output to sibling tools
+
+Dispatch should stay a routing layer, not the place where Hyphae, Rhizome, or
+other integration policy is invented.
 
 ### Hyphae owns
 
@@ -68,7 +75,8 @@ src/
 ```
 
 Mycelium compiles into one binary, but the internal shape is intentionally
-modular because command families differ sharply in output style.
+modular because command families differ sharply in output style. The router
+remains a hotspot to protect, not a place to accumulate new policy.
 
 - **`dispatch.rs`**: The traffic director. Every parsed command lands here
   before it reaches a family-specific handler.
@@ -172,6 +180,10 @@ File: `src/filter.rs` and `src/parser/`
 2. Route it through `dispatch.rs`.
 3. Implement the handler and, if needed, an `OutputParser`.
 4. Add token-tracking coverage and a failure-mode test before calling it done.
+
+If the new behavior is large enough to obscure the router or adapter module,
+move the higher-level regression coverage into `tests/` instead of keeping it
+inline with the hotspot.
 
 ---
 
