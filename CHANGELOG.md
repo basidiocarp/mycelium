@@ -9,6 +9,24 @@ All notable changes to Mycelium are documented in this file.
 - **Changelog format**: Release headings and entry structure now follow the
   shared ecosystem changelog template.
 
+## [0.8.10] - 2026-04-08
+
+### Changed
+
+- **Foundation alignment**: README, architecture notes, plugin docs, and
+  command guidance now describe Mycelium's internal module boundaries and
+  sibling-tool responsibilities more explicitly.
+- **Boundary verification**: Added foundation alignment coverage for dispatch,
+  tracking, and integration-layer structure.
+
+### Fixed
+
+- **Plugin fallback safety**: fallback commands keep raw command execution
+  single-shot and preserve stderr and exit status on plugin failure.
+- **Tracing depth**: onboarding, Rhizome, plugin, and tracking paths now carry
+  the shared workflow and subprocess context deeper into the touched runtime
+  boundaries.
+
 ## [0.8.9] - 2026-04-08
 
 ### Fixed
