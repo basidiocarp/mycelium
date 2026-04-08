@@ -12,7 +12,9 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 use std::time::Duration;
 
+use spore::logging::{SpanContext, subprocess_span, tool_span};
 use spore::{EcosystemError, McpClient, Tool};
+use tracing::{debug, warn};
 
 const COMMAND_OUTPUT_SCHEMA_VERSION: &str = "1.0";
 
@@ -40,6 +42,14 @@ pub(crate) struct ProjectIdentity {
 /// calls. If the subprocess crashes, a new one is spawned on the next call.
 static HYPHAE_PROCESS: Mutex<Option<McpClient>> = Mutex::new(None);
 
+fn span_context() -> SpanContext {
+    let context = SpanContext::for_app("mycelium").with_tool("hyphae_store_command_output");
+    match std::env::current_dir() {
+        Ok(path) => context.with_workspace_root(path.display().to_string()),
+        Err(_) => context,
+    }
+}
+
 /// Get or establish the persistent Hyphae connection.
 ///
 /// Checks if a connection exists and is alive. If not, attempts to create a new
@@ -53,16 +63,20 @@ fn get_or_connect() -> Result<MutexGuard<'static, Option<McpClient>>> {
     if let Some(client) = guard.as_mut()
         && client.is_alive()
     {
+        debug!("Reusing live hyphae MCP subprocess");
         return Ok(guard);
     }
 
+    let _spawn_span = subprocess_span("hyphae serve", &span_context()).entered();
     match McpClient::spawn(Tool::Hyphae, &["serve"]) {
         Ok(client) => {
+            debug!("Spawned hyphae MCP subprocess");
             *guard = Some(client.with_timeout(Duration::from_secs(10)));
             Ok(guard)
         }
         Err(e) => {
             *guard = None;
+            warn!("Failed to spawn hyphae MCP subprocess: {e}");
             Err(anyhow!(
                 "{}",
                 EcosystemError::new(Tool::Hyphae, "spawn_failed", "Failed to spawn hyphae serve")
@@ -95,6 +109,7 @@ pub fn store_output(command: &str, output: &str, project: Option<&str>) -> Resul
     let runtime_session_id = current_runtime_session_id();
 
     let arguments = build_arguments(command, output, &identity, runtime_session_id.as_deref());
+    let _tool_span = tool_span("hyphae_store_command_output", &span_context()).entered();
 
     let mut guard = get_or_connect()?;
 
@@ -106,6 +121,7 @@ pub fn store_output(command: &str, output: &str, project: Option<&str>) -> Resul
         Ok(response) => parse_response(&response),
         Err(e) => {
             *guard = None;
+            warn!("Hyphae tool call failed, dropping cached client: {e}");
             Err(anyhow!(
                 "{}",
                 EcosystemError::new(

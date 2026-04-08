@@ -71,10 +71,24 @@ mod wget_cmd;
 use anyhow::Result;
 use clap::Parser;
 use clap::error::ErrorKind;
+use spore::logging::{SpanContext, root_span};
+use tracing::Level;
 
 use commands::Cli;
 
 fn main() -> Result<()> {
+    spore::logging::init_app("mycelium", Level::WARN);
+    let workspace_root = std::env::current_dir()
+        .ok()
+        .map(|path| path.display().to_string());
+    let root_context = match workspace_root {
+        Some(workspace_root) => {
+            SpanContext::for_app("mycelium").with_workspace_root(workspace_root)
+        }
+        None => SpanContext::for_app("mycelium"),
+    };
+    let _runtime_span = root_span(&root_context).entered();
+
     let cli = match Cli::try_parse() {
         Ok(cli) => cli,
         Err(e) => {

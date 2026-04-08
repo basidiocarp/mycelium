@@ -158,6 +158,18 @@ cargo clippy
 cargo fmt
 ```
 
+## Logging
+
+Mycelium writes diagnostic logs to stderr through Spore's shared logger.
+
+- Use `MYCELIUM_LOG` for repo-specific logging, for example
+  `MYCELIUM_LOG=mycelium=debug mycelium git status`.
+- `RUST_LOG` still works as the wider Rust fallback, but `MYCELIUM_LOG` is the
+  intended operator knob for this binary.
+- Logging is separate from Mycelium's normal product behavior: filtered command
+  output still goes to stdout, while passthrough command stderr, warnings, and
+  audit-style diagnostics continue to use stderr as part of the CLI surface.
+
 ## License
 
 MIT

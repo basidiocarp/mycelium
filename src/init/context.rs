@@ -8,11 +8,13 @@
 use anyhow::{Context, Result, bail};
 use serde::Deserialize;
 use serde_json::{Value, json};
+use spore::logging::{SpanContext, subprocess_span, tool_span};
 use spore::{EcosystemError, Tool};
 use std::io::{Read, Write};
 use std::process::{Command, Stdio};
 use std::sync::mpsc;
 use std::time::Duration;
+use tracing::{debug, warn};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public API
@@ -54,7 +56,14 @@ fn call_gather_context(
     budget: u64,
     include: Option<&str>,
 ) -> Result<String> {
+    let span_context = match std::env::current_dir() {
+        Ok(path) => {
+            SpanContext::for_app("mycelium").with_workspace_root(path.display().to_string())
+        }
+        Err(_) => SpanContext::for_app("mycelium"),
+    };
     let arguments = build_gather_context_arguments(task, project, budget, include);
+    let _tool_span = tool_span("hyphae_gather_context", &span_context).entered();
 
     let request = spore::jsonrpc::Request::new(
         "tools/call",
@@ -68,6 +77,7 @@ fn call_gather_context(
         serde_json::to_string(&request).context("Failed to serialize request")? + "\n";
 
     // Spawn hyphae serve subprocess
+    let _spawn_span = subprocess_span("hyphae serve", &span_context).entered();
     let mut child = Command::new(hyphae_bin)
         .arg("serve")
         .stdin(Stdio::piped())
@@ -95,6 +105,7 @@ fn call_gather_context(
     let response = rx
         .recv_timeout(Duration::from_secs(10))
         .context("Hyphae response timed out after 10 seconds")?;
+    debug!("Received response from hyphae gather_context subprocess");
 
     let _ = child.wait();
 
@@ -144,6 +155,7 @@ fn parse_mcp_response(response: &str) -> Result<String> {
 
         if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
             if let Some(error) = json.get("error") {
+                warn!("Hyphae gather_context returned JSON-RPC error: {error}");
                 bail!(
                     "{}",
                     EcosystemError::new(
@@ -160,6 +172,7 @@ fn parse_mcp_response(response: &str) -> Result<String> {
                     let message = first_tool_result_text(result)
                         .filter(|text| !text.trim().is_empty())
                         .unwrap_or("Hyphae tool call failed");
+                    warn!("Hyphae gather_context returned tool error: {message}");
                     bail!(
                         "{}",
                         EcosystemError::new(

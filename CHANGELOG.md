@@ -9,6 +9,21 @@ All notable changes to Mycelium are documented in this file.
 - **Changelog format**: Release headings and entry structure now follow the
   shared ecosystem changelog template.
 
+## [0.8.8] - 2026-04-08
+
+### Changed
+
+- **Shared logging rollout**: Mycelium now initializes logging through Spore's
+  app-aware `MYCELIUM_LOG` path instead of relying on generic runtime setup.
+- **Workflow tracing**: Startup, Hyphae subprocess launches, and Hyphae-backed
+  tool calls now emit shared tracing spans with workspace-aware context for
+  faster failure localization.
+
+### Fixed
+
+- **Operator guidance**: Docs now distinguish debug logging on stderr from
+  Mycelium's normal command output, audit messages, and passthrough stderr.
+
 ## [0.8.7] - 2026-04-01
 
 ### Added
