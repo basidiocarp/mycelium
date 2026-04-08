@@ -6,13 +6,16 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
-  group: performance-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   benchmark:
-    uses: basidiocarp/.github/.github/workflows/rust-performance.yml@main
+    uses: basidiocarp/.github/.github/workflows/rust-performance.yml@ac464bb
     with:
       binary: mycelium
       max-size-mb: 12
