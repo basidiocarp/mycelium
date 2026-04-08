@@ -1297,7 +1297,12 @@ fn test_rewrite_find_name_glob_prefers_fd_glob() {
     let _guard = set_find_fd_rewrite_active_for_tests(true);
     assert_eq!(
         rewrite_command("find src -name 'test_*'", &[]),
-        Some("fd --glob 'test_*' src".into())
+        Some(crate::platform::render_shell_command(&[
+            "fd".to_string(),
+            "--glob".to_string(),
+            "test_*".to_string(),
+            "src".to_string(),
+        ]))
     );
 }
 
