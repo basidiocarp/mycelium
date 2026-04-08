@@ -37,7 +37,7 @@ tempfile = "3"
 sha2 = "0.10"
 ureq = "3"
 strip-ansi-escapes = "0.2"
-spore = { git = "https://github.com/basidiocarp/spore", tag = "v0.4.7" }
+spore = { git = "https://github.com/basidiocarp/spore", rev = "ca13188aa966ce4627d2a7f7c968a333d76a65c1" }
 libc = "0.2"
 which = "7"
 tree-sitter = "0.25"

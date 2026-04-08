@@ -53,10 +53,7 @@ pub(super) fn current_project_path_string() -> String {
 }
 
 pub(super) fn current_runtime_session_id() -> Option<String> {
-    std::env::var("CLAUDE_SESSION_ID")
-        .ok()
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty())
+    spore::claude_session_id()
 }
 
 fn canonicalize_project_path(path: String) -> String {

@@ -150,10 +150,7 @@ fn build_arguments(
 }
 
 fn current_runtime_session_id() -> Option<String> {
-    std::env::var("CLAUDE_SESSION_ID")
-        .ok()
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty())
+    spore::claude_session_id()
 }
 
 /// ─────────────────────────────────────────────────────────────────────────────
