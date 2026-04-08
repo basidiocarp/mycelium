@@ -5,6 +5,7 @@ use std::path::Path;
 use std::path::PathBuf;
 
 // Embedded slim Mycelium awareness instructions used by the Claude Code hook-based adapter.
+#[cfg_attr(not(unix), allow(dead_code))]
 pub(crate) const MYCELIUM_SLIM: &str = include_str!("../../hooks/mycelium-awareness.md");
 
 // Legacy full instructions for backward compatibility (--claude-md mode)
@@ -208,6 +209,7 @@ pub(crate) fn upsert_mycelium_block(content: &str, block: &str) -> (String, Myce
 }
 
 /// Patch CLAUDE.md: add @MYCELIUM.md, migrate if old block exists.
+#[cfg_attr(not(unix), allow(dead_code))]
 pub(crate) fn patch_claude_md(path: &Path, verbose: u8) -> Result<bool> {
     let mut content = if path.exists() {
         fs::read_to_string(path)?
