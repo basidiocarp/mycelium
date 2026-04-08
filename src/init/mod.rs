@@ -15,6 +15,7 @@ use claude_md::{
     MYCELIUM_INSTRUCTIONS, MyceliumBlockUpsert, remove_mycelium_block, resolve_claude_dir,
     upsert_mycelium_block,
 };
+#[cfg(unix)]
 use claude_md::{MYCELIUM_SLIM, patch_claude_md};
 #[cfg(unix)]
 use hook::{extract_hook_version, extract_quoted_assignment};
@@ -22,7 +23,6 @@ use hook::{extract_hook_version, extract_quoted_assignment};
 use hook::{prepare_hook_paths, prepare_session_summary_hook_path, write_if_changed};
 use json_patch::{clean_double_blanks, hook_already_present, remove_hook_from_settings};
 
-#[cfg(unix)]
 const LEGACY_SESSION_SUMMARY_HOOK_NAME: &str = "session-summary.sh";
 
 /// Main entry point for `mycelium init`

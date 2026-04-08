@@ -2,6 +2,7 @@ use std::fs;
 use std::io::{self, BufRead, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+#[cfg(unix)]
 use std::sync::Once;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
