@@ -17,6 +17,8 @@ use spore::{Tool, discover, jsonrpc::Request};
 use toml::value::Table;
 use tracing::warn;
 
+use super::hook::atomic_write;
+
 static ONBOARD_CANCELLED: AtomicBool = AtomicBool::new(false);
 #[cfg(unix)]
 static INSTALL_SIGINT_HANDLER: Once = Once::new();
@@ -365,7 +367,8 @@ fn configure_codex_mcp_servers(
 
     let (updated, result) = upsert_codex_servers(&existing, hyphae, rhizome)?;
     if updated != existing {
-        fs::write(&path, updated).with_context(|| format!("Failed to write {}", path.display()))?;
+        atomic_write(&path, &updated)
+            .with_context(|| format!("Failed to write {}", path.display()))?;
     }
 
     Ok(result)
