@@ -37,5 +37,9 @@ fn bench_rewrite_command(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(tooling_hot_paths, bench_classify_command, bench_rewrite_command);
+criterion_group!(
+    tooling_hot_paths,
+    bench_classify_command,
+    bench_rewrite_command
+);
 criterion_main!(tooling_hot_paths);
