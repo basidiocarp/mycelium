@@ -1,6 +1,6 @@
 # Mycelium Analytics, Hooks, and Configuration
 
-> Analytics commands, hook system, configuration options, and the tee system. For command reference, see [COMMANDS.md](COMMANDS.md).
+> Analytics commands, hook system, configuration options, and the tee system. For command reference, see [commands.md](commands.md).
 
 ---
 

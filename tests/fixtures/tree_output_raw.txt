@@ -51,7 +51,7 @@
 │   └── large_dataset.rs
 ├── docs
 │   ├── README.md
-│   ├── ARCHITECTURE.md
+│   ├── architecture.md
 │   ├── API.md
 │   ├── CONTRIBUTING.md
 │   ├── api

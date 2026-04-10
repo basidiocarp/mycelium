@@ -239,7 +239,7 @@ you would apply to CLI-facing contract tests.
 ## Key Dependencies
 
 - **`clap`** — command parsing across a very large CLI surface.
-- **`rusqlite`** — savings history and tracking analytics stay local and fast.
+- **`rusqlite`** — bundled SQLite keeps savings history and tracking analytics local and portable; that tradeoff is intentional.
 - **`tree-sitter`** — powers structural filtering for code reads.
 - **`spore`** — shared token estimation and ecosystem primitives.
 - **`insta`** — snapshot testing for noisy CLI outputs that would otherwise be

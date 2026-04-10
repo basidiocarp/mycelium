@@ -1,6 +1,6 @@
 # Mycelium Command Reference
 
-> Reference for the public Mycelium command surface. Hidden/internal commands such as `wc`, `parse-health`, `hook-audit`, and `rewrite` are intentionally omitted. For an overview of filtering strategies and savings, see [FEATURES.md](FEATURES.md).
+> Reference for the public Mycelium command surface. Hidden/internal commands such as `wc`, `parse-health`, `hook-audit`, and `rewrite` are intentionally omitted. For an overview of filtering strategies and savings, see [features.md](features.md).
 
 ---
 
@@ -513,7 +513,17 @@ Displays only failures. Supports all `cargo test` arguments.
 mycelium cargo nextest [run|list|--lib] [args...]
 ```
 
-Filters `cargo nextest` output to show only failures.
+Filters `cargo nextest` output to show only failures. Mycelium forwards the
+rest of the `cargo nextest` argument surface unchanged, so the command works
+with normal nextest flags and filters.
+
+Common uses:
+
+```bash
+mycelium cargo nextest run
+mycelium cargo nextest list
+mycelium cargo nextest --lib
+```
 
 ---
 

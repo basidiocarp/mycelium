@@ -21,6 +21,8 @@ target/
 .claude/
 .serena/
 .plans/
+docs/plans/rtk-feature-audit.md
+docs/plans/rtk-feature-plan.md
 CLAUDE.md
 INSTALL.md
 .rhizome/

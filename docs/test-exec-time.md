@@ -100,3 +100,20 @@ The timer adds negligible overhead:
 - SQLite insert with extra column → ~1-5µs
 
 Total overhead: **< 0.1ms per command**
+
+## Benchmarking and Profiling
+
+Use **Criterion** when you want a repeatable benchmark for a pure Rust hot
+path with stable inputs. In Mycelium, that is the right fit for functions like
+command classification, rewrite decisions, and compact text filters where you
+want regression detection across commits.
+
+Use end-to-end timing and targeted tracing when you do not yet know which Rust
+function is responsible for the slowdown. That is more useful for command
+spawning, SQLite access, shell parsing, or other I/O-heavy work that Criterion
+would miss or over-isolate.
+
+Practical rule:
+
+- start with command timing and tracing if the slowdown is still a mystery
+- switch to Criterion once you know the hot function and want a stable guardrail

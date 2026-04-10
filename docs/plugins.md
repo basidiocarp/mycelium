@@ -300,6 +300,6 @@ ls -la ~/.config/mycelium/plugins/
 
 ## See Also
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) — System architecture
-- [TRACKING.md](TRACKING.md) — How token savings are tracked
-- [COST_ANALYSIS.md](COST_ANALYSIS.md) — Economics and accuracy of savings
+- [architecture.md](architecture.md) — System architecture
+- [tracking.md](tracking.md) — How token savings are tracked
+- [cost-analysis.md](cost-analysis.md) — Economics and accuracy of savings

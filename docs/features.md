@@ -8,12 +8,12 @@ Mycelium filters and compresses command output before it reaches your LLM. Singl
 
 | Document | Contents |
 |----------|----------|
-| **[COMMANDS.md](COMMANDS.md)** | Public command reference |
-| **[ANALYTICS.md](ANALYTICS.md)** | Analytics, hook system, configuration, tee system |
-| **[ARCHITECTURE.md](ARCHITECTURE.md)** | System design, modules, filtering strategies |
-| **[EXTENDING.md](EXTENDING.md)** | Adding new commands, development patterns, ADRs |
-| **[PLUGINS.md](PLUGINS.md)** | Custom filter plugins |
-| **[COST_ANALYSIS.md](COST_ANALYSIS.md)** | Token economics and accuracy |
+| **[commands.md](commands.md)** | Public command reference |
+| **[analytics.md](analytics.md)** | Analytics, hook system, configuration, tee system |
+| **[architecture.md](architecture.md)** | System design, modules, filtering strategies |
+| **[extending.md](extending.md)** | Adding new commands, development patterns, ADRs |
+| **[plugins.md](plugins.md)** | Custom filter plugins |
+| **[cost-analysis.md](cost-analysis.md)** | Token economics and accuracy |
 
 ---
 

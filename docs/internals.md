@@ -448,7 +448,7 @@ mycelium gain --csv              # CSV export
 Example output:
 ```
 ────────────────────────────────────────────────────────────────
-Token Savings Summary — claude-mycelium
+Token Savings Summary — basidiocarp
 ────────────────────────────────────────────────────────────────
 
 Total tokens saved:          847,294  (65% reduction)

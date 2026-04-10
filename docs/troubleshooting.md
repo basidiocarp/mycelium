@@ -62,7 +62,7 @@ Start with `mycelium doctor`. Most failures trace back to a stale Claude hook ad
 
 3. Install the real Mycelium CLI and verify it with `gain`:
    ```bash
-   cargo install --locked --git https://github.com/basidiocarp/mycelium mycelium-cli --root ~/.local
+   cargo install --locked --git https://github.com/basidiocarp/mycelium --root ~/.local
    mycelium gain
    ```
 
@@ -238,7 +238,7 @@ mycelium gain --status
 
 ## See also
 
-- [INSTALL.md](../INSTALL.md)
-- [docs/COMMANDS.md](COMMANDS.md)
-- [docs/ANALYTICS.md](ANALYTICS.md)
-- [docs/UPDATE.md](UPDATE.md)
+- [getting-started/installation.md](getting-started/installation.md)
+- [commands.md](commands.md)
+- [analytics.md](analytics.md)
+- [update.md](update.md)

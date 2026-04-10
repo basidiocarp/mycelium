@@ -598,5 +598,5 @@ Planned improvements:
 ## See Also
 
 - [README.md](../README.md) - Main project documentation
-- [FEATURES.md](FEATURES.md) - Complete feature documentation
+- [features.md](features.md) - Complete feature documentation
 - [Rust docs](https://docs.rs/) - Run `cargo doc --open` for API docs

@@ -422,4 +422,4 @@ print(f'mycelium estimate: {len(text) // 4}')
 
 - [README.md](../README.md) - Full mycelium documentation
 - [CLAUDE.md](../CLAUDE.md) - Claude Code integration guide
-- [ARCHITECTURE.md](ARCHITECTURE.md) - Technical architecture
+- [architecture.md](architecture.md) - Technical architecture

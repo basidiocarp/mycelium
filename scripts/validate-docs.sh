@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+DOC_ARCHITECTURE="docs/architecture.md"
+
 echo "🔍 Validating Mycelium documentation consistency..."
 
 # =========================================================
@@ -9,7 +11,7 @@ echo "🔍 Validating Mycelium documentation consistency..."
 CARGO_VERSION=$(grep '^version = ' Cargo.toml | cut -d'"' -f2)
 echo "📦 Cargo.toml version: $CARGO_VERSION"
 
-for file in README.md CLAUDE.md ARCHITECTURE.md; do
+for file in README.md CLAUDE.md; do
   if [ ! -f "$file" ]; then
     echo "⚠️  $file not found, skipping"
     continue
@@ -27,14 +29,14 @@ echo "✅ Version consistency: all docs mention $CARGO_VERSION"
 MAIN_MODULES=$(grep -c '^mod ' src/main.rs)
 echo "📊 Module count in main.rs: $MAIN_MODULES"
 
-if [ -f "ARCHITECTURE.md" ]; then
-  ARCH_MODULES=$(grep 'Total:.*modules' ARCHITECTURE.md | grep -o '[0-9]\+' | head -1)
+if [ -f "$DOC_ARCHITECTURE" ]; then
+  ARCH_MODULES=$(grep 'Total:.*modules' "$DOC_ARCHITECTURE" | grep -o '[0-9]\+' | head -1)
   if [ -z "$ARCH_MODULES" ]; then
-    echo "⚠️  Could not extract module count from ARCHITECTURE.md"
+    echo "⚠️  Could not extract module count from $DOC_ARCHITECTURE"
   else
-    echo "📊 Module count in ARCHITECTURE.md: $ARCH_MODULES"
+    echo "📊 Module count in $DOC_ARCHITECTURE: $ARCH_MODULES"
     if [ "$MAIN_MODULES" != "$ARCH_MODULES" ]; then
-      echo "❌ Module count mismatch: main.rs=$MAIN_MODULES, ARCHITECTURE.md=$ARCH_MODULES"
+      echo "❌ Module count mismatch: main.rs=$MAIN_MODULES, $DOC_ARCHITECTURE=$ARCH_MODULES"
       exit 1
     fi
   fi

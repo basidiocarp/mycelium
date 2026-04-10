@@ -4,12 +4,23 @@ All notable changes to Mycelium are documented in this file.
 
 ## [Unreleased]
 
+## [0.8.13] - 2026-04-09
+
 ### Changed
 
-- **Changelog format**: Release headings and entry structure now follow the
-  shared ecosystem changelog template.
+- **Performance investigation coverage**: Added a Criterion bench for tooling
+  hot paths and refreshed the test-exec-time guidance so profiling work has a
+  stable, repo-local starting point.
+- **Docs structure**: The docs set now uses the lowercase path layout with a
+  central `docs/README.md`, plus dedicated update and uninstall references.
 
-## [0.8.10] - 2026-04-08
+### Fixed
+
+- **Compile-info drag**: Mycelium now keeps the tuned dev profile and no longer
+  carries a direct `ureq` dependency, leaving HTTP ownership with `spore`
+  while keeping bundled SQLite for portable local storage.
+
+## [0.8.12] - 2026-04-08
 
 ### Changed
 

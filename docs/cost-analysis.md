@@ -320,6 +320,6 @@ Expected output size per command category (used for discovery projections):
 
 ## See Also
 
-- [TRACKING.md](TRACKING.md) — Tracking API, database schema, integration examples
-- [AUDIT_GUIDE.md](AUDIT_GUIDE.md) — Using `mycelium gain` and `mycelium discover`
-- [ARCHITECTURE.md](ARCHITECTURE.md) — System architecture overview
+- [tracking.md](tracking.md) — Tracking API, database schema, integration examples
+- [audit-guide.md](audit-guide.md) — Using `mycelium gain` and `mycelium discover`
+- [architecture.md](architecture.md) — System architecture overview

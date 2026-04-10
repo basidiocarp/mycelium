@@ -1,4 +1,4 @@
-# Mycelium Filter Redesign — Session Prompt
+# Filter Redesign Handoff
 
 Complete the filter redesign handoff at `.handoffs/mycelium/filter-redesign.md`. Steps 1-4 are already implemented. Only Step 5 remains, plus running the verification script.
 

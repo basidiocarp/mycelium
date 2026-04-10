@@ -148,14 +148,17 @@ into dispatch.
 
 ## Documentation
 
-- [docs/FEATURES.md](docs/FEATURES.md): feature overview and savings summary
-- [docs/COMMANDS.md](docs/COMMANDS.md): public command reference
-- [docs/ANALYTICS.md](docs/ANALYTICS.md): token savings analytics and hooks
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): technical architecture
-- [docs/EXTENDING.md](docs/EXTENDING.md): adding new commands and filters
-- [docs/PLUGINS.md](docs/PLUGINS.md): custom filter plugins
-- [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md): common issues
-- [docs/ROADMAP.md](docs/ROADMAP.md): planned work
+- [docs/README.md](docs/README.md): docs index and reading order
+- [docs/getting-started/README.md](docs/getting-started/README.md): install and setup path
+- [docs/features.md](docs/features.md): feature overview and savings summary
+- [docs/commands.md](docs/commands.md): public command reference
+- [docs/analytics.md](docs/analytics.md): token savings analytics and hooks
+- [docs/architecture.md](docs/architecture.md): technical architecture
+- [docs/extending.md](docs/extending.md): adding new commands and filters
+- [docs/plugins.md](docs/plugins.md): custom filter plugins
+- [docs/troubleshooting.md](docs/troubleshooting.md): common issues
+- [docs/roadmap.md](docs/roadmap.md): planned work
+- [docs/plans/README.md](docs/plans/README.md): active planning docs
 
 ## Development
 

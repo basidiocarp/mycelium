@@ -1,6 +1,6 @@
 # Extending Mycelium
 
-> Guide to adding new commands, development patterns, and architecture decisions. For system architecture, see [ARCHITECTURE.md](ARCHITECTURE.md).
+> Guide to adding new commands, development patterns, and architecture decisions. For system architecture, see [architecture.md](architecture.md).
 
 ---
 
@@ -67,7 +67,7 @@ fn execute_command(args: &[String]) -> Result<String> {
 /// Apply filtering strategy
 fn filter_output(raw: &str, verbose: u8) -> String {
     // Choose strategy: stats, grouping, deduplication, etc.
-    // See "Filtering Strategies" in ARCHITECTURE.md for options
+    // See "Filtering Strategies" in architecture.md for options
 
     if verbose >= 3 {
         eprintln!("Raw output:\n{}", raw);
@@ -206,7 +206,7 @@ cargo clippy --all-targets
 
 ### Step 7: Document Your Command
 
-Update FEATURES.md or COMMANDS.md:
+Update features.md or commands.md:
 
 ```markdown
 ### New Commands
@@ -274,14 +274,14 @@ if verbose >= 3 {
 
 When implementing a new command, consider:
 
-- [ ] **Filtering Strategy**: Which of the 12 strategies fits best? (See [ARCHITECTURE.md](ARCHITECTURE.md#filtering-strategies))
+- [ ] **Filtering Strategy**: Which of the 12 strategies fits best? (See [architecture.md](architecture.md#filtering-strategies))
 - [ ] **Exit Code Preservation**: Does your command need to preserve exit codes for CI/CD?
 - [ ] **Verbosity Support**: Add debug output for `-v`, `-vv`, `-vvv`
 - [ ] **Error Handling**: Use `.context()` for meaningful error messages
 - [ ] **Package Manager Detection**: For JS/TS tools, use the standard detection pattern
 - [ ] **Tests**: Add unit tests for filtering logic
 - [ ] **Token Tracking**: Integrate with `tracking::track()`
-- [ ] **Documentation**: Update COMMANDS.md with token savings and use cases
+- [ ] **Documentation**: Update commands.md with token savings and use cases
 
 ---
 
