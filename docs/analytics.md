@@ -150,6 +150,7 @@ mycelium cc-economics                      # Compatibility alias
 
 - `--project` and `--project-path` scope the Mycelium savings side of the report.
 - Claude Code spend from `ccusage` remains global because `ccusage` does not currently expose per-project attribution.
+- The long-term contract boundary for usage and cost inputs is `septa/usage-event-v1.schema.json`; Mycelium should consume normalized usage events or deterministic summaries over that shape instead of growing host-specific parsing rules in UI-facing surfaces.
 
 ---
 

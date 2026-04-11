@@ -4,6 +4,21 @@ All notable changes to Mycelium are documented in this file.
 
 ## [Unreleased]
 
+## [0.8.14] - 2026-04-10
+
+### Added
+
+- **Usage-event contract guard**: Mycelium now carries a focused workspace
+  alignment test that asserts `usage-event-v1` exposes the fields deterministic
+  usage summaries need.
+
+### Changed
+
+- **Analytics boundary docs**: the analytics guidance now treats
+  `usage-event-v1` as the long-term normalized input contract for usage and
+  cost reporting instead of letting UI-facing surfaces grow host-specific
+  parsing assumptions.
+
 ## [0.8.13] - 2026-04-09
 
 ### Changed
