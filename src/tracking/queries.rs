@@ -107,7 +107,7 @@ impl Tracker {
              FROM commands
              WHERE (?1 IS NULL OR project_path = ?1 OR project_path GLOB ?2)
              GROUP BY mycelium_cmd
-             ORDER BY SUM(saved_tokens) DESC
+             ORDER BY SUM(saved_tokens) DESC, mycelium_cmd ASC
              LIMIT ?3",
         )?;
 

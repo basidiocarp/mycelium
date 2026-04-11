@@ -103,6 +103,7 @@ large code     ─►    ask Rhizome          ─►     structural summary
 - Command-specific display helpers and retained guidance
 - Mycelium-specific init, config, and uninstall flows
 - Optional routing of large outputs to downstream tools
+- Deterministic telemetry summary surfaces built from local tracking aggregates
 
 ## What Mycelium Does Not Own
 
@@ -143,6 +144,24 @@ One package does not mean one file. The router stays intentionally thin, the
 command-family modules own their own behavior, and sibling integrations such as
 Hyphae and Rhizome remain in their dedicated surfaces instead of being folded
 into dispatch.
+
+## Deterministic Telemetry Summary Surface
+
+`mycelium` now names one reusable summary boundary in `src/tracking/`:
+the deterministic telemetry summary surface. It is local-first, machine-readable,
+and built from the existing tracking and gain aggregates instead of a separate
+remote telemetry path.
+
+The ownership split is explicit:
+
+- `cortina` captures normalized edge events
+- `mycelium` summarizes them into deterministic telemetry and usage summaries
+- `cap` consumes and renders those summaries instead of recomputing them in the UI
+
+Today the stable consumer seam is the gain JSON export, which now includes a
+named telemetry summary block derived from the tracking database. Downstream
+tools can either consume that JSON surface or call the tracking summary API
+directly through the library.
 
 ---
 

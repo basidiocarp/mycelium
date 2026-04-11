@@ -30,4 +30,7 @@ pub use git_filters::{
     filter_stash_list, filter_status_with_args, filter_worktree_list, format_status_output,
     format_status_output_with_profile,
 };
-pub use tracking::{DbPathInfo, DbPathSource, TimedExecution, Tracker, resolve_db_path_info};
+pub use tracking::{
+    DbPathInfo, DbPathSource, TelemetrySummarySurface, TimedExecution, Tracker,
+    resolve_db_path_info,
+};

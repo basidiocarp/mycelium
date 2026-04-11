@@ -156,6 +156,69 @@ fn test_get_by_command_limited_honors_limit() {
     });
 }
 
+#[test]
+fn test_telemetry_summary_surface_orders_command_breakdown_deterministically() {
+    with_test_db(
+        "test_telemetry_summary_surface_orders_command_breakdown_deterministically",
+        |db_path| {
+            let tracker =
+                Tracker::new_with_override(Some(db_path)).expect("Failed to create tracker");
+
+            tracker
+                .record("git status", "mycelium git status", 100, 20, 5)
+                .expect("record git status");
+            tracker
+                .record("git diff", "mycelium git diff", 100, 20, 4)
+                .expect("record git diff");
+
+            let summary = tracker
+                .get_telemetry_summary_filtered(None)
+                .expect("telemetry summary");
+
+            assert_eq!(
+                summary
+                    .command_breakdown
+                    .iter()
+                    .map(|command| command.command.as_str())
+                    .collect::<Vec<_>>(),
+                vec!["mycelium git diff", "mycelium git status"]
+            );
+        },
+    );
+}
+
+#[test]
+fn test_telemetry_summary_surface_orders_parse_failures_deterministically() {
+    with_test_db(
+        "test_telemetry_summary_surface_orders_parse_failures_deterministically",
+        |db_path| {
+            let tracker =
+                Tracker::new_with_override(Some(db_path)).expect("Failed to create tracker");
+
+            tracker
+                .record_parse_failure("zeta command", "parse failed", false)
+                .expect("record zeta parse failure");
+            tracker
+                .record_parse_failure("alpha command", "parse failed", false)
+                .expect("record alpha parse failure");
+
+            let summary = tracker
+                .get_telemetry_summary_filtered(None)
+                .expect("telemetry summary");
+
+            assert_eq!(
+                summary
+                    .parse_failure_summary
+                    .top_commands
+                    .iter()
+                    .map(|command| command.command.as_str())
+                    .collect::<Vec<_>>(),
+                vec!["alpha command", "zeta command"]
+            );
+        },
+    );
+}
+
 // 4. track_passthrough doesn't dilute stats
 #[test]
 fn test_track_passthrough_no_dilution() {

@@ -30,6 +30,7 @@
 
 mod queries;
 mod schema;
+mod telemetry;
 mod timer;
 pub(crate) mod utils;
 
@@ -42,6 +43,7 @@ use utils::{current_project_path_string, current_runtime_session_id, get_db_path
 
 #[allow(unused_imports)]
 pub use queries::ParseHealthRow;
+pub use telemetry::TelemetrySummarySurface;
 pub use timer::TimedExecution;
 pub(crate) use utils::project_filter_params;
 #[allow(unused_imports)]
@@ -571,7 +573,7 @@ impl Tracker {
              FROM parse_failures
              WHERE (?1 IS NULL OR project_path = ?1 OR project_path GLOB ?2)
              GROUP BY raw_command
-             ORDER BY cnt DESC
+             ORDER BY cnt DESC, raw_command ASC
              LIMIT 10",
         )?;
         let top_commands = stmt

@@ -1,6 +1,7 @@
 //! JSON and CSV export for token savings data.
 use crate::tracking::{
-    CommandStats, DayStats, DetailedCommandRecord, MonthStats, Tracker, WeekStats,
+    CommandStats, DayStats, DetailedCommandRecord, MonthStats, TelemetrySummarySurface, Tracker,
+    WeekStats,
 };
 use anyhow::{Context, Result};
 use serde::Serialize;
@@ -9,6 +10,7 @@ use serde::Serialize;
 pub(crate) struct ExportData {
     pub(crate) schema_version: &'static str,
     pub(crate) summary: ExportSummary,
+    pub(crate) telemetry_summary: TelemetrySummarySurface,
     pub(crate) by_command: Vec<ExportCommandStats>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) history: Option<Vec<DetailedCommandRecord>>,
@@ -58,7 +60,7 @@ impl From<CommandStats> for ExportCommandStats {
     clippy::too_many_arguments,
     reason = "CLI export flags map directly to the supported output selectors"
 )]
-pub(crate) fn export_json(
+fn build_export_data(
     tracker: &Tracker,
     daily: bool,
     weekly: bool,
@@ -67,10 +69,13 @@ pub(crate) fn export_json(
     history: bool,
     limit: usize,
     project_scope: Option<&str>,
-) -> Result<()> {
+) -> Result<ExportData> {
     let summary = tracker
         .get_summary_filtered(project_scope)
         .context("Failed to load token savings summary from database")?;
+    let telemetry_summary = tracker
+        .get_telemetry_summary_filtered(project_scope)
+        .context("Failed to build deterministic telemetry summary surface")?;
     let by_command = tracker
         .get_by_command_limited(project_scope, limit)
         .context("Failed to load by-command token savings from database")?
@@ -78,7 +83,7 @@ pub(crate) fn export_json(
         .map(ExportCommandStats::from)
         .collect();
 
-    let export = ExportData {
+    Ok(ExportData {
         schema_version: "1.0",
         summary: ExportSummary {
             total_commands: summary.total_commands,
@@ -89,6 +94,7 @@ pub(crate) fn export_json(
             total_time_ms: summary.total_time_ms,
             avg_time_ms: summary.avg_time_ms,
         },
+        telemetry_summary,
         by_command,
         history: if history {
             Some(
@@ -114,12 +120,77 @@ pub(crate) fn export_json(
         } else {
             None
         },
-    };
+    })
+}
+
+#[allow(
+    clippy::too_many_arguments,
+    reason = "CLI export flags map directly to the supported output selectors"
+)]
+pub(crate) fn export_json(
+    tracker: &Tracker,
+    daily: bool,
+    weekly: bool,
+    monthly: bool,
+    all: bool,
+    history: bool,
+    limit: usize,
+    project_scope: Option<&str>,
+) -> Result<()> {
+    let export = build_export_data(
+        tracker,
+        daily,
+        weekly,
+        monthly,
+        all,
+        history,
+        limit,
+        project_scope,
+    )?;
 
     let json = serde_json::to_string_pretty(&export)?;
     println!("{}", json);
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::build_export_data;
+    use crate::tracking::Tracker;
+    use tempfile::tempdir;
+
+    #[test]
+    fn gain_json_export_includes_deterministic_telemetry_summary_surface() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("gain-export.db");
+        let db_path = db_path.to_string_lossy().to_string();
+        let tracker = Tracker::new_with_override(Some(&db_path)).expect("tracker");
+
+        tracker
+            .record("git diff", "mycelium git diff", 100, 10, 4)
+            .expect("record git diff");
+        tracker
+            .record("git status", "mycelium git status", 100, 10, 5)
+            .expect("record git status");
+
+        let export = build_export_data(&tracker, false, false, false, false, false, 10, None)
+            .expect("build export data");
+
+        assert_eq!(
+            export.telemetry_summary.summary_surface,
+            "deterministic-telemetry-summary"
+        );
+        assert_eq!(export.telemetry_summary.command_breakdown.len(), 2);
+        assert_eq!(
+            export.telemetry_summary.command_breakdown[0].command,
+            "mycelium git diff"
+        );
+        assert_eq!(
+            export.telemetry_summary.command_breakdown[1].command,
+            "mycelium git status"
+        );
+    }
 }
 
 pub(crate) fn export_csv(
