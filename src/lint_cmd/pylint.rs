@@ -1,10 +1,8 @@
 //! Pylint JSON output parser, formatter, and generic lint fallback.
 use crate::parser::types::{Diagnostic, DiagnosticReport, DiagnosticSeverity};
-use crate::parser::{
-    FormatMode, OutputParser, ParseResult, TokenFormatter, emit_passthrough_warning,
-    truncate_output,
-};
-use crate::utils::truncate;
+#[cfg(test)]
+use crate::parser::{FormatMode, TokenFormatter};
+use crate::parser::{OutputParser, ParseResult, emit_passthrough_warning, truncate_output};
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -12,10 +10,6 @@ use std::collections::HashMap;
 pub(super) struct PylintDiagnostic {
     #[serde(rename = "type")]
     msg_type: String, // "warning", "error", "convention", "refactor"
-    #[allow(dead_code)]
-    module: String,
-    #[allow(dead_code)]
-    obj: String,
     line: usize,
     column: usize,
     path: String,
@@ -91,7 +85,7 @@ impl OutputParser for PylintParser {
 }
 
 /// Filter pylint JSON2 output - group by symbol and file
-#[allow(dead_code)]
+#[cfg(test)]
 pub fn filter_pylint_json(output: &str) -> String {
     let report = match PylintParser::parse(output) {
         ParseResult::Full(r) | ParseResult::Degraded(r, _) => r,
@@ -99,44 +93,6 @@ pub fn filter_pylint_json(output: &str) -> String {
     };
 
     report.format(FormatMode::Compact)
-}
-
-/// Filter generic linter output (fallback for non-ESLint/Pylint linters)
-#[allow(dead_code)]
-pub fn filter_generic_lint(output: &str) -> String {
-    let mut warnings = 0;
-    let mut errors = 0;
-    let mut issues: Vec<String> = Vec::new();
-
-    for line in output.lines() {
-        let line_lower = line.to_lowercase();
-        if line_lower.contains("warning") {
-            warnings += 1;
-            issues.push(line.to_string());
-        }
-        if line_lower.contains("error") && !line_lower.contains("0 error") {
-            errors += 1;
-            issues.push(line.to_string());
-        }
-    }
-
-    if errors == 0 && warnings == 0 {
-        return "✓ Lint: No issues found".to_string();
-    }
-
-    let mut result = String::new();
-    result.push_str(&format!("Lint: {} errors, {} warnings\n", errors, warnings));
-    result.push_str("═══════════════════════════════════════\n");
-
-    for issue in issues.iter().take(20) {
-        result.push_str(&format!("{}\n", truncate(issue, 100)));
-    }
-
-    if issues.len() > 20 {
-        result.push_str(&format!("\n... +{} more issues\n", issues.len() - 20));
-    }
-
-    result.trim().to_string()
 }
 
 #[cfg(test)]

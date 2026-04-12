@@ -7,27 +7,17 @@ use serde::Deserialize;
 use std::collections::HashMap;
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 struct RuffLocation {
     row: usize,
     column: usize,
 }
 
 #[derive(Debug, Deserialize)]
-struct RuffFix {
-    #[allow(dead_code)]
-    applicability: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 struct RuffDiagnostic {
     code: String,
     message: String,
     location: RuffLocation,
-    end_location: Option<RuffLocation>,
     filename: String,
-    fix: Option<RuffFix>,
 }
 
 pub struct RuffCheckParser;
@@ -88,25 +78,6 @@ impl OutputParser for RuffCheckParser {
             by_code,
             global_messages: Vec::new(),
         })
-    }
-}
-
-/// Run Ruff and filter output with JSON parsing for check, text parsing for format.
-#[allow(dead_code)]
-pub fn run(args: &[String], verbose: u8) -> Result<()> {
-    // Detect subcommand: check, format, or version
-    let is_check = args.is_empty()
-        || args[0] == "check"
-        || (!args[0].starts_with('-') && args[0] != "format" && args[0] != "version");
-
-    let is_format = args.iter().any(|a| a == "format");
-
-    if is_check {
-        run_check(args, verbose)
-    } else if is_format {
-        run_format(args, verbose)
-    } else {
-        run_passthrough(args, verbose)
     }
 }
 

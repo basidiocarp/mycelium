@@ -129,7 +129,6 @@ impl TimedExecution {
     ///
     /// - `parse_tier`: 1=Full, 2=Degraded, 3=Passthrough
     /// - `format_mode`: "compact", "verbose", or "ultra"
-    #[allow(dead_code)]
     pub fn track_with_parse_info(
         &self,
         original_cmd: &str,

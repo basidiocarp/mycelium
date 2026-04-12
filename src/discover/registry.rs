@@ -268,7 +268,10 @@ pub(crate) fn rewrite_block_reason(cmd: &str, excluded: &[String]) -> Option<Str
     None
 }
 
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "Binary rewrite resolution consumes this helper even though the library target does not"
+)]
 pub(crate) fn learned_correction_block_reason(cmd: &str, excluded: &[String]) -> Option<String> {
     if let Some(reason) = rewrite_shape_block_reason(cmd) {
         return Some(reason);

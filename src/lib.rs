@@ -8,12 +8,10 @@ pub mod discover;
 pub mod git_filters;
 pub mod learn;
 pub mod platform;
-#[allow(dead_code)]
 #[path = "plugin.rs"]
-mod plugin;
-#[allow(dead_code)]
+pub mod plugin;
 #[path = "tee.rs"]
-mod tee;
+pub mod tee;
 #[path = "tracking/mod.rs"]
 pub mod tracking;
 

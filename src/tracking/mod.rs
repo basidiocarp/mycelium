@@ -292,10 +292,13 @@ pub struct PassthroughCommandStat {
 
 /// Individual parse failure record.
 #[derive(Debug)]
-#[allow(dead_code)]
 pub struct ParseFailureRecord {
     pub timestamp: String,
     pub raw_command: String,
+    #[allow(
+        dead_code,
+        reason = "Failure detail is surfaced by reporting consumers outside the bin target"
+    )]
     pub error_message: String,
     pub fallback_succeeded: bool,
 }
@@ -422,7 +425,7 @@ impl Tracker {
     ///
     /// - `parse_tier`: Parser result tier (1=Full, 2=Degraded, 3=Passthrough, 0=legacy)
     /// - `format_mode`: Format mode used ("compact", "verbose", "ultra", or "")
-    #[allow(clippy::too_many_arguments, dead_code)]
+    #[allow(clippy::too_many_arguments)]
     pub fn record_with_parse_info(
         &self,
         original_cmd: &str,
@@ -532,7 +535,10 @@ impl Tracker {
     }
 
     /// Get parse failure summary for `mycelium gain --failures`.
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "Round-trip summary coverage lives in tests while the API remains available to callers"
+    )]
     pub fn get_parse_failure_summary(&self) -> Result<ParseFailureSummary> {
         self.get_parse_failure_summary_filtered(None)
     }

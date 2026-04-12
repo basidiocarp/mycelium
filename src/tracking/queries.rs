@@ -14,7 +14,6 @@ use super::{
 
 /// A row from the parse health query.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct ParseHealthRow {
     pub command: String,
     pub tier: u8,
@@ -436,7 +435,10 @@ impl Tracker {
     /// }
     /// # Ok::<(), anyhow::Error>(())
     /// ```
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "Round-trip query coverage lives in tests while the API remains available to callers"
+    )]
     pub fn get_recent(&self, limit: usize) -> Result<Vec<CommandRecord>> {
         self.get_recent_filtered(limit, None)
     }
@@ -532,7 +534,6 @@ impl Tracker {
     ///
     /// Returns rows grouped by command and tier, excluding legacy commands (parse_tier=0).
     /// Used by `mycelium parse-health`.
-    #[allow(dead_code)]
     pub fn get_parse_health(&self, days: u32) -> Result<Vec<ParseHealthRow>> {
         let mut stmt = self.conn.prepare(
             "SELECT mycelium_cmd, parse_tier, COUNT(*) as count

@@ -154,45 +154,6 @@ pub(crate) fn export_json(
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::build_export_data;
-    use crate::tracking::Tracker;
-    use tempfile::tempdir;
-
-    #[test]
-    fn gain_json_export_includes_deterministic_telemetry_summary_surface() {
-        let dir = tempdir().expect("tempdir");
-        let db_path = dir.path().join("gain-export.db");
-        let db_path = db_path.to_string_lossy().to_string();
-        let tracker = Tracker::new_with_override(Some(&db_path)).expect("tracker");
-
-        tracker
-            .record("git diff", "mycelium git diff", 100, 10, 4)
-            .expect("record git diff");
-        tracker
-            .record("git status", "mycelium git status", 100, 10, 5)
-            .expect("record git status");
-
-        let export = build_export_data(&tracker, false, false, false, false, false, 10, None)
-            .expect("build export data");
-
-        assert_eq!(
-            export.telemetry_summary.summary_surface,
-            "deterministic-telemetry-summary"
-        );
-        assert_eq!(export.telemetry_summary.command_breakdown.len(), 2);
-        assert_eq!(
-            export.telemetry_summary.command_breakdown[0].command,
-            "mycelium git diff"
-        );
-        assert_eq!(
-            export.telemetry_summary.command_breakdown[1].command,
-            "mycelium git status"
-        );
-    }
-}
-
 pub(crate) fn export_csv(
     tracker: &Tracker,
     daily: bool,
@@ -268,4 +229,43 @@ pub(crate) fn export_csv(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::build_export_data;
+    use crate::tracking::Tracker;
+    use tempfile::tempdir;
+
+    #[test]
+    fn gain_json_export_includes_deterministic_telemetry_summary_surface() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("gain-export.db");
+        let db_path = db_path.to_string_lossy().to_string();
+        let tracker = Tracker::new_with_override(Some(&db_path)).expect("tracker");
+
+        tracker
+            .record("git diff", "mycelium git diff", 100, 10, 4)
+            .expect("record git diff");
+        tracker
+            .record("git status", "mycelium git status", 100, 10, 5)
+            .expect("record git status");
+
+        let export = build_export_data(&tracker, false, false, false, false, false, 10, None)
+            .expect("build export data");
+
+        assert_eq!(
+            export.telemetry_summary.summary_surface,
+            "deterministic-telemetry-summary"
+        );
+        assert_eq!(export.telemetry_summary.command_breakdown.len(), 2);
+        assert_eq!(
+            export.telemetry_summary.command_breakdown[0].command,
+            "mycelium git diff"
+        );
+        assert_eq!(
+            export.telemetry_summary.command_breakdown[1].command,
+            "mycelium git status"
+        );
+    }
 }

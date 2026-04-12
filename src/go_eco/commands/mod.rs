@@ -8,10 +8,7 @@ use std::process::Command;
 pub use filters::{filter_go_build, filter_go_test_json, filter_go_vet};
 
 #[derive(Debug, serde::Deserialize)]
-#[allow(dead_code)]
 pub struct GoTestEvent {
-    #[serde(rename = "Time")]
-    pub time: Option<String>,
     #[serde(rename = "Action")]
     pub action: String,
     #[serde(rename = "Package")]
@@ -20,8 +17,6 @@ pub struct GoTestEvent {
     pub test: Option<String>,
     #[serde(rename = "Output")]
     pub output: Option<String>,
-    #[serde(rename = "Elapsed")]
-    pub elapsed: Option<f64>,
     #[serde(rename = "ImportPath")]
     pub import_path: Option<String>,
     #[serde(rename = "FailedBuild")]

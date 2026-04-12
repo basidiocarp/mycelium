@@ -23,7 +23,10 @@ const COMMAND_OUTPUT_SCHEMA_VERSION: &str = "1.0";
 pub struct ChunkSummary {
     pub summary: String,
     pub document_id: String,
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "Chunk cardinality is consumed by integration tests and downstream formatting helpers"
+    )]
     pub chunk_count: usize,
 }
 

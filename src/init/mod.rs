@@ -686,7 +686,6 @@ fn remove_legacy_session_summary_artifacts(verbose: u8) -> Result<()> {
 }
 
 #[cfg(not(unix))]
-#[allow(dead_code)]
 fn report_settings_patch_result(_patch_result: crate::init::json_patch::PatchResult) {}
 
 /// Default mode: hook + slim MYCELIUM.md + @MYCELIUM.md reference where supported.

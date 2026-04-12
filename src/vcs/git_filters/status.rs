@@ -103,7 +103,10 @@ fn format_status_output_with_limit(porcelain: &str, max_status_files: usize) -> 
 }
 
 /// Format porcelain output into compact Mycelium status display using a named profile.
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "The profile-aware status surface is part of the public library API"
+)]
 pub fn format_status_output_with_profile(porcelain: &str, profile: CompactionProfile) -> String {
     format_status_output_with_limit(porcelain, profile.tuning().status_max_files)
 }

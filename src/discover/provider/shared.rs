@@ -24,10 +24,3 @@ pub(super) fn cutoff_time(since_days: Option<u64>) -> Option<SystemTime> {
             .unwrap_or(SystemTime::UNIX_EPOCH)
     })
 }
-
-pub(super) fn session_id_from_path(path: &Path) -> String {
-    path.file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("unknown")
-        .to_string()
-}

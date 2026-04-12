@@ -7,23 +7,15 @@ use std::collections::HashMap;
 use std::process::Command;
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 struct Position {
     #[serde(rename = "Filename")]
     filename: String,
-    #[serde(rename = "Line")]
-    line: usize,
-    #[serde(rename = "Column")]
-    column: usize,
 }
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 struct Issue {
     #[serde(rename = "FromLinter")]
     from_linter: String,
-    #[serde(rename = "Text")]
-    text: String,
     #[serde(rename = "Pos")]
     pos: Position,
 }

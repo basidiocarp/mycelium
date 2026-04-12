@@ -15,7 +15,6 @@ pub enum PatchMode {
 }
 
 const REWRITE_EVENT: &str = "PreToolUse";
-#[cfg_attr(not(unix), allow(dead_code))]
 const REWRITE_MATCHER: &str = "Bash";
 const REWRITE_HOOK_FILE: &str = "mycelium-rewrite.sh";
 const STOP_EVENT: &str = "Stop";
@@ -24,7 +23,6 @@ const LEGACY_SESSION_SUMMARY_HOOK_FILE: &str = "session-summary.sh";
 
 /// Result of settings.json patching operation.
 #[derive(Debug, Clone, Copy, PartialEq)]
-#[cfg_attr(not(unix), allow(dead_code))]
 pub enum PatchResult {
     Patched,        // One or more hooks were added successfully
     AlreadyPresent, // All required hooks were already in settings.json
@@ -286,13 +284,11 @@ pub(crate) fn hook_already_present(
     hook_commands(root, event).any(|command| same_hook_command(event, command, hook_command))
 }
 
-#[cfg_attr(not(unix), allow(dead_code))]
 fn hook_command_present_exact(root: &serde_json::Value, event: &str, hook_command: &str) -> bool {
     let normalized_expected = normalize_hook_command(hook_command);
     hook_commands(root, event).any(|command| normalize_hook_command(command) == normalized_expected)
 }
 
-#[cfg_attr(not(unix), allow(dead_code))]
 fn hooks_fully_present(
     rewrite_hook_present: bool,
     session_summary_hook_present: bool,
@@ -377,7 +373,6 @@ fn sibling_hook_command(command: &str, file_name: &str) -> Option<String> {
     )
 }
 
-#[cfg_attr(not(unix), allow(dead_code))]
 fn legacy_session_summary_command(command: &str) -> Option<String> {
     sibling_hook_command(command, LEGACY_SESSION_SUMMARY_HOOK_FILE)
 }

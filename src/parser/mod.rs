@@ -26,7 +26,7 @@ pub enum ParseResult<T> {
     Passthrough(String),
 }
 
-#[allow(dead_code)]
+#[cfg(test)]
 impl<T> ParseResult<T> {
     /// Unwrap the parsed data, panicking on Passthrough
     pub fn unwrap(self) -> T {

@@ -89,7 +89,10 @@ impl FilterResult {
     }
 }
 
-#[allow(dead_code)] // Trait API: filter_with_quality and name are available for implementors
+#[allow(
+    dead_code,
+    reason = "Trait surface reserves advanced filter hooks for future callers"
+)]
 pub trait FilterStrategy {
     /// Filter content and return quality metadata.
     ///
@@ -213,19 +216,6 @@ impl FilterStrategy for NoFilter {
 
 pub struct MinimalFilter;
 
-#[allow(dead_code)]
-pub(crate) fn is_actionable_comment(line: &str) -> bool {
-    let upper = line.to_uppercase();
-    upper.contains("TODO")
-        || upper.contains("FIXME")
-        || upper.contains("HACK")
-        || upper.contains("SAFETY")
-        || upper.contains("NOTE")
-        || upper.contains("XXX")
-        || upper.contains("BUG")
-        || upper.contains("WARNING")
-}
-
 fn is_noise_comment(line: &str) -> bool {
     let trimmed = line.trim();
     // Separator lines: only comment chars + separator chars
@@ -257,12 +247,6 @@ fn is_noise_comment(line: &str) -> bool {
 fn multiple_blank_lines() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| Regex::new(r"\n{3,}").expect("valid regex"))
-}
-
-#[allow(dead_code)]
-fn trailing_whitespace() -> &'static Regex {
-    static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"[ \t]+$").expect("valid regex"))
 }
 
 impl FilterStrategy for MinimalFilter {

@@ -316,7 +316,10 @@ pub fn config_path() -> Result<PathBuf> {
         .ok_or_else(|| anyhow::anyhow!("could not determine mycelium config directory"))
 }
 
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "Library consumers use this through the curated lib.rs re-export"
+)]
 pub fn current_compaction_profile() -> CompactionProfile {
     Config::load()
         .map(|config| config.filters.compaction_profile)

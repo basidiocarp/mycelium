@@ -214,7 +214,7 @@ impl OutputParser for TscParser {
 }
 
 /// Filter TypeScript compiler output — thin wrapper around TscParser.
-#[allow(dead_code)]
+#[cfg(test)]
 pub fn filter_tsc_output(output: &str) -> String {
     let result = TscParser::parse(output);
     let mode = FormatMode::Compact;

@@ -46,17 +46,6 @@ fn re_init_progress() -> &'static regex::Regex {
     })
 }
 
-/// Run a terraform command with token-optimized output.
-#[allow(dead_code)]
-pub fn run(subcommand: &str, args: &[String], verbose: u8) -> Result<()> {
-    match subcommand {
-        "plan" => run_plan(args, verbose),
-        "apply" => run_apply(args, verbose),
-        "init" => run_init(args, verbose),
-        _ => run_passthrough_impl(subcommand, args, verbose),
-    }
-}
-
 /// Run terraform plan with token-optimized output.
 pub fn run_plan(args: &[String], verbose: u8) -> Result<()> {
     let timer = tracking::TimedExecution::start();

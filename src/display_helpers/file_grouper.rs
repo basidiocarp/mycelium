@@ -59,7 +59,7 @@ impl FileGrouper {
     }
 
     /// Total number of items across all files.
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub fn total(&self) -> usize {
         self.by_file.values().map(|v| v.len()).sum()
     }

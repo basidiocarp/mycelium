@@ -81,6 +81,7 @@ Current direction:
 - When changing tracked savings behavior, check metrics and persistence, not just display text.
 - When changing setup or uninstall behavior, keep Mycelium-specific flows separate from shared Stipe policy.
 - Update docs when a public command, setup path, or troubleshooting path changes.
+- Validate septa contracts after changing any cross-project payload: `cd septa && bash validate-all.sh`
 
 ---
 

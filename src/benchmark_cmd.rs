@@ -12,8 +12,6 @@ use crate::tracking;
 
 /// A single benchmark result.
 struct BenchResult {
-    #[allow(dead_code)]
-    name: String,
     raw_tokens: usize,
     filtered_tokens: usize,
     status: BenchStatus,
@@ -204,7 +202,6 @@ fn bench(
     );
 
     results.push(BenchResult {
-        name: name.to_string(),
         raw_tokens,
         filtered_tokens,
         status,

@@ -18,14 +18,15 @@ use shared::project_filter_looks_like_path;
 pub struct ExtractedCommand {
     pub command: String,
     pub output_len: Option<usize>,
-    #[allow(dead_code)]
-    pub session_id: String,
     /// Actual output content (first ~1000 chars for error detection)
     pub output_content: Option<String>,
     /// Whether the tool_result indicated an error
     pub is_error: bool,
     /// Chronological sequence index within the session
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "Session replay and ordering diagnostics depend on stable extraction order"
+    )]
     pub sequence_index: usize,
 }
 

@@ -53,7 +53,7 @@ impl FilteredCommand {
     }
 
     /// Append a single arg.
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub fn arg<S: Into<String>>(mut self, arg: S) -> Self {
         self.args.push(arg.into());
         self
@@ -150,7 +150,7 @@ impl FilteredCommand {
     /// Execute and return (raw, filtered) instead of printing.
     /// Does NOT call `std::process::exit` — caller handles exit code.
     /// Does NOT call tee or print output.
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub fn run_capturing(self) -> Result<(String, String)> {
         use crate::{tracking, utils};
 

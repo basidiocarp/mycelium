@@ -68,7 +68,10 @@ fn compact_diff_with_hunk_limit(diff: &str, max_lines: usize, max_hunk_lines: us
 }
 
 /// Compact a unified diff using a specific named profile.
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "The profile-aware diff surface is part of the public library API"
+)]
 pub fn compact_diff_with_profile(
     diff: &str,
     max_lines: usize,

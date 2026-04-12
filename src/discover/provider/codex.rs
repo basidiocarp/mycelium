@@ -1,4 +1,4 @@
-use super::shared::{codex_project_filter_matches, cutoff_time, session_id_from_path};
+use super::shared::{codex_project_filter_matches, cutoff_time};
 use super::{ExtractedCommand, SessionProvider};
 use anyhow::{Context, Result};
 use ignore::WalkBuilder;
@@ -134,7 +134,6 @@ impl CodexProvider {
             fs::File::open(path).with_context(|| format!("failed to open {}", path.display()))?;
         let reader = BufReader::new(file);
 
-        let session_id = session_id_from_path(path);
         let mut pending_tool_uses: Vec<(String, String, usize)> = Vec::new();
         let mut tool_results: HashMap<String, (usize, String, bool)> = HashMap::new();
         let mut commands = Vec::new();
@@ -198,7 +197,6 @@ impl CodexProvider {
             commands.push(ExtractedCommand {
                 command,
                 output_len,
-                session_id: session_id.clone(),
                 output_content,
                 is_error,
                 sequence_index,

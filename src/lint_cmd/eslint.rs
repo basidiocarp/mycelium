@@ -1,9 +1,8 @@
 //! ESLint JSON output parser and formatter.
 use crate::parser::types::{Diagnostic, DiagnosticReport, DiagnosticSeverity};
-use crate::parser::{
-    FormatMode, OutputParser, ParseResult, TokenFormatter, emit_passthrough_warning,
-    truncate_output,
-};
+#[cfg(test)]
+use crate::parser::{FormatMode, TokenFormatter};
+use crate::parser::{OutputParser, ParseResult, emit_passthrough_warning, truncate_output};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -97,7 +96,7 @@ impl OutputParser for EslintParser {
 }
 
 /// Filter ESLint JSON output - group by rule and file
-#[allow(dead_code)]
+#[cfg(test)]
 pub fn filter_eslint_json(output: &str) -> String {
     let report = match EslintParser::parse(output) {
         ParseResult::Full(r) | ParseResult::Degraded(r, _) => r,

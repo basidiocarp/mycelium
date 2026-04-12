@@ -5,6 +5,7 @@
 //! - Text truncation
 //! - Command execution with error context
 
+#[cfg(test)]
 use anyhow::{Context, Result};
 use std::process::Command;
 
@@ -62,7 +63,7 @@ pub fn strip_ansi(text: &str) -> String {
 /// let (stdout, stderr, code) = execute_command("echo", &["test"]).unwrap();
 /// assert_eq!(code, 0);
 /// ```
-#[allow(dead_code)]
+#[cfg(test)]
 pub fn execute_command(cmd: &str, args: &[&str]) -> Result<(String, String, i32)> {
     let output = Command::new(cmd)
         .args(args)
@@ -207,7 +208,6 @@ pub fn ok_confirmation(action: &str, detail: &str) -> String {
 /// let pm = detect_package_manager();
 /// // Returns "pnpm" if pnpm-lock.yaml exists, "bun" if bun.lockb, "yarn" if yarn.lock, else "npm"
 /// ```
-#[allow(dead_code)]
 pub fn detect_package_manager() -> &'static str {
     if std::path::Path::new("pnpm-lock.yaml").exists() {
         "pnpm"
@@ -264,14 +264,6 @@ pub fn which_command(cmd: &str) -> Option<String> {
 /// Extract the exit code from a process status, defaulting to 1 for signals.
 pub fn exit_code(status: &std::process::ExitStatus) -> i32 {
     status.code().unwrap_or(1)
-}
-
-#[allow(dead_code)]
-pub fn exit_if_failed(status: &std::process::ExitStatus) {
-    let code = exit_code(status);
-    if code != 0 {
-        std::process::exit(code);
-    }
 }
 
 #[cfg(test)]

@@ -16,14 +16,13 @@ use crate::learn::corrections_store;
 /// REWRITTEN=$(mycelium rewrite "$CMD") || exit 0
 /// [ "$CMD" = "$REWRITTEN" ] && exit 0  # already Mycelium, skip
 /// ```
-pub fn run(cmd: &str, explain: bool) -> anyhow::Result<()> {
-    let resolution = resolve(cmd);
-
-    if explain {
-        print!("{}", render_explanation(&resolution));
+pub fn run(cmd: &str, explain_mode: bool) -> anyhow::Result<()> {
+    if explain_mode {
+        print!("{}", self::explain(cmd));
         return Ok(());
     }
 
+    let resolution = resolve(cmd);
     if let Some(rewritten) = resolution.rewritten {
         print!("{}", rewritten);
         return Ok(());
@@ -62,7 +61,6 @@ pub(crate) fn resolve_runtime_command(cmd: &str) -> RuntimeResolution {
     }
 }
 
-#[allow(dead_code)]
 pub fn explain(cmd: &str) -> String {
     render_explanation(&resolve(cmd))
 }

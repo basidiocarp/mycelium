@@ -14,31 +14,6 @@ struct Package {
     latest_version: Option<String>,
 }
 
-/// Run pip (or uv) and filter output for list, outdated, and install subcommands.
-#[allow(dead_code)]
-pub fn run(args: &[String], verbose: u8) -> Result<()> {
-    if args.is_empty() {
-        anyhow::bail!(
-            "mycelium pip: no subcommand specified\nSupported: list, outdated, install, uninstall, show"
-        );
-    }
-
-    // Detect subcommand
-    let subcommand = args.first().map(|s| s.as_str()).unwrap_or("");
-
-    match subcommand {
-        "list" => run_list(&args[1..], verbose),
-        "outdated" => run_outdated(&args[1..], verbose),
-        "install" => run_install(args, verbose),
-        "uninstall" => run_uninstall(args, verbose),
-        "show" => run_show(args, verbose),
-        _ => anyhow::bail!(
-            "mycelium pip: unsupported subcommand '{}'\nSupported: list, outdated, install, uninstall, show",
-            subcommand
-        ),
-    }
-}
-
 /// List installed packages (pip list --format=json)
 pub fn run_list(args: &[String], verbose: u8) -> Result<()> {
     let timer = tracking::TimedExecution::start();
