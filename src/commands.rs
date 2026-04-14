@@ -478,9 +478,12 @@ pub enum Commands {
     /// Show token savings summary and history
     #[command(display_order = 100)]
     Gain {
-        /// Filter statistics to current project (current working directory)
-        #[arg(short, long)]
-        project: bool,
+        /// Scope to a project. Bare --project or -p uses the current directory.
+        /// --project <name> searches known project paths (full path, case-insensitive substring).
+        /// --project all shows per-project breakdown.
+        #[arg(short, long, num_args = 0..=1, default_missing_value = ".",
+              value_name = "NAME", conflicts_with = "project_path")]
+        project: Option<String>,
         /// Filter to a specific project path (use '.' for current directory)
         #[arg(long = "project-path", value_name = "PATH")]
         project_path: Option<String>,

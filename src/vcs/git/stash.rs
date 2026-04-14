@@ -1,6 +1,6 @@
 //! Stash handler for git command proxy.
 use crate::tracking;
-use crate::vcs::git_filters::{compact_diff, filter_stash_list};
+use crate::vcs::git_filters::compact_diff;
 use anyhow::{Context, Result};
 
 pub(super) fn run_stash(
@@ -17,8 +17,10 @@ pub(super) fn run_stash(
 
     match subcommand {
         Some("list") => {
+            // Use --format to get structured output directly instead of
+            // regex-parsing the human-readable "stash@{N}: WIP on branch: hash msg" format.
             let output = super::git_cmd(global_args)
-                .args(["stash", "list"])
+                .args(["stash", "list", "--format=%gd: %s"])
                 .output()
                 .context("Failed to run git stash list")?;
             let stdout = String::from_utf8_lossy(&output.stdout);
@@ -31,7 +33,8 @@ pub(super) fn run_stash(
                 return Ok(());
             }
 
-            let filtered = filter_stash_list(&stdout);
+            // Output is already compact: "stash@{0}: commit message"
+            let filtered = stdout.trim().to_string();
             println!("{}", filtered);
             timer.track("git stash list", "mycelium git stash list", &raw, &filtered);
         }

@@ -82,6 +82,75 @@ fn test_cc_economics_alias_still_parses() {
 }
 
 #[test]
+fn test_gain_project_bare_flag_parses() {
+    let cli = Cli::try_parse_from(["mycelium", "gain", "--project"]).unwrap();
+    match cli.command {
+        Commands::Gain { project, .. } => {
+            // Bare --project uses default_missing_value "."
+            assert_eq!(project.as_deref(), Some("."));
+        }
+        _ => panic!("Expected Gain command"),
+    }
+}
+
+#[test]
+fn test_gain_project_name_parses() {
+    let cli = Cli::try_parse_from(["mycelium", "gain", "--project", "mycelium"]).unwrap();
+    match cli.command {
+        Commands::Gain { project, .. } => {
+            assert_eq!(project.as_deref(), Some("mycelium"));
+        }
+        _ => panic!("Expected Gain command"),
+    }
+}
+
+#[test]
+fn test_gain_project_all_parses() {
+    // Clap produces Some("all"), which gain::run() intercepts before
+    // resolve_project_scope to route to show_projects_table.
+    let cli = Cli::try_parse_from(["mycelium", "gain", "--project", "all"]).unwrap();
+    match cli.command {
+        Commands::Gain { project, .. } => {
+            assert_eq!(project.as_deref(), Some("all"));
+        }
+        _ => panic!("Expected Gain command"),
+    }
+}
+
+#[test]
+fn test_gain_project_conflicts_with_project_path() {
+    let err =
+        match Cli::try_parse_from(["mycelium", "gain", "--project", "foo", "--project-path", "."]) {
+            Ok(_) => panic!("expected clap conflict"),
+            Err(err) => err,
+        };
+    assert_eq!(err.kind(), clap::error::ErrorKind::ArgumentConflict);
+}
+
+#[test]
+fn test_gain_project_short_flag_parses() {
+    let cli = Cli::try_parse_from(["mycelium", "gain", "-p"]).unwrap();
+    match cli.command {
+        Commands::Gain { project, .. } => {
+            // Bare -p uses default_missing_value "."
+            assert_eq!(project.as_deref(), Some("."));
+        }
+        _ => panic!("Expected Gain command"),
+    }
+}
+
+#[test]
+fn test_gain_no_project_flag_is_none() {
+    let cli = Cli::try_parse_from(["mycelium", "gain"]).unwrap();
+    match cli.command {
+        Commands::Gain { project, .. } => {
+            assert!(project.is_none());
+        }
+        _ => panic!("Expected Gain command"),
+    }
+}
+
+#[test]
 fn test_gain_diagnostics_flag_parses() {
     let cli = Cli::try_parse_from(["mycelium", "gain", "--diagnostics"]).unwrap();
     match cli.command {

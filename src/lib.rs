@@ -25,8 +25,8 @@ pub use discover::registry::{
 };
 pub use git_filters::{
     compact_diff, compact_diff_with_profile, filter_branch_output, filter_log_output,
-    filter_stash_list, filter_status_with_args, filter_worktree_list, format_status_output,
-    format_status_output_with_profile,
+    filter_stash_list, filter_status_with_args, filter_worktree_list, format_branch_structured,
+    format_status_output, format_status_output_with_profile, format_worktree_porcelain,
 };
 pub use tracking::{
     DbPathInfo, DbPathSource, TelemetrySummarySurface, TimedExecution, Tracker,

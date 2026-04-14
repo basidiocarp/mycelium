@@ -154,6 +154,13 @@ pub fn filter_status_with_args(output: &str) -> String {
 }
 
 /// Filter branch listing into compact format with current, local, and remote-only sections
+///
+/// Legacy text-parsing fallback. The binary now uses `git branch --format` for
+/// structured output, but this remains in the library API for external callers.
+#[allow(
+    dead_code,
+    reason = "Kept in library API as fallback for callers that receive pre-formatted branch output"
+)]
 pub fn filter_branch_output(output: &str) -> String {
     let mut current = String::new();
     let mut local: Vec<String> = Vec::new();
@@ -203,6 +210,134 @@ pub fn filter_branch_output(output: &str) -> String {
                 result.push(format!("    ... +{} more", remote_only.len() - 10));
             }
         }
+    }
+
+    result.join("\n")
+}
+
+/// Format branch listing from pre-parsed structured data (from `git branch --format`).
+///
+/// Takes pre-separated current, local, and remote branch names instead of parsing
+/// human-readable `git branch -a` output. This avoids regex fragility when git's
+/// display format changes.
+pub fn format_branch_structured(current: &str, local: &[String], remote: &[String]) -> String {
+    let mut result = Vec::new();
+    result.push(format!("* {}", current));
+
+    for b in local {
+        result.push(format!("  {}", b));
+    }
+
+    if !remote.is_empty() {
+        // Filter out remotes that already exist locally
+        let remote_only: Vec<&String> = remote
+            .iter()
+            .filter(|r| r.as_str() != current && !local.contains(r))
+            .collect();
+        if !remote_only.is_empty() {
+            result.push(format!("  remote-only ({}):", remote_only.len()));
+            for b in remote_only.iter().take(10) {
+                result.push(format!("    {}", b));
+            }
+            if remote_only.len() > 10 {
+                result.push(format!("    ... +{} more", remote_only.len() - 10));
+            }
+        }
+    }
+
+    result.join("\n")
+}
+
+/// Format worktree listing from `git worktree list --porcelain` output.
+///
+/// Porcelain format outputs one attribute per line with blank-line separators:
+/// ```text
+/// worktree /path/to/main
+/// HEAD abc1234def5678
+/// branch refs/heads/main
+///
+/// worktree /path/to/feature
+/// HEAD def5678abc1234
+/// branch refs/heads/feature
+/// ```
+///
+/// This avoids parsing the space-aligned human-readable format.
+pub fn format_worktree_porcelain(porcelain: &str) -> String {
+    let home = dirs::home_dir()
+        .map(|h| h.to_string_lossy().to_string())
+        .unwrap_or_default();
+
+    let mut result = Vec::new();
+    let mut current_path = String::new();
+    let mut current_head = String::new();
+    let mut current_branch = String::new();
+    let mut is_bare = false;
+
+    for line in porcelain.lines() {
+        if line.trim().is_empty() {
+            // End of a worktree entry -- emit it
+            if !current_path.is_empty() {
+                let mut path = current_path.clone();
+                if !home.is_empty() && path.starts_with(&home) {
+                    path = format!("~{}", &path[home.len()..]);
+                }
+                let short_head = if current_head.len() > 7 {
+                    &current_head[..7]
+                } else {
+                    &current_head
+                };
+                let branch_display = if is_bare {
+                    "(bare)".to_string()
+                } else if current_branch.is_empty() {
+                    "(detached)".to_string()
+                } else {
+                    let short = current_branch
+                        .strip_prefix("refs/heads/")
+                        .unwrap_or(&current_branch);
+                    format!("[{}]", short)
+                };
+                result.push(format!("{} {} {}", path, short_head, branch_display));
+            }
+            current_path.clear();
+            current_head.clear();
+            current_branch.clear();
+            is_bare = false;
+            continue;
+        }
+
+        if let Some(path) = line.strip_prefix("worktree ") {
+            current_path = path.to_string();
+        } else if let Some(head) = line.strip_prefix("HEAD ") {
+            current_head = head.to_string();
+        } else if let Some(branch) = line.strip_prefix("branch ") {
+            current_branch = branch.to_string();
+        } else if line == "bare" {
+            is_bare = true;
+        }
+    }
+
+    // Emit last entry if porcelain didn't end with blank line
+    if !current_path.is_empty() {
+        let mut path = current_path;
+        if !home.is_empty() && path.starts_with(&home) {
+            path = format!("~{}", &path[home.len()..]);
+        }
+        let short_head = if current_head.len() > 7 {
+            &current_head[..7]
+        } else {
+            &current_head
+        };
+        let branch_display = if is_bare {
+            "(bare)".to_string()
+        } else if current_branch.is_empty() {
+            "(detached)".to_string()
+        } else {
+            let short = current_branch
+                .strip_prefix("refs/heads/")
+                .unwrap_or(&current_branch);
+            format!("[{}]", short)
+        };
+        result.push(format!("{} {} {}", path, short_head, branch_display));
     }
 
     result.join("\n")
@@ -410,5 +545,140 @@ no changes added to commit (use "git add" and/or "git commit -a")
         }
         let result = format_status_output_with_profile(&porcelain, CompactionProfile::Aggressive);
         assert!(result.contains("... +20 more files"));
+    }
+
+    // ── format_branch_structured tests ─────────────────────────────────
+
+    #[test]
+    fn test_format_branch_structured_basic() {
+        let current = "main";
+        let local = vec!["feature/auth".to_string(), "fix/bug-123".to_string()];
+        let remote = vec![
+            "main".to_string(),
+            "feature/auth".to_string(),
+            "release/v2".to_string(),
+        ];
+        let result = format_branch_structured(current, &local, &remote);
+        assert!(result.contains("* main"));
+        assert!(result.contains("  feature/auth"));
+        assert!(result.contains("  fix/bug-123"));
+        // remote-only should show release/v2 but not main or feature/auth (already local)
+        assert!(result.contains("remote-only (1):"));
+        assert!(result.contains("release/v2"));
+    }
+
+    #[test]
+    fn test_format_branch_structured_no_remotes() {
+        let current = "main";
+        let local = vec!["develop".to_string()];
+        let remote: Vec<String> = Vec::new();
+        let result = format_branch_structured(current, &local, &remote);
+        assert!(result.contains("* main"));
+        assert!(result.contains("  develop"));
+        assert!(!result.contains("remote-only"));
+    }
+
+    #[test]
+    fn test_format_branch_structured_many_remotes() {
+        let current = "main";
+        let local: Vec<String> = Vec::new();
+        let remote: Vec<String> = (1..=15)
+            .map(|i| format!("feature-{}", i))
+            .collect();
+        let result = format_branch_structured(current, &local, &remote);
+        assert!(result.contains("remote-only (15):"));
+        // First 10 shown
+        assert!(result.contains("feature-10"));
+        // 11+ truncated
+        assert!(result.contains("... +5 more"));
+    }
+
+    #[test]
+    fn test_format_branch_structured_matches_legacy_output() {
+        // Verify the new function produces identical output to the legacy filter
+        let current = "main";
+        let local = vec!["feature/auth".to_string(), "fix/bug-123".to_string()];
+        let remote = vec!["release/v2".to_string()];
+        let structured = format_branch_structured(current, &local, &remote);
+
+        // Build equivalent human-readable input for the legacy filter
+        let human_readable = "* main\n  feature/auth\n  fix/bug-123\n  remotes/origin/HEAD -> origin/main\n  remotes/origin/main\n  remotes/origin/feature/auth\n  remotes/origin/release/v2\n";
+        let legacy = filter_branch_output(human_readable);
+
+        assert_eq!(structured, legacy);
+    }
+
+    // ── format_worktree_porcelain tests ────────────────────────────────
+
+    #[test]
+    fn test_format_worktree_porcelain_basic() {
+        let porcelain = "\
+worktree /home/user/project
+HEAD abc1234def5678901234567890abcdef12345678
+branch refs/heads/main
+
+worktree /home/user/worktrees/feat
+HEAD def5678abc1234901234567890abcdef12345678
+branch refs/heads/feature
+
+";
+        let result = format_worktree_porcelain(porcelain);
+        assert!(result.contains("abc1234"));
+        assert!(result.contains("[main]"));
+        assert!(result.contains("[feature]"));
+        assert_eq!(result.lines().count(), 2);
+    }
+
+    #[test]
+    fn test_format_worktree_porcelain_detached_head() {
+        let porcelain = "\
+worktree /tmp/detached
+HEAD abc1234def5678901234567890abcdef12345678
+detached
+
+";
+        let result = format_worktree_porcelain(porcelain);
+        assert!(result.contains("(detached)"));
+    }
+
+    #[test]
+    fn test_format_worktree_porcelain_bare() {
+        let porcelain = "\
+worktree /tmp/bare-repo
+HEAD abc1234def5678901234567890abcdef12345678
+bare
+
+";
+        let result = format_worktree_porcelain(porcelain);
+        assert!(result.contains("(bare)"));
+    }
+
+    #[test]
+    fn test_format_worktree_porcelain_no_trailing_newline() {
+        // Porcelain output without trailing blank line
+        let porcelain = "\
+worktree /tmp/project
+HEAD abc1234def5678901234567890abcdef12345678
+branch refs/heads/main";
+        let result = format_worktree_porcelain(porcelain);
+        assert!(result.contains("[main]"));
+        assert!(result.contains("abc1234"));
+    }
+
+    #[test]
+    fn test_format_worktree_porcelain_home_shortening() {
+        let home = dirs::home_dir()
+            .map(|h| h.to_string_lossy().to_string())
+            .unwrap_or_else(|| "/home/user".to_string());
+
+        let porcelain = format!(
+            "worktree {home}/projects/myapp\nHEAD abc1234def5678\nbranch refs/heads/main\n\n"
+        );
+        let result = format_worktree_porcelain(&porcelain);
+        assert!(
+            result.contains("~/projects/myapp"),
+            "Should shorten home directory to ~, got: {}",
+            result
+        );
     }
 }

@@ -1,7 +1,8 @@
 //! Status, add, branch, and worktree handlers for git command proxy.
 use crate::tracking;
 use crate::vcs::git_filters::{
-    filter_branch_output, filter_status_with_args, filter_worktree_list, format_status_output,
+    filter_status_with_args, format_branch_structured, format_status_output,
+    format_worktree_porcelain,
 };
 use anyhow::{Context, Result};
 
@@ -207,22 +208,81 @@ pub(super) fn run_branch(args: &[String], verbose: u8, global_args: &[String]) -
         return Ok(());
     }
 
-    // List mode: show compact branch list
-    let mut cmd = super::git_cmd(global_args);
-    cmd.arg("branch");
-    if !has_list_flag {
-        cmd.arg("-a");
-    }
-    cmd.arg("--no-color");
-    for arg in args {
-        cmd.arg(arg);
+    // List mode: use --format for structured output instead of parsing human-readable text.
+    // We run two commands: local branches (always) and remote branches (when -a or -r).
+    let wants_remote = !has_list_flag
+        || args.iter().any(|a| a == "-a" || a == "--all" || a == "-r" || a == "--remotes");
+    let wants_local = !args.iter().any(|a| a == "-r" || a == "--remotes");
+
+    // Collect extra filter flags the user may have passed (--merged, --contains, etc.)
+    let filter_flags: Vec<&String> = args
+        .iter()
+        .filter(|a| {
+            a.as_str() != "-a"
+                && a.as_str() != "--all"
+                && a.as_str() != "-r"
+                && a.as_str() != "--remotes"
+                && a.as_str() != "--list"
+        })
+        .collect();
+
+    let mut current = String::new();
+    let mut local: Vec<String> = Vec::new();
+    let mut remote: Vec<String> = Vec::new();
+
+    // Local branches with HEAD marker via --format
+    if wants_local {
+        let mut cmd = super::git_cmd(global_args);
+        cmd.args(["branch", "--format=%(HEAD)\t%(refname:short)"]);
+        for f in &filter_flags {
+            cmd.arg(f.as_str());
+        }
+        let output = cmd.output().context("Failed to run git branch")?;
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        for line in stdout.lines() {
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
+            if let Some(name) = line.strip_prefix("*\t") {
+                current = name.to_string();
+            } else if let Some(name) = line.strip_prefix(" \t") {
+                local.push(name.to_string());
+            } else {
+                // Fallback for unexpected format
+                local.push(line.to_string());
+            }
+        }
     }
 
-    let output = cmd.output().context("Failed to run git branch")?;
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let raw = stdout.to_string();
+    // Remote branches via --format
+    if wants_remote {
+        let mut cmd = super::git_cmd(global_args);
+        cmd.args(["branch", "-r", "--format=%(refname:short)"]);
+        for f in &filter_flags {
+            cmd.arg(f.as_str());
+        }
+        let output = cmd.output().context("Failed to run git branch -r")?;
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        for line in stdout.lines() {
+            let name = line.trim();
+            if name.is_empty() {
+                continue;
+            }
+            // Skip HEAD pointer (e.g. "origin/HEAD")
+            if name.ends_with("/HEAD") || name.contains("HEAD ->") {
+                continue;
+            }
+            // Strip "origin/" prefix for comparison with local names
+            let short = name.strip_prefix("origin/").unwrap_or(name);
+            remote.push(short.to_string());
+        }
+    }
 
-    let filtered = filter_branch_output(&stdout);
+    // Build raw for tracking (approximate -- we used structured output)
+    let raw = format!("* {}\n{}", current, local.join("\n"));
+
+    let filtered = format_branch_structured(&current, &local, &remote);
     println!("{}", filtered);
 
     timer.track(
@@ -283,16 +343,16 @@ pub(super) fn run_worktree(args: &[String], verbose: u8, global_args: &[String])
         return Ok(());
     }
 
-    // Default: list mode
+    // Default: list mode with --porcelain for structured output
     let output = super::git_cmd(global_args)
-        .args(["worktree", "list"])
+        .args(["worktree", "list", "--porcelain"])
         .output()
-        .context("Failed to run git worktree list")?;
+        .context("Failed to run git worktree list --porcelain")?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let raw = stdout.to_string();
 
-    let filtered = filter_worktree_list(&stdout);
+    let filtered = format_worktree_porcelain(&stdout);
     println!("{}", filtered);
     timer.track(
         "git worktree list",

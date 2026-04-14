@@ -12,7 +12,7 @@ pub(crate) use helpers::resolve_project_scope;
 
 #[allow(clippy::too_many_arguments)]
 pub fn run(
-    project: bool,
+    project: Option<&str>,
     project_path: Option<&str>,
     projects: bool,
     diagnostics: bool,
@@ -43,19 +43,18 @@ pub fn run(
         return display::show_status(&tracker);
     }
 
-    // --projects: per-project breakdown table
-    if projects {
+    // --projects or --project all: per-project breakdown table
+    if projects || project.map(|p| p.eq_ignore_ascii_case("all")).unwrap_or(false) {
         return display::show_projects_table(&tracker);
     }
 
-    let project_scope = helpers::resolve_project_scope(project, project_path)?;
+    let project_scope = helpers::resolve_project_scope(project, project_path, &tracker)?;
 
     if failures {
         return display::show_failures(&tracker, project_scope.as_deref());
     }
 
     if diagnostics {
-        let project_scope = helpers::resolve_project_scope(project, project_path)?;
         return rewrite_diagnostics::show_rewrite_diagnostics(
             &tracker,
             project_scope.as_deref(),

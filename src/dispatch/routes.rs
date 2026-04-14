@@ -283,7 +283,7 @@ pub(super) fn dispatch_command(cli: Cli) -> Result<()> {
             compare,
         } => {
             gain::run(
-                project,
+                project.as_deref(),
                 project_path.as_deref(),
                 projects,
                 diagnostics,

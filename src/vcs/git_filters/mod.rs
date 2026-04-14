@@ -7,8 +7,8 @@ pub mod status;
 pub use diff::{compact_diff, compact_diff_with_profile};
 #[allow(unused_imports)]
 pub use status::{
-    filter_branch_output, filter_status_with_args, format_status_output,
-    format_status_output_with_profile,
+    filter_branch_output, filter_status_with_args, format_branch_structured, format_status_output,
+    format_status_output_with_profile, format_worktree_porcelain,
 };
 
 /// Detect `rev:path` style arguments (blob show) while ignoring flags like
@@ -37,6 +37,13 @@ pub fn filter_log_output(output: &str, limit: usize) -> String {
 }
 
 /// Compact stash list: strip "WIP on branch:" prefix
+///
+/// Legacy text-parsing fallback. The binary now uses `git stash list --format`
+/// for structured output, but this remains in the library API for external callers.
+#[allow(
+    dead_code,
+    reason = "Kept in library API as fallback for callers that receive pre-formatted stash output"
+)]
 pub fn filter_stash_list(output: &str) -> String {
     // Format: "stash@{0}: WIP on main: abc1234 commit message"
     let mut result = Vec::new();
@@ -59,6 +66,13 @@ pub fn filter_stash_list(output: &str) -> String {
 }
 
 /// Compact worktree list: shorten home directory paths
+///
+/// Legacy text-parsing fallback. The binary now uses `git worktree list --porcelain`
+/// for structured output, but this remains in the library API for external callers.
+#[allow(
+    dead_code,
+    reason = "Kept in library API as fallback for callers that receive pre-formatted worktree output"
+)]
 pub fn filter_worktree_list(output: &str) -> String {
     let home = dirs::home_dir()
         .map(|h| h.to_string_lossy().to_string())
