@@ -13,6 +13,8 @@ pub(crate) struct ExportData {
     pub(crate) telemetry_summary: TelemetrySummarySurface,
     pub(crate) by_command: Vec<ExportCommandStats>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) by_project: Option<Vec<ExportProjectStats>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) history: Option<Vec<DetailedCommandRecord>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) daily: Option<Vec<DayStats>>,
@@ -52,6 +54,27 @@ impl From<CommandStats> for ExportCommandStats {
             exec_time_ms: value.exec_time_ms,
             input_tokens: value.input_tokens,
             tokens_saved: value.tokens_saved,
+        }
+    }
+}
+
+#[derive(Serialize)]
+pub(crate) struct ExportProjectStats {
+    pub(crate) project_path: String,
+    pub(crate) commands: i64,
+    pub(crate) saved_tokens: i64,
+    pub(crate) avg_savings_pct: f64,
+    pub(crate) last_used: String,
+}
+
+impl From<crate::tracking::ProjectStats> for ExportProjectStats {
+    fn from(value: crate::tracking::ProjectStats) -> Self {
+        Self {
+            project_path: value.project_path,
+            commands: value.commands,
+            saved_tokens: value.saved_tokens,
+            avg_savings_pct: value.avg_savings_pct,
+            last_used: value.last_used,
         }
     }
 }
@@ -96,6 +119,7 @@ fn build_export_data(
         },
         telemetry_summary,
         by_command,
+        by_project: None,
         history: if history {
             Some(
                 tracker
@@ -151,6 +175,20 @@ pub(crate) fn export_json(
     let json = serde_json::to_string_pretty(&export)?;
     println!("{}", json);
 
+    Ok(())
+}
+
+pub(crate) fn export_json_projects(tracker: &Tracker) -> Result<()> {
+    let mut export = build_export_data(tracker, false, false, false, false, false, 50, None)?;
+
+    let stats = tracker
+        .get_by_project()
+        .context("Failed to load per-project statistics from database")?;
+
+    export.by_project = Some(stats.into_iter().map(Into::into).collect());
+
+    let json = serde_json::to_string_pretty(&export)?;
+    println!("{json}");
     Ok(())
 }
 
@@ -267,5 +305,32 @@ mod tests {
             export.telemetry_summary.command_breakdown[1].command,
             "mycelium git status"
         );
+    }
+
+    #[test]
+    fn gain_json_project_export_includes_by_project_and_summary() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("gain-project-export.db");
+        let db_path = db_path.to_string_lossy().to_string();
+        let tracker = Tracker::new_with_override(Some(&db_path)).expect("tracker");
+
+        tracker
+            .record("git status", "mycelium git status", 100, 10, 5)
+            .expect("record");
+
+        let export = build_export_data(&tracker, false, false, false, false, false, 50, None)
+            .expect("build export data");
+
+        // The export includes required schema fields
+        assert_eq!(export.schema_version, "1.0");
+        assert_eq!(export.summary.total_commands, 1);
+        assert!(export.by_project.is_none());
+
+        // Verify that by_project can be populated via get_by_project
+        let stats = tracker.get_by_project().expect("get_by_project");
+        let by_project: Vec<super::ExportProjectStats> =
+            stats.into_iter().map(Into::into).collect();
+        // Tracker auto-detects project path from CWD, so this should be non-empty
+        assert!(!by_project.is_empty());
     }
 }

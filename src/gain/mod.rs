@@ -44,8 +44,12 @@ pub fn run(
     }
 
     // --projects or --project all: per-project breakdown table
-    if projects || project.map(|p| p.eq_ignore_ascii_case("all")).unwrap_or(false) {
-        return display::show_projects_table(&tracker);
+    let is_project_all = projects || project.map(|p| p.eq_ignore_ascii_case("all")).unwrap_or(false);
+    if is_project_all {
+        return match format {
+            "json" => export::export_json_projects(&tracker),
+            _ => display::show_projects_table(&tracker),
+        };
     }
 
     let project_scope = helpers::resolve_project_scope(project, project_path, &tracker)?;
