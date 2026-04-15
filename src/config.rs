@@ -618,7 +618,10 @@ enabled = false
 threshold_tokens = 6000
 "#;
         let config: Config = toml::from_str(toml).expect("valid toml");
-        let summary = config.filters.summary.expect("summary config should be present");
+        let summary = config
+            .filters
+            .summary
+            .expect("summary config should be present");
         assert_eq!(summary.threshold_tokens, 6000);
     }
 

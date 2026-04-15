@@ -44,7 +44,10 @@ pub fn run(
     }
 
     // --projects or --project all: per-project breakdown table
-    let is_project_all = projects || project.map(|p| p.eq_ignore_ascii_case("all")).unwrap_or(false);
+    let is_project_all = projects
+        || project
+            .map(|p| p.eq_ignore_ascii_case("all"))
+            .unwrap_or(false);
     if is_project_all {
         return match format {
             "json" => export::export_json_projects(&tracker),

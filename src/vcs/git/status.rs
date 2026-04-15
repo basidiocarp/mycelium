@@ -211,7 +211,9 @@ pub(super) fn run_branch(args: &[String], verbose: u8, global_args: &[String]) -
     // List mode: use --format for structured output instead of parsing human-readable text.
     // We run two commands: local branches (always) and remote branches (when -a or -r).
     let wants_remote = !has_list_flag
-        || args.iter().any(|a| a == "-a" || a == "--all" || a == "-r" || a == "--remotes");
+        || args
+            .iter()
+            .any(|a| a == "-a" || a == "--all" || a == "-r" || a == "--remotes");
     let wants_local = !args.iter().any(|a| a == "-r" || a == "--remotes");
 
     // Collect extra filter flags the user may have passed (--merged, --contains, etc.)

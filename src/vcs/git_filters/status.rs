@@ -582,9 +582,7 @@ no changes added to commit (use "git add" and/or "git commit -a")
     fn test_format_branch_structured_many_remotes() {
         let current = "main";
         let local: Vec<String> = Vec::new();
-        let remote: Vec<String> = (1..=15)
-            .map(|i| format!("feature-{}", i))
-            .collect();
+        let remote: Vec<String> = (1..=15).map(|i| format!("feature-{}", i)).collect();
         let result = format_branch_structured(current, &local, &remote);
         assert!(result.contains("remote-only (15):"));
         // First 10 shown

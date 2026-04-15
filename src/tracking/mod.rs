@@ -39,7 +39,9 @@ use chrono::{Duration, Utc};
 use rusqlite::{Connection, params};
 use serde::Serialize;
 
-use utils::{current_project_path_string, current_project_root, current_runtime_session_id, get_db_path};
+use utils::{
+    current_project_path_string, current_project_root, current_runtime_session_id, get_db_path,
+};
 
 #[allow(unused_imports)]
 pub use queries::ParseHealthRow;

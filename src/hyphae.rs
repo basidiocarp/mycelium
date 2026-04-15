@@ -153,7 +153,7 @@ pub fn route_or_filter(
                         &summary.summary,
                         summary.input_tokens,
                         summary.output_tokens,
-                        0, // exec_time_ms not available in this context
+                        0,    // exec_time_ms not available in this context
                         None, // exit_code not available
                     );
                 }
@@ -569,6 +569,9 @@ mod tests {
         // When no config file is present (typical test environment),
         // the threshold should fall back to the default.
         let threshold = get_summary_threshold();
-        assert_eq!(threshold, crate::summarizer::DEFAULT_SUMMARY_THRESHOLD_TOKENS);
+        assert_eq!(
+            threshold,
+            crate::summarizer::DEFAULT_SUMMARY_THRESHOLD_TOKENS
+        );
     }
 }

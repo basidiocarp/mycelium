@@ -119,11 +119,17 @@ fn test_gain_project_all_parses() {
 
 #[test]
 fn test_gain_project_conflicts_with_project_path() {
-    let err =
-        match Cli::try_parse_from(["mycelium", "gain", "--project", "foo", "--project-path", "."]) {
-            Ok(_) => panic!("expected clap conflict"),
-            Err(err) => err,
-        };
+    let err = match Cli::try_parse_from([
+        "mycelium",
+        "gain",
+        "--project",
+        "foo",
+        "--project-path",
+        ".",
+    ]) {
+        Ok(_) => panic!("expected clap conflict"),
+        Err(err) => err,
+    };
     assert_eq!(err.kind(), clap::error::ErrorKind::ArgumentConflict);
 }
 
