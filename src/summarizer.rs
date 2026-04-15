@@ -15,10 +15,6 @@ pub struct OutputSummary {
     pub input_tokens: usize,
     /// Estimated tokens in summary
     pub output_tokens: usize,
-    /// Tokens saved by summarization
-    pub tokens_saved: usize,
-    /// Savings as percentage
-    pub savings_pct: f64,
 }
 
 /// Summarize command output if above the token threshold.
@@ -40,19 +36,11 @@ pub fn summarize(raw: &str, command: &str, threshold_tokens: usize) -> Option<Ou
 
     let summary_text = build_summary(raw, command, input_tokens);
     let output_tokens = estimate_tokens(&summary_text);
-    let tokens_saved = input_tokens.saturating_sub(output_tokens);
-    let savings_pct = if input_tokens > 0 {
-        (tokens_saved as f64 / input_tokens as f64) * 100.0
-    } else {
-        0.0
-    };
 
     Some(OutputSummary {
         summary: summary_text,
         input_tokens,
         output_tokens,
-        tokens_saved,
-        savings_pct,
     })
 }
 
@@ -171,8 +159,7 @@ mod tests {
         let summary = result.unwrap();
         assert!(summary.input_tokens > 0);
         assert!(summary.output_tokens > 0);
-        assert!(summary.tokens_saved > 0);
-        assert!(summary.savings_pct > 0.0);
+        assert!(summary.input_tokens > summary.output_tokens);
     }
 
     #[test]
