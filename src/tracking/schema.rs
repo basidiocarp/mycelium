@@ -131,5 +131,32 @@ pub(super) fn init_schema(conn: &Connection) -> Result<()> {
     )
     .context("Failed to create idx_pf_project_path_timestamp")?;
 
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS summaries (
+            id INTEGER PRIMARY KEY,
+            captured_at TEXT NOT NULL,
+            command TEXT NOT NULL,
+            summary TEXT NOT NULL,
+            input_tokens INTEGER NOT NULL,
+            output_tokens INTEGER NOT NULL,
+            tokens_saved INTEGER NOT NULL,
+            savings_pct REAL NOT NULL,
+            exit_code INTEGER,
+            exec_time_ms INTEGER,
+            project_path TEXT DEFAULT '',
+            project_root TEXT DEFAULT '',
+            worktree_id TEXT DEFAULT '',
+            session_id TEXT
+        )",
+        [],
+    )
+    .context("Failed to create summaries table")?;
+
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_summaries_captured_at ON summaries(captured_at)",
+        [],
+    )
+    .context("Failed to create idx_summaries_captured_at")?;
+
     Ok(())
 }

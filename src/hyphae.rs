@@ -38,20 +38,38 @@ pub fn should_use_hyphae() -> bool {
 pub enum OutputAction {
     /// Small output — return as-is.
     Passthrough,
-    /// Medium output or Hyphae unavailable — apply local filter.
+    /// Filter for tokens or summarization.
     Filter,
     /// Large output + Hyphae available — chunk via Hyphae.
     Chunk,
+    /// Output above summary threshold — replace with compact summary.
+    Summarize,
 }
 
 /// Decide how to handle command output based on size and Hyphae availability.
 pub fn decide_action(output: &str) -> OutputAction {
+    // Check summary threshold first
+    let summary_threshold = get_summary_threshold();
+    let tokens = crate::tracking::utils::estimate_tokens(output);
+    if tokens >= summary_threshold {
+        return OutputAction::Summarize;
+    }
+
+    // Then check adaptive classification for filtering or chunking
     let level = mycelium::adaptive::classify(output);
     match level {
         mycelium::adaptive::AdaptiveLevel::Passthrough => OutputAction::Passthrough,
         mycelium::adaptive::AdaptiveLevel::Structured if should_use_hyphae() => OutputAction::Chunk,
         _ => OutputAction::Filter,
     }
+}
+
+fn get_summary_threshold() -> usize {
+    crate::config::Config::load()
+        .ok()
+        .and_then(|config| config.filters.summary)
+        .map(|summary_config| summary_config.threshold_tokens)
+        .unwrap_or(crate::summarizer::DEFAULT_SUMMARY_THRESHOLD_TOKENS)
 }
 
 /// Validate a filter's output against the raw input.
@@ -104,9 +122,10 @@ fn should_show_filter_header() -> bool {
         .unwrap_or(true)
 }
 
-/// Route command output through Hyphae or fall back to local filtering.
+/// Route command output through Hyphae, summarize, or fall back to local filtering.
 ///
 /// - Small outputs pass through unchanged.
+/// - Outputs above summary threshold are replaced with compact summary.
 /// - Large outputs are sent to Hyphae for chunked storage (if available).
 /// - On Hyphae failure or medium outputs, `filter_fn` is applied.
 /// - All filter results pass through `validate_filter_output` before returning.
@@ -119,6 +138,27 @@ pub fn route_or_filter(
 
     match decide_action(raw) {
         OutputAction::Passthrough => FilterResult::passthrough(raw),
+        OutputAction::Summarize => {
+            let summary_threshold = get_summary_threshold();
+            if let Some(summary) = crate::summarizer::summarize(raw, command, summary_threshold) {
+                // Record summary silently (don't fail if tracking has issues)
+                if let Ok(tracker) = crate::tracking::Tracker::new() {
+                    let _ = tracker.record_summary(
+                        command,
+                        &summary.summary,
+                        summary.input_tokens,
+                        summary.output_tokens,
+                        0, // exec_time_ms not available in this context
+                        None, // exit_code not available
+                    );
+                }
+                FilterResult::full(raw, summary.summary)
+            } else {
+                // Fallback to filter if summarization returns None
+                let result = filter_fn(raw);
+                validate_filter_output(raw, result)
+            }
+        }
         OutputAction::Filter => {
             let result = filter_fn(raw);
             let validated = validate_filter_output(raw, result);

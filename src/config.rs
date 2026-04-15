@@ -158,6 +158,27 @@ pub struct RhizomeConfig {
     pub enabled: Option<bool>,
 }
 
+/// Controls command output summarization for large outputs.
+///
+/// When enabled, outputs above the token threshold are replaced with a compact summary.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SummaryConfig {
+    #[serde(default = "default_summary_threshold_tokens")]
+    pub threshold_tokens: usize,
+}
+
+fn default_summary_threshold_tokens() -> usize {
+    4000
+}
+
+impl Default for SummaryConfig {
+    fn default() -> Self {
+        Self {
+            threshold_tokens: default_summary_threshold_tokens(),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FilterConfig {
     #[serde(default = "default_ignore_dirs")]
@@ -176,6 +197,8 @@ pub struct FilterConfig {
     pub hyphae: Option<HyphaeConfig>,
     #[serde(default)]
     pub rhizome: Option<RhizomeConfig>,
+    #[serde(default)]
+    pub summary: Option<SummaryConfig>,
     /// Show a header line when output is filtered (default: true)
     #[serde(default = "default_true")]
     pub show_filter_header: bool,
@@ -263,6 +286,7 @@ impl Default for FilterConfig {
             adaptive: None,
             hyphae: None,
             rhizome: None,
+            summary: None,
             show_filter_header: true,
         }
     }
@@ -585,5 +609,22 @@ enabled = false
         let config: Config = toml::from_str(toml).expect("valid toml");
         assert_eq!(config.filters.hyphae.unwrap().enabled, Some(true));
         assert_eq!(config.filters.rhizome.unwrap().enabled, Some(false));
+    }
+
+    #[test]
+    fn test_summary_config_custom_threshold() {
+        let toml = r#"
+[filters.summary]
+threshold_tokens = 6000
+"#;
+        let config: Config = toml::from_str(toml).expect("valid toml");
+        let summary = config.filters.summary.expect("summary config should be present");
+        assert_eq!(summary.threshold_tokens, 6000);
+    }
+
+    #[test]
+    fn test_summary_config_absent_is_none() {
+        let config = Config::default();
+        assert!(config.filters.summary.is_none());
     }
 }

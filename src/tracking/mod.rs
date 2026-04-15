@@ -497,6 +497,48 @@ impl Tracker {
         Ok(())
     }
 
+    /// Record a command output summary for analytics.
+    pub fn record_summary(
+        &self,
+        command: &str,
+        summary: &str,
+        input_tokens: usize,
+        output_tokens: usize,
+        exec_time_ms: u64,
+        exit_code: Option<i32>,
+    ) -> Result<()> {
+        let saved = input_tokens.saturating_sub(output_tokens);
+        let pct = if input_tokens > 0 {
+            (saved as f64 / input_tokens as f64) * 100.0
+        } else {
+            0.0
+        };
+
+        let project_path = current_project_path_string();
+        let session_id = current_runtime_session_id();
+
+        self.conn.execute(
+            "INSERT INTO summaries (captured_at, command, summary, project_path, session_id, input_tokens, output_tokens, tokens_saved, savings_pct, exec_time_ms, exit_code)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            params![
+                Utc::now().to_rfc3339(),
+                command,
+                summary,
+                project_path,
+                session_id,
+                input_tokens as i64,
+                output_tokens as i64,
+                saved as i64,
+                pct,
+                exec_time_ms as i64,
+                exit_code,
+            ],
+        )?;
+
+        self.cleanup_old()?;
+        Ok(())
+    }
+
     fn cleanup_old(&self) -> Result<()> {
         let cutoff = Utc::now() - Duration::days(HISTORY_DAYS);
         self.conn.execute(
@@ -505,6 +547,10 @@ impl Tracker {
         )?;
         self.conn.execute(
             "DELETE FROM parse_failures WHERE timestamp < ?1",
+            params![cutoff.to_rfc3339()],
+        )?;
+        self.conn.execute(
+            "DELETE FROM summaries WHERE captured_at < ?1",
             params![cutoff.to_rfc3339()],
         )?;
         Ok(())

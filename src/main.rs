@@ -62,6 +62,7 @@ mod runner_cmd;
 mod self_update_cmd;
 mod streaming;
 mod summary_cmd;
+mod summarizer;
 mod tee;
 mod terraform_cmd;
 mod tracking;
