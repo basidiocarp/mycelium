@@ -682,3 +682,44 @@ fn test_get_by_project() {
         );
     });
 }
+
+// 15. record_summary round-trip test
+#[test]
+fn test_record_summary_roundtrip() {
+    with_test_db("test_record_summary_roundtrip", |db_path| {
+        let tracker = Tracker::new_with_override(Some(db_path)).expect("Failed to create tracker");
+
+        tracker
+            .record_summary("cargo test", "5 tests passed", 1000, 200, 50, Some(0))
+            .expect("Failed to record summary");
+
+        let (captured_at, command, summary, project_path, input_tokens, output_tokens, tokens_saved, savings_pct) = tracker
+            .conn
+            .query_row(
+                "SELECT captured_at, command, summary, project_path, input_tokens, output_tokens, tokens_saved, savings_pct FROM summaries WHERE command = 'cargo test'",
+                [],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, String>(3)?,
+                        row.get::<_, i64>(4)?,
+                        row.get::<_, i64>(5)?,
+                        row.get::<_, i64>(6)?,
+                        row.get::<_, f64>(7)?,
+                    ))
+                },
+            )
+            .expect("Failed to query summary");
+
+        assert_eq!(command, "cargo test");
+        assert_eq!(summary, "5 tests passed");
+        assert_eq!(input_tokens, 1000);
+        assert_eq!(output_tokens, 200);
+        assert_eq!(tokens_saved, 800);
+        assert_eq!(savings_pct, 80.0);
+        assert!(!captured_at.is_empty());
+        assert!(!project_path.is_empty());
+    });
+}

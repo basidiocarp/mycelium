@@ -98,6 +98,8 @@ fn is_error_line(line: &str) -> bool {
     lower.contains("error") || lower.contains("failed") || lower.contains("fatal")
 }
 
+/// Check if a line looks like a warning. Lines that also match error patterns
+/// are classified as errors instead (error takes priority over warning).
 fn is_warning_line(line: &str) -> bool {
     let lower = line.to_lowercase();
     (lower.contains("warning") || lower.contains("warn")) && !lower.contains("error")
@@ -190,5 +192,11 @@ mod tests {
         assert!(is_warning_line("warn: short form"));
         assert!(!is_warning_line("error: not a warning"));
         assert!(!is_warning_line("normal output"));
+    }
+
+    #[test]
+    fn test_mixed_error_warning_classified_as_error() {
+        assert!(is_error_line("warning: deprecated, may cause error"));
+        assert!(!is_warning_line("warning: deprecated, may cause error"));
     }
 }

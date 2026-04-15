@@ -49,7 +49,7 @@ pub enum OutputAction {
 /// Decide how to handle command output based on size and Hyphae availability.
 ///
 /// Priority: Chunk (Hyphae preserves full output) > Summarize > Filter > Passthrough.
-pub fn decide_action(output: &str) -> OutputAction {
+pub fn decide_action(output: &str, summary_threshold: usize) -> OutputAction {
     let level = mycelium::adaptive::classify(output);
 
     // Hyphae chunking takes priority — it preserves full retrievability.
@@ -58,7 +58,6 @@ pub fn decide_action(output: &str) -> OutputAction {
     }
 
     // Summarize large outputs when Hyphae is unavailable.
-    let summary_threshold = get_summary_threshold();
     let tokens = crate::tracking::utils::estimate_tokens(output);
     if tokens >= summary_threshold {
         return OutputAction::Summarize;
@@ -142,10 +141,10 @@ pub fn route_or_filter(
 ) -> crate::filter::FilterResult {
     use crate::filter::{FilterQuality, FilterResult};
 
-    match decide_action(raw) {
+    let summary_threshold = get_summary_threshold();
+    match decide_action(raw, summary_threshold) {
         OutputAction::Passthrough => FilterResult::passthrough(raw),
         OutputAction::Summarize => {
-            let summary_threshold = get_summary_threshold();
             if let Some(summary) = crate::summarizer::summarize(raw, command, summary_threshold) {
                 // Record summary silently (don't fail if tracking has issues)
                 if let Ok(tracker) = crate::tracking::Tracker::new() {
@@ -248,7 +247,10 @@ mod tests {
     #[test]
     fn test_decide_action_small_output() {
         let small = "hello world\n";
-        assert_eq!(decide_action(small), OutputAction::Passthrough);
+        assert_eq!(
+            decide_action(small, crate::summarizer::DEFAULT_SUMMARY_THRESHOLD_TOKENS),
+            OutputAction::Passthrough
+        );
     }
 
     #[test]
@@ -256,7 +258,10 @@ mod tests {
         // ~600 tokens (2400 chars / 4) — between passthrough (500) and light (2000) thresholds,
         // with enough lines to avoid the ≤5-line passthrough override.
         let medium = format!("{}\n", "a".repeat(24)).repeat(100); // ~600 tokens, 100 lines
-        assert_eq!(decide_action(&medium), OutputAction::Filter);
+        assert_eq!(
+            decide_action(&medium, crate::summarizer::DEFAULT_SUMMARY_THRESHOLD_TOKENS),
+            OutputAction::Filter
+        );
     }
 
     #[test]
@@ -265,9 +270,15 @@ mod tests {
         // With Hyphae available: Chunk; without: Filter.
         let large = format!("{}\n", "a".repeat(100)).repeat(120); // ~3000 tokens, 120 lines
         if is_available() {
-            assert_eq!(decide_action(&large), OutputAction::Chunk);
+            assert_eq!(
+                decide_action(&large, crate::summarizer::DEFAULT_SUMMARY_THRESHOLD_TOKENS),
+                OutputAction::Chunk
+            );
         } else {
-            assert_eq!(decide_action(&large), OutputAction::Filter);
+            assert_eq!(
+                decide_action(&large, crate::summarizer::DEFAULT_SUMMARY_THRESHOLD_TOKENS),
+                OutputAction::Filter
+            );
         }
     }
 
@@ -551,5 +562,13 @@ mod tests {
         // Even with no compression, header should show 0% savings
         assert!(result.contains("(0%)"));
         assert!(result.contains("1→1 lines"));
+    }
+
+    #[test]
+    fn test_get_summary_threshold_returns_default_without_config() {
+        // When no config file is present (typical test environment),
+        // the threshold should fall back to the default.
+        let threshold = get_summary_threshold();
+        assert_eq!(threshold, crate::summarizer::DEFAULT_SUMMARY_THRESHOLD_TOKENS);
     }
 }
