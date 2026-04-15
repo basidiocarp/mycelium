@@ -39,7 +39,7 @@ use chrono::{Duration, Utc};
 use rusqlite::{Connection, params};
 use serde::Serialize;
 
-use utils::{current_project_path_string, current_runtime_session_id, get_db_path};
+use utils::{current_project_path_string, current_project_root, current_runtime_session_id, get_db_path};
 
 #[allow(unused_imports)]
 pub use queries::ParseHealthRow;
@@ -516,16 +516,18 @@ impl Tracker {
 
         let project_path = current_project_path_string();
         let session_id = current_runtime_session_id();
+        let project_root = current_project_root();
 
         self.conn.execute(
-            "INSERT INTO summaries (captured_at, command, summary, project_path, session_id, input_tokens, output_tokens, tokens_saved, savings_pct, exec_time_ms, exit_code)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            "INSERT INTO summaries (captured_at, command, summary, project_path, session_id, project_root, input_tokens, output_tokens, tokens_saved, savings_pct, exec_time_ms, exit_code)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
             params![
                 Utc::now().to_rfc3339(),
                 command,
                 summary,
                 project_path,
                 session_id,
+                project_root,
                 input_tokens as i64,
                 output_tokens as i64,
                 saved as i64,

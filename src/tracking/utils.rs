@@ -57,6 +57,21 @@ pub(super) fn current_runtime_session_id() -> Option<String> {
     spore::claude_session_id()
 }
 
+/// Detect the git repository root for the current working directory.
+/// Returns an empty string if not inside a git repository.
+pub(super) fn current_project_root() -> String {
+    std::env::current_dir()
+        .ok()
+        .map(canonicalize_pathbuf)
+        .and_then(|canonical| {
+            canonical
+                .ancestors()
+                .find(|candidate| candidate.join(".git").exists())
+                .map(|p| p.to_string_lossy().to_string())
+        })
+        .unwrap_or_default()
+}
+
 fn canonicalize_project_path(path: String) -> String {
     canonicalize_pathbuf(PathBuf::from(path))
         .to_string_lossy()

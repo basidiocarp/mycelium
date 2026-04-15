@@ -47,19 +47,25 @@ pub enum OutputAction {
 }
 
 /// Decide how to handle command output based on size and Hyphae availability.
+///
+/// Priority: Chunk (Hyphae preserves full output) > Summarize > Filter > Passthrough.
 pub fn decide_action(output: &str) -> OutputAction {
-    // Check summary threshold first
+    let level = mycelium::adaptive::classify(output);
+
+    // Hyphae chunking takes priority — it preserves full retrievability.
+    if level == mycelium::adaptive::AdaptiveLevel::Structured && should_use_hyphae() {
+        return OutputAction::Chunk;
+    }
+
+    // Summarize large outputs when Hyphae is unavailable.
     let summary_threshold = get_summary_threshold();
     let tokens = crate::tracking::utils::estimate_tokens(output);
     if tokens >= summary_threshold {
         return OutputAction::Summarize;
     }
 
-    // Then check adaptive classification for filtering or chunking
-    let level = mycelium::adaptive::classify(output);
     match level {
         mycelium::adaptive::AdaptiveLevel::Passthrough => OutputAction::Passthrough,
-        mycelium::adaptive::AdaptiveLevel::Structured if should_use_hyphae() => OutputAction::Chunk,
         _ => OutputAction::Filter,
     }
 }
