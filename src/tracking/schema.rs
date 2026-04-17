@@ -152,6 +152,22 @@ pub(super) fn init_schema(conn: &Connection) -> Result<()> {
     )
     .context("Failed to create summaries table")?;
 
+    // Migrations: add columns that were absent in older summaries table schemas.
+    // Uses the silent-error pattern (let _ =) so these no-op on fresh databases
+    // where the columns already exist from CREATE TABLE above.
+    let _ = conn.execute(
+        "ALTER TABLE summaries ADD COLUMN captured_at TEXT DEFAULT ''",
+        [],
+    );
+    let _ = conn.execute(
+        "ALTER TABLE summaries ADD COLUMN project_root TEXT DEFAULT ''",
+        [],
+    );
+    let _ = conn.execute(
+        "ALTER TABLE summaries ADD COLUMN worktree_id TEXT DEFAULT ''",
+        [],
+    );
+
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_summaries_captured_at ON summaries(captured_at)",
         [],
