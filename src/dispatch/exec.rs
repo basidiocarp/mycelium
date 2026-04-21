@@ -253,13 +253,31 @@ pub fn dispatch_json(cli: Cli) -> Result<()> {
         .and_then(|path| path.canonicalize().ok().or(Some(path)))
         .map(|path| path.to_string_lossy().to_string());
 
+    // Get raw output only from known tool binaries to prevent arbitrary code execution.
+    // Only allow execution of tools that mycelium is designed to proxy.
     let raw_output = if !args.is_empty() {
-        let raw_result = std::process::Command::new(&args[0])
-            .args(&args[1..])
-            .output();
-        match raw_result {
-            Ok(out) => String::from_utf8_lossy(&out.stdout).to_string(),
-            Err(_) => String::new(),
+        let tool_name = &args[0];
+        let allowed_tools = [
+            "git", "gh", "cargo", "npm", "pnpm", "yarn", "npx", "ls", "grep", "tree",
+            "cat", "find", "docker", "kubectl", "curl", "wget", "vitest", "pytest",
+            "ruff", "go", "tsc", "next", "prettier", "playwright", "prisma",
+        ];
+
+        let base_name = std::path::Path::new(tool_name)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or(tool_name);
+
+        if allowed_tools.iter().any(|t| base_name == *t) {
+            let raw_result = std::process::Command::new(tool_name)
+                .args(&args[1..])
+                .output();
+            match raw_result {
+                Ok(out) => String::from_utf8_lossy(&out.stdout).to_string(),
+                Err(_) => String::new(),
+            }
+        } else {
+            String::new()
         }
     } else {
         String::new()

@@ -142,16 +142,36 @@ pub(super) fn get_db_path(override_path: Option<&str>) -> Result<PathBuf> {
 ///
 /// Uses `GLOB` instead of `LIKE` so that `_` and `%` in paths are treated
 /// as literal characters rather than wildcard patterns.
+///
+/// The glob pattern is properly escaped to prevent injection of glob metacharacters.
 pub(crate) fn project_filter_params(
     project_path: Option<&str>,
 ) -> (Option<String>, Option<String>) {
     match project_path {
-        Some(p) => (
-            Some(p.to_string()),
-            Some(format!("{}{}*", p, std::path::MAIN_SEPARATOR)),
-        ),
+        Some(p) => {
+            // Escape GLOB metacharacters: *, ?, [, ]
+            // We need to escape these so they are treated as literals in the GLOB pattern.
+            let escaped = escape_glob_pattern(p);
+            (
+                Some(p.to_string()),
+                Some(format!("{}{}*", escaped, std::path::MAIN_SEPARATOR)),
+            )
+        }
         None => (None, None),
     }
+}
+
+/// Escape special characters in a path for use in SQLite GLOB patterns.
+///
+/// GLOB patterns use *, ?, [, and ] as metacharacters. This function escapes
+/// them so they are treated as literal characters.
+fn escape_glob_pattern(path: &str) -> String {
+    path.chars()
+        .map(|c| match c {
+            '*' | '?' | '[' | ']' => format!("[{}]", c),
+            _ => c.to_string(),
+        })
+        .collect()
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────

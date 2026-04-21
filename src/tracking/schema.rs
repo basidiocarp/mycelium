@@ -56,11 +56,9 @@ pub(super) fn init_schema(conn: &Connection) -> Result<()> {
             [],
         );
     }
-    // Migration: rename mycelium_cmd column to mycelium_cmd
-    let _ = conn.execute(
-        "ALTER TABLE commands RENAME COLUMN mycelium_cmd TO mycelium_cmd",
-        [],
-    );
+    // Migration slot: previously attempted to rename mycelium_cmd to itself.
+    // This was a no-op and has been skipped. The column mycelium_cmd already
+    // exists from schema creation and does not require renaming.
     // Index for fast project-scoped gain queries
     let _ = conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_project_path_timestamp ON commands(project_path, timestamp)",

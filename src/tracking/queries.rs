@@ -535,16 +535,17 @@ impl Tracker {
     /// Returns rows grouped by command and tier, excluding legacy commands (parse_tier=0).
     /// Used by `mycelium parse-health`.
     pub fn get_parse_health(&self, days: u32) -> Result<Vec<ParseHealthRow>> {
+        let modifier = format!("-{} days", days);
         let mut stmt = self.conn.prepare(
             "SELECT mycelium_cmd, parse_tier, COUNT(*) as count
              FROM commands
-             WHERE timestamp > datetime('now', '-' || ?1 || ' days')
+             WHERE timestamp > datetime('now', ?)
                AND parse_tier > 0
              GROUP BY mycelium_cmd, parse_tier
              ORDER BY count DESC",
         )?;
 
-        let rows = stmt.query_map(params![days], |row| {
+        let rows = stmt.query_map(params![&modifier], |row| {
             Ok(ParseHealthRow {
                 command: row.get(0)?,
                 tier: row.get::<_, i64>(1)? as u8,

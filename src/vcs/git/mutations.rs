@@ -65,6 +65,10 @@ pub(super) fn run_commit(args: &[String], verbose: u8, global_args: &[String]) -
         if !stdout.trim().is_empty() {
             eprintln!("{}", stdout);
         }
+        return Err(anyhow::anyhow!(
+            "git commit failed with exit code {}",
+            output.status.code().unwrap_or(1)
+        ));
     }
 
     Ok(())

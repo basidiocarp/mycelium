@@ -48,8 +48,10 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
 fn bundle_pattern() -> &'static Regex {
     static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
     RE.get_or_init(|| {
+        // This regex pattern is hardcoded and must be valid at compile time.
+        // The pattern matches Next.js bundle output with route symbols and size metrics.
         Regex::new(r"^[○●◐λ✓]\s+([\w/\-.]+)\s+(\d+(?:\.\d+)?)\s*(kB|B)\s+(\d+(?:\.\d+)?)\s*(kB|B)")
-            .unwrap()
+            .expect("bundle_pattern regex is valid by construction")
     })
 }
 
