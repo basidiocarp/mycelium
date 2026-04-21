@@ -4,6 +4,7 @@
 
 use anyhow::{Context, Result};
 use rusqlite::Connection;
+use tracing;
 
 /// Initialize the database schema, creating tables and running all migrations.
 ///
@@ -51,10 +52,12 @@ pub(super) fn init_schema(conn: &Connection) -> Result<()> {
         )
         .unwrap_or(false);
     if has_nulls {
-        let _ = conn.execute(
+        if let Err(e) = conn.execute(
             "UPDATE commands SET project_path = '' WHERE project_path IS NULL",
             [],
-        );
+        ) {
+            tracing::warn!("migration UPDATE on commands failed: {e}");
+        }
     }
     // Migration slot: previously attempted to rename mycelium_cmd to itself.
     // This was a no-op and has been skipped. The column mycelium_cmd already
@@ -113,10 +116,12 @@ pub(super) fn init_schema(conn: &Connection) -> Result<()> {
         "ALTER TABLE parse_failures ADD COLUMN project_path TEXT DEFAULT ''",
         [],
     );
-    let _ = conn.execute(
+    if let Err(e) = conn.execute(
         "UPDATE parse_failures SET project_path = '' WHERE project_path IS NULL",
         [],
-    );
+    ) {
+        tracing::warn!("migration UPDATE on parse_failures failed: {e}");
+    }
 
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_pf_timestamp ON parse_failures(timestamp)",

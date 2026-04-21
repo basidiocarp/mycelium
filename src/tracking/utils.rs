@@ -144,6 +144,12 @@ pub(super) fn get_db_path(override_path: Option<&str>) -> Result<PathBuf> {
 /// as literal characters rather than wildcard patterns.
 ///
 /// The glob pattern is properly escaped to prevent injection of glob metacharacters.
+///
+/// # Security Note
+///
+/// Path traversal risk: SQL-only. The project path is used only in parameterized SQL
+/// GLOB queries, never in filesystem operations. `escape_glob_pattern` ensures
+/// GLOB metacharacters cannot inject unintended query semantics.
 pub(crate) fn project_filter_params(
     project_path: Option<&str>,
 ) -> (Option<String>, Option<String>) {
