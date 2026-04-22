@@ -1,10 +1,22 @@
 use anyhow::{Context, Result};
 use std::process::Command;
+use crate::summarizer::{self, DEFAULT_SUMMARY_THRESHOLD_TOKENS};
 
 /// Builder for the standard mycelium filter-track-exit pattern.
 ///
 /// Abstracts the boilerplate shared by 20+ command modules:
 /// timer → run command → strip ANSI (optional) → filter → tee → print → track → exit on failure.
+///
+/// ## Summary Mode
+///
+/// This builder automatically activates summary mode for large outputs. When the filtered
+/// output exceeds the token threshold (default: 4000 tokens), the builder emits a concise
+/// summary instead of the full output. The summary includes the command name, exit code,
+/// and key counts (lines, bytes). Small outputs pass through unchanged.
+///
+/// The summary mode reuses the heuristic logic from [`crate::summarizer`], which detects
+/// error and warning counts in the output and provides a retrieval notice for accessing
+/// the full output via `mycelium proxy`.
 ///
 /// # Example
 /// ```rust,ignore
@@ -98,6 +110,11 @@ impl FilteredCommand {
     }
 
     /// Execute: timer → run command → filter → tee → print → track → exit on failure.
+    ///
+    /// This method automatically applies summary mode to large outputs:
+    /// - Small outputs (below threshold) pass through unchanged
+    /// - Large outputs trigger summary mode: emits a concise summary with command name,
+    ///   exit code, and key metrics (line count, byte count)
     pub fn run(self) -> Result<()> {
         use crate::{tee, tracking, utils};
 
@@ -132,13 +149,27 @@ impl FilteredCommand {
             .unwrap_or_else(|| format!("mycelium {} {}", self.tool_name, self.args.join(" ")));
         let slug = self.tee_slug.unwrap_or_else(|| self.tool_name.clone());
 
-        if let Some(hint) = tee::tee_and_hint(&raw, &slug, exit_code) {
-            println!("{}\n{}", filtered, hint);
+        // Check if filtered output exceeds the summary threshold
+        let (output_to_print, final_output) = if let Some(summary) = summarizer::summarize(&filtered, &self.tool_name, DEFAULT_SUMMARY_THRESHOLD_TOKENS) {
+            // Large output: use summary instead
+            let summary_with_status = format!(
+                "{}\nexit code: {}",
+                summary.summary,
+                exit_code
+            );
+            (summary_with_status.clone(), summary_with_status)
         } else {
-            println!("{}", filtered);
+            // Small output: pass through unchanged
+            (filtered.clone(), filtered)
+        };
+
+        if let Some(hint) = tee::tee_and_hint(&raw, &slug, exit_code) {
+            println!("{}\n{}", output_to_print, hint);
+        } else {
+            println!("{}", output_to_print);
         }
 
-        timer.track(&raw_label, &mycelium_label, &raw, &filtered);
+        timer.track(&raw_label, &mycelium_label, &raw, &final_output);
 
         if exit_code != 0 {
             std::process::exit(exit_code);
@@ -183,9 +214,18 @@ impl FilteredCommand {
             .mycelium_label
             .unwrap_or_else(|| format!("mycelium {} {}", self.tool_name, self.args.join(" ")));
 
-        timer.track(&raw_label, &mycelium_label, &raw, &filtered);
+        // Check if filtered output exceeds the summary threshold
+        let final_output = if let Some(summary) = summarizer::summarize(&filtered, &self.tool_name, DEFAULT_SUMMARY_THRESHOLD_TOKENS) {
+            // Large output: use summary instead
+            summary.summary
+        } else {
+            // Small output: pass through unchanged
+            filtered
+        };
 
-        Ok((raw, filtered))
+        timer.track(&raw_label, &mycelium_label, &raw, &final_output);
+
+        Ok((raw, final_output))
     }
 }
 
