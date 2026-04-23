@@ -36,7 +36,7 @@ chrono = "0.4"
 tempfile = "3"
 sha2 = "0.10"
 strip-ansi-escapes = "0.2"
-spore = { git = "https://github.com/basidiocarp/spore", tag = "v0.4.9" }
+spore = { git = "https://github.com/basidiocarp/spore", tag = "v0.4.11" }
 tracing = "0.1"
 libc = "0.2"
 which = "7"
