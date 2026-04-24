@@ -1,0 +1,15 @@
+# Declarative filter for npm test output.
+# Strips ANSI colors and timestamps, keeps only the final summary lines
+# plus any PASS/FAIL/Error lines.
+
+[filter]
+name = "npm-test"
+command_pattern = "npm test"
+
+[transform]
+strip_ansi = true
+strip_timestamps = true
+
+[truncate]
+keep_last_n_lines = 50
+keep_on_match = ["PASS", "FAIL", "Tests:", "Test Suites:", "Error", "✓", "✗"]

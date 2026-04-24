@@ -258,9 +258,31 @@ pub fn dispatch_json(cli: Cli) -> Result<()> {
     let raw_output = if !args.is_empty() {
         let tool_name = &args[0];
         let allowed_tools = [
-            "git", "gh", "cargo", "npm", "pnpm", "yarn", "npx", "ls", "grep", "tree",
-            "cat", "find", "docker", "kubectl", "curl", "wget", "vitest", "pytest",
-            "ruff", "go", "tsc", "next", "prettier", "playwright", "prisma",
+            "git",
+            "gh",
+            "cargo",
+            "npm",
+            "pnpm",
+            "yarn",
+            "npx",
+            "ls",
+            "grep",
+            "tree",
+            "cat",
+            "find",
+            "docker",
+            "kubectl",
+            "curl",
+            "wget",
+            "vitest",
+            "pytest",
+            "ruff",
+            "go",
+            "tsc",
+            "next",
+            "prettier",
+            "playwright",
+            "prisma",
         ];
 
         let base_name = std::path::Path::new(tool_name)
@@ -268,7 +290,7 @@ pub fn dispatch_json(cli: Cli) -> Result<()> {
             .and_then(|n| n.to_str())
             .unwrap_or(tool_name);
 
-        if allowed_tools.iter().any(|t| base_name == *t) {
+        if allowed_tools.contains(&base_name) {
             let raw_result = std::process::Command::new(tool_name)
                 .args(&args[1..])
                 .output();

@@ -4,7 +4,6 @@
 
 use anyhow::{Context, Result};
 use rusqlite::Connection;
-use tracing;
 
 /// Initialize the database schema, creating tables and running all migrations.
 ///

@@ -4,6 +4,9 @@ pub mod adaptive;
 #[path = "config.rs"]
 pub mod config;
 pub mod discover;
+#[path = "filter.rs"]
+pub mod filter;
+pub mod filters;
 #[path = "vcs/git_filters/mod.rs"]
 pub mod git_filters;
 pub mod learn;
