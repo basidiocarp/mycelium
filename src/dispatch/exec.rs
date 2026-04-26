@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 
+use super::content_router::ContentRouter;
 use crate::commands::{Cli, Commands};
 use crate::{json_output, rewrite_cmd, tracking};
 
@@ -139,9 +140,6 @@ pub(super) fn run_spawned_command(
                 break;
             }
             captured.extend_from_slice(&buf[..count]);
-            let mut out = std::io::stdout().lock();
-            out.write_all(&buf[..count])?;
-            out.flush()?;
         }
 
         Ok(captured)
@@ -179,6 +177,15 @@ pub(super) fn run_spawned_command(
     let stderr = String::from_utf8_lossy(&stderr_bytes);
     let full_output = format!("{}{}", stdout, stderr);
 
+    // Apply content-aware routing to stdout before printing
+    let router = ContentRouter::default();
+    let routed_stdout = router.route(&stdout);
+
+    // Print routed stdout after all output is captured.
+    // Stderr is already streamed live by the capture thread above.
+    print!("{routed_stdout}");
+
+    // Track using the original output, not the routed output (for accurate token tracking)
     timer.track(tracked_input, tracked_output, &full_output, &full_output);
 
     if !status.success() {

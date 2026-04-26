@@ -1,6 +1,6 @@
+use crate::summarizer::{self, DEFAULT_SUMMARY_THRESHOLD_TOKENS};
 use anyhow::{Context, Result};
 use std::process::Command;
-use crate::summarizer::{self, DEFAULT_SUMMARY_THRESHOLD_TOKENS};
 
 /// Builder for the standard mycelium filter-track-exit pattern.
 ///
@@ -150,13 +150,11 @@ impl FilteredCommand {
         let slug = self.tee_slug.unwrap_or_else(|| self.tool_name.clone());
 
         // Check if filtered output exceeds the summary threshold
-        let (output_to_print, final_output) = if let Some(summary) = summarizer::summarize(&filtered, &self.tool_name, DEFAULT_SUMMARY_THRESHOLD_TOKENS) {
+        let (output_to_print, final_output) = if let Some(summary) =
+            summarizer::summarize(&filtered, &self.tool_name, DEFAULT_SUMMARY_THRESHOLD_TOKENS)
+        {
             // Large output: use summary instead
-            let summary_with_status = format!(
-                "{}\nexit code: {}",
-                summary.summary,
-                exit_code
-            );
+            let summary_with_status = format!("{}\nexit code: {}", summary.summary, exit_code);
             (summary_with_status.clone(), summary_with_status)
         } else {
             // Small output: pass through unchanged
@@ -215,7 +213,9 @@ impl FilteredCommand {
             .unwrap_or_else(|| format!("mycelium {} {}", self.tool_name, self.args.join(" ")));
 
         // Check if filtered output exceeds the summary threshold
-        let final_output = if let Some(summary) = summarizer::summarize(&filtered, &self.tool_name, DEFAULT_SUMMARY_THRESHOLD_TOKENS) {
+        let final_output = if let Some(summary) =
+            summarizer::summarize(&filtered, &self.tool_name, DEFAULT_SUMMARY_THRESHOLD_TOKENS)
+        {
             // Large output: use summary instead
             summary.summary
         } else {

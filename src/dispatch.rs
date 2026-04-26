@@ -1,4 +1,5 @@
 //! Routes parsed CLI commands to their specialized handler modules.
+mod content_router;
 mod exec;
 mod families;
 mod routes;
