@@ -712,9 +712,9 @@ checksum = "09edd9e8b54e49e587e4f6295a7d29c3ea94d469cb40ab8ca70b288248a81db2"
 
 [[package]]
 name = "libc"
-version = "0.2.183"
+version = "0.2.186"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5b646652bf6661599e1da8901b3b9522896f01e736bad5f723fe7a3a27f899d"
+checksum = "68ab91017fe16c622486840e4c83c9a37afeff978bd239b5293d61ece587de66"
 
 [[package]]
 name = "libredox"
@@ -1183,7 +1183,7 @@ checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 [[package]]
 name = "spore"
 version = "0.4.11"
-source = "git+https://github.com/basidiocarp/spore?tag=v0.4.11#0bc2e878010e75e30e26fa517d747e97d59628b0"
+source = "git+https://github.com/basidiocarp/spore?rev=0bc2e878010e75e30e26fa517d747e97d59628b0#0bc2e878010e75e30e26fa517d747e97d59628b0"
 dependencies = [
  "anyhow",
  "chrono",
