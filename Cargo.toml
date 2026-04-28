@@ -39,7 +39,7 @@ strip-ansi-escapes = "0.2"
 spore = { git = "https://github.com/basidiocarp/spore", rev = "0bc2e878010e75e30e26fa517d747e97d59628b0" }
 tracing = "0.1"
 libc = "0.2"
-which = "7"
+which = "8"
 tree-sitter = "0.25"
 tree-sitter-bash = "0.25"
 
