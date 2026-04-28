@@ -10,6 +10,9 @@ use serde::Serialize;
 pub(crate) struct ExportData {
     pub(crate) schema_version: &'static str,
     pub(crate) summary: ExportSummary,
+    // telemetry_summary is internal diagnostics; excluded from the public
+    // mycelium-gain-v1 JSON contract (schema has additionalProperties: false).
+    #[serde(skip_serializing)]
     pub(crate) telemetry_summary: TelemetrySummarySurface,
     pub(crate) by_command: Vec<ExportCommandStats>,
     #[serde(skip_serializing_if = "Option::is_none")]
