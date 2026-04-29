@@ -2,77 +2,44 @@
 
 use anyhow::{Context, Result, bail};
 use spore::logging::{SpanContext, subprocess_span, tool_span};
-use spore::{Tool, discover};
+use spore::McpClient;
 use std::path::Path;
-use std::process::{Command, Stdio};
-use std::sync::mpsc;
 use std::time::Duration;
-use tracing::warn;
 
 /// Get hierarchical outline (modules, classes, methods with nesting) for a file.
 pub fn get_structure(file: &Path) -> Result<String> {
-    run_rhizome_command("structure", file)
-}
+    let context = span_context("structure", file);
+    let _tool_span = tool_span("rhizome_structure", &context).entered();
 
-fn run_rhizome_command(subcommand: &str, file: &Path) -> Result<String> {
-    let info = discover(Tool::Rhizome).context("Rhizome binary not found")?;
-    let context = span_context(subcommand, file);
-    let _tool_span = tool_span("rhizome_cli", &context).entered();
+    let file_str = file.to_str().context("Invalid file path encoding")?;
 
-    let file_str = file.to_str().context("Invalid file path")?;
+    let mut client = McpClient::spawn(spore::Tool::Rhizome, &[])
+        .context("Failed to start rhizome MCP server")?
+        .with_timeout(Duration::from_secs(3));
 
-    // Spawn rhizome subprocess with timeout
-    let (tx, rx) = mpsc::channel();
-    let bin = info.binary_path.to_string_lossy().to_string();
-    let sub = subcommand.to_string();
-    let path = file_str.to_string();
-    let command_label = format!("rhizome {subcommand} {file_str}");
+    let command_label = format!("rhizome get_structure {file_str}");
+    let _subprocess_span = subprocess_span(&command_label, &context).entered();
 
-    std::thread::spawn(move || {
-        let result = Command::new(&bin)
-            .arg(&sub)
-            .arg(&path)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .output();
-        let _ = tx.send(result);
-    });
+    let result = client
+        .call_tool("get_structure", serde_json::json!({ "file": file_str }))
+        .context("Rhizome get_structure failed")?;
 
-    let output = {
-        let _subprocess_span = subprocess_span(&command_label, &context).entered();
-        rx.recv_timeout(Duration::from_secs(3))
-            .context("Rhizome command timed out after 3 seconds")?
-            .context("Failed to execute rhizome")?
-    };
+    // get_structure returns: [{"type":"text","text":"<indented tree text>"}]
+    let text = result
+        .as_array()
+        .and_then(|arr| arr.first())
+        .and_then(|v| v.get("text"))
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow::anyhow!("Unexpected get_structure response shape"))?;
 
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        warn!(
-            subcommand,
-            file = file_str,
-            "rhizome subprocess exited non-zero: {}",
-            stderr.trim()
-        );
+    if text.is_empty() {
         bail!(
-            "rhizome {} failed (exit {}): {}",
-            subcommand,
-            output.status.code().unwrap_or(-1),
-            stderr.trim()
-        );
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout)
-        .trim_end()
-        .to_string();
-    if stdout.is_empty() {
-        bail!(
-            "rhizome {} returned empty output for {}",
-            subcommand,
+            "rhizome get_structure returned empty output for {}",
             file_str
         );
     }
 
-    Ok(stdout)
+    Ok(text.trim_end().to_string())
 }
 
 fn span_context(subcommand: &str, file: &Path) -> SpanContext {
@@ -95,7 +62,10 @@ mod tests {
         if let Err(err) = result {
             let msg = err.to_string();
             assert!(
-                msg.contains("not found") || msg.contains("timed out") || msg.contains("failed"),
+                msg.contains("not found")
+                    || msg.contains("timed out")
+                    || msg.contains("failed")
+                    || msg.contains("MCP"),
                 "Unexpected error: {}",
                 msg
             );
@@ -108,5 +78,15 @@ mod tests {
         let result = get_structure(&path);
         // Should fail gracefully
         assert!(result.is_err());
+    }
+
+    #[test]
+    #[ignore]
+    fn test_get_structure_with_rhizome_returns_text() {
+        let path = PathBuf::from("src/rhizome_client.rs");
+        let result = get_structure(&path);
+        assert!(result.is_ok(), "expected Ok, got: {:?}", result);
+        let text = result.unwrap();
+        assert!(!text.is_empty());
     }
 }
