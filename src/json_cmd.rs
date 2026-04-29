@@ -6,6 +6,22 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::Path;
 
+/// Maximum bytes accepted for file/stdin reads before rejecting with an error.
+pub(crate) const MAX_JSON_BYTES: usize = 1024 * 1024; // 1 MB
+
+fn reject_if_oversized(len: usize, max_bytes: usize, label: &str) -> Result<()> {
+    if len > max_bytes {
+        anyhow::bail!(
+            "{} ({} bytes) exceeds the {} byte JSON limit. \
+             Use `mycelium proxy` for large inputs.",
+            label,
+            len,
+            max_bytes
+        );
+    }
+    Ok(())
+}
+
 /// Reject non-JSON files with a clear error before doing any I/O.
 fn validate_json_extension(file: &Path) -> Result<()> {
     if let Some(ext) = file.extension().and_then(|e| e.to_str()) {
@@ -46,6 +62,8 @@ pub fn run(file: &Path, max_depth: usize, verbose: u8) -> Result<()> {
     let content = fs::read_to_string(file)
         .with_context(|| format!("Failed to read file: {}", file.display()))?;
 
+    reject_if_oversized(content.len(), MAX_JSON_BYTES, &format!("file {}", file.display()))?;
+
     let schema = filter_json_string(&content, max_depth)?;
     println!("{}", schema);
     timer.track(
@@ -70,6 +88,8 @@ pub fn run_stdin(max_depth: usize, verbose: u8) -> Result<()> {
         .lock()
         .read_to_string(&mut content)
         .context("Failed to read from stdin")?;
+
+    reject_if_oversized(content.len(), MAX_JSON_BYTES, "stdin")?;
 
     let schema = filter_json_string(&content, max_depth)?;
     println!("{}", schema);
@@ -228,5 +248,23 @@ mod tests {
         let schema = extract_schema(&json, 0, 5);
         assert!(schema.contains("items"));
         assert!(schema.contains("(3)"));
+    }
+
+    #[test]
+    fn json_stdin_rejects_oversized_input() {
+        let oversized = "x".repeat(MAX_JSON_BYTES + 1);
+        assert!(
+            reject_if_oversized(oversized.len(), MAX_JSON_BYTES, "stdin").is_err(),
+            "oversized JSON stdin should be rejected"
+        );
+    }
+
+    #[test]
+    fn json_stdin_accepts_within_limit() {
+        let ok = "x".repeat(MAX_JSON_BYTES);
+        assert!(
+            reject_if_oversized(ok.len(), MAX_JSON_BYTES, "stdin").is_ok(),
+            "JSON input at limit should be accepted"
+        );
     }
 }

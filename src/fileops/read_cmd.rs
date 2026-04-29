@@ -5,6 +5,22 @@ use anyhow::{Context, Result};
 use std::fs;
 use std::path::Path;
 
+/// Maximum bytes accepted for file/stdin reads before rejecting with an error.
+pub(crate) const MAX_READ_BYTES: usize = 10 * 1024 * 1024; // 10 MB
+
+fn reject_if_oversized(len: usize, max_bytes: usize, label: &str) -> Result<()> {
+    if len > max_bytes {
+        anyhow::bail!(
+            "{} ({} bytes) exceeds the {} byte read limit. \
+             Use `mycelium proxy` for large inputs.",
+            label,
+            len,
+            max_bytes
+        );
+    }
+    Ok(())
+}
+
 /// Read a file with language-aware filtering to strip comments and whitespace.
 pub fn run(
     file: &Path,
@@ -22,6 +38,8 @@ pub fn run(
     // Read file content
     let content = fs::read_to_string(file)
         .with_context(|| format!("Failed to read file: {}", file.display()))?;
+
+    reject_if_oversized(content.len(), MAX_READ_BYTES, &format!("file {}", file.display()))?;
 
     // Detect language from extension
     let lang = file
@@ -129,6 +147,8 @@ pub fn run_stdin(
         .read_to_string(&mut content)
         .context("Failed to read from stdin")?;
 
+    reject_if_oversized(content.len(), MAX_READ_BYTES, "stdin")?;
+
     // No file extension, so use Unknown language
     let lang = Language::Unknown;
 
@@ -212,5 +232,23 @@ fn main() {{
         // Test that run_stdin has the correct signature and compiles
         // We don't run it because it would hang waiting for stdin
         // Compile-time verification that the function exists with the correct signature
+    }
+
+    #[test]
+    fn read_stdin_rejects_oversized_input() {
+        let oversized = "x".repeat(MAX_READ_BYTES + 1);
+        assert!(
+            reject_if_oversized(oversized.len(), MAX_READ_BYTES, "stdin").is_err(),
+            "oversized stdin should be rejected"
+        );
+    }
+
+    #[test]
+    fn read_stdin_accepts_within_limit() {
+        let ok = "x".repeat(MAX_READ_BYTES);
+        assert!(
+            reject_if_oversized(ok.len(), MAX_READ_BYTES, "stdin").is_ok(),
+            "input at limit should be accepted"
+        );
     }
 }

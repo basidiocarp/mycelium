@@ -5,6 +5,22 @@ use anyhow::Result;
 use std::fs;
 use std::path::Path;
 
+/// Maximum bytes accepted for file/stdin reads before rejecting with an error.
+pub(crate) const MAX_DIFF_BYTES: usize = 10 * 1024 * 1024; // 10 MB
+
+fn reject_if_oversized(len: usize, max_bytes: usize, label: &str) -> Result<()> {
+    if len > max_bytes {
+        anyhow::bail!(
+            "{} ({} bytes) exceeds the {} byte diff limit. \
+             Use `mycelium proxy` for large inputs.",
+            label,
+            len,
+            max_bytes
+        );
+    }
+    Ok(())
+}
+
 /// Ultra-condensed diff - only changed lines, no context
 pub fn run(file1: &Path, file2: &Path, verbose: u8) -> Result<()> {
     let timer = tracking::TimedExecution::start();
@@ -14,7 +30,9 @@ pub fn run(file1: &Path, file2: &Path, verbose: u8) -> Result<()> {
     }
 
     let content1 = fs::read_to_string(file1)?;
+    reject_if_oversized(content1.len(), MAX_DIFF_BYTES, &format!("{}", file1.display()))?;
     let content2 = fs::read_to_string(file2)?;
+    reject_if_oversized(content2.len(), MAX_DIFF_BYTES, &format!("{}", file2.display()))?;
     let raw = format!("{}\n---\n{}", content1, content2);
 
     let lines1: Vec<&str> = content1.lines().collect();
@@ -73,6 +91,8 @@ pub fn run_stdin(_verbose: u8) -> Result<()> {
 
     let mut input = String::new();
     io::stdin().read_to_string(&mut input)?;
+
+    reject_if_oversized(input.len(), MAX_DIFF_BYTES, "stdin")?;
 
     // Parse unified diff format
     let condensed = condense_unified_diff(&input);
@@ -383,6 +403,24 @@ diff --git a/b.rs b/b.rs
             savings >= 60,
             "diff filter: expected >= 60% token savings, got {}%",
             savings
+        );
+    }
+
+    #[test]
+    fn diff_stdin_rejects_oversized_input() {
+        let oversized = "x".repeat(MAX_DIFF_BYTES + 1);
+        assert!(
+            reject_if_oversized(oversized.len(), MAX_DIFF_BYTES, "stdin").is_err(),
+            "oversized diff stdin should be rejected"
+        );
+    }
+
+    #[test]
+    fn diff_stdin_accepts_within_limit() {
+        let ok = "x".repeat(MAX_DIFF_BYTES);
+        assert!(
+            reject_if_oversized(ok.len(), MAX_DIFF_BYTES, "stdin").is_ok(),
+            "diff input at limit should be accepted"
         );
     }
 }

@@ -140,19 +140,19 @@ pub(super) fn run_add(args: &[String], verbose: u8, global_args: &[String]) -> R
     Ok(())
 }
 
-pub(super) fn run_branch(args: &[String], verbose: u8, global_args: &[String]) -> Result<()> {
-    let timer = tracking::TimedExecution::start();
-
-    if verbose > 0 {
-        eprintln!("git branch");
-    }
-
-    // Detect write operations: delete, rename, copy
+/// Returns true when the branch args indicate a write operation (create, delete, rename, copy).
+///
+/// Write mode fires for:
+/// - Action flags: -d, -D, -m, -M, -c, -C
+/// - Positional args (branch name or start-point) without an explicit list flag
+///
+/// This classification is what prevents `git branch <name>` from being silently
+/// swallowed into list mode — the regression this module guards against.
+fn is_branch_write_op(args: &[String]) -> bool {
     let has_action_flag = args
         .iter()
         .any(|a| a == "-d" || a == "-D" || a == "-m" || a == "-M" || a == "-c" || a == "-C");
 
-    // Detect list-mode flags
     let has_list_flag = args.iter().any(|a| {
         a == "-a"
             || a == "--all"
@@ -165,11 +165,20 @@ pub(super) fn run_branch(args: &[String], verbose: u8, global_args: &[String]) -
             || a == "--no-contains"
     });
 
-    // Detect positional arguments (not flags) — indicates branch creation
     let has_positional_arg = args.iter().any(|a| !a.starts_with('-'));
 
+    has_action_flag || (has_positional_arg && !has_list_flag)
+}
+
+pub(super) fn run_branch(args: &[String], verbose: u8, global_args: &[String]) -> Result<()> {
+    let timer = tracking::TimedExecution::start();
+
+    if verbose > 0 {
+        eprintln!("git branch");
+    }
+
     // Write operation: action flags, or positional args without list flags (= branch creation)
-    if has_action_flag || (has_positional_arg && !has_list_flag) {
+    if is_branch_write_op(args) {
         let mut cmd = super::git_cmd(global_args);
         cmd.arg("branch");
         for arg in args {
@@ -210,6 +219,17 @@ pub(super) fn run_branch(args: &[String], verbose: u8, global_args: &[String]) -
 
     // List mode: use --format for structured output instead of parsing human-readable text.
     // We run two commands: local branches (always) and remote branches (when -a or -r).
+    let has_list_flag = args.iter().any(|a| {
+        a == "-a"
+            || a == "--all"
+            || a == "-r"
+            || a == "--remotes"
+            || a == "--list"
+            || a == "--merged"
+            || a == "--no-merged"
+            || a == "--contains"
+            || a == "--no-contains"
+    });
     let wants_remote = !has_list_flag
         || args
             .iter()
@@ -370,6 +390,55 @@ pub(super) fn run_worktree(args: &[String], verbose: u8, global_args: &[String])
 mod tests {
     use super::*;
     use std::process::Command;
+
+    // ── Pure unit tests: branch mode classification ──────────────────────────
+    // These run by default (`cargo test branch_creation`) without a real git repo.
+
+    fn args(v: &[&str]) -> Vec<String> {
+        v.iter().map(|s| s.to_string()).collect()
+    }
+
+    /// `git branch new-feature` — positional arg, no list flag → write (creation).
+    #[test]
+    fn test_branch_creation_detected_with_name() {
+        assert!(is_branch_write_op(&args(&["new-feature"])));
+    }
+
+    /// `git branch new-feature HEAD` — positional + start-point → write (creation from commit).
+    #[test]
+    fn test_branch_creation_from_start_point_detected() {
+        assert!(is_branch_write_op(&args(&["new-feature", "HEAD"])));
+    }
+
+    /// `git branch --list pattern` — explicit --list flag overrides positional → list mode.
+    #[test]
+    fn test_branch_creation_not_triggered_by_explicit_list_flag() {
+        assert!(!is_branch_write_op(&args(&["--list", "pattern*"])));
+    }
+
+    /// `git branch` (no args) → list mode.
+    #[test]
+    fn test_branch_creation_not_triggered_with_no_args() {
+        assert!(!is_branch_write_op(&args(&[])));
+    }
+
+    /// `git branch -a` → list mode.
+    #[test]
+    fn test_branch_creation_not_triggered_by_all_flag() {
+        assert!(!is_branch_write_op(&args(&["-a"])));
+    }
+
+    /// `git branch -d old-branch` — action flag → write.
+    #[test]
+    fn test_branch_creation_action_flag_delete() {
+        assert!(is_branch_write_op(&args(&["-d", "old-branch"])));
+    }
+
+    /// `git branch -m old new` — action flag → write.
+    #[test]
+    fn test_branch_creation_action_flag_rename() {
+        assert!(is_branch_write_op(&args(&["-m", "old", "new"])));
+    }
 
     /// Regression test: `git branch <name>` must create, not list.
     /// Before fix, positional args fell into list mode which added `-a`,
