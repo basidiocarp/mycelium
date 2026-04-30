@@ -229,12 +229,12 @@ pub(crate) fn export_csv(
         let weeks = tracker.get_by_week_filtered(project_scope)?;
         println!("# Weekly Data");
         println!(
-            "week_start,week_end,commands,input_tokens,output_tokens,saved_tokens,savings_pct,total_time_ms,avg_time_ms"
+            "date,week_end,commands,input_tokens,output_tokens,saved_tokens,savings_pct,total_time_ms,avg_time_ms"
         );
         for week in weeks {
             println!(
                 "{},{},{},{},{},{},{:.2},{},{}",
-                week.week_start,
+                week.date,
                 week.week_end,
                 week.commands,
                 week.input_tokens,
@@ -252,12 +252,12 @@ pub(crate) fn export_csv(
         let months = tracker.get_by_month_filtered(project_scope)?;
         println!("# Monthly Data");
         println!(
-            "month,commands,input_tokens,output_tokens,saved_tokens,savings_pct,total_time_ms,avg_time_ms"
+            "date,commands,input_tokens,output_tokens,saved_tokens,savings_pct,total_time_ms,avg_time_ms"
         );
         for month in months {
             println!(
                 "{},{},{},{},{},{:.2},{},{}",
-                month.month,
+                month.date,
                 month.commands,
                 month.input_tokens,
                 month.output_tokens,

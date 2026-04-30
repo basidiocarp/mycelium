@@ -723,3 +723,87 @@ fn test_record_summary_roundtrip() {
         assert!(!project_path.is_empty());
     });
 }
+
+// 16. WeekStats serialization test -- verify `date` field is present and no extra fields
+#[test]
+fn test_week_stats_serialization() {
+    let week_stats = WeekStats {
+        date: "2026-04-20".to_string(),
+        week_end: "2026-04-26".to_string(),
+        commands: 42,
+        input_tokens: 15420,
+        output_tokens: 3842,
+        saved_tokens: 11578,
+        savings_pct: 75.08,
+        total_time_ms: 8450,
+        avg_time_ms: 201,
+    };
+
+    let json_str = serde_json::to_string(&week_stats).expect("Failed to serialize WeekStats");
+    let json: serde_json::Value = serde_json::from_str(&json_str).expect("Failed to parse JSON");
+
+    // Verify `date` field is present
+    assert!(json.get("date").is_some(), "Missing 'date' field in serialized WeekStats");
+    assert_eq!(json.get("date").unwrap().as_str(), Some("2026-04-20"));
+
+    // Verify `week_end` is not serialized (skip_serializing)
+    assert!(json.get("week_end").is_none(), "week_end should not be serialized");
+
+    // Verify all required schema fields are present
+    assert!(json.get("commands").is_some());
+    assert!(json.get("saved_tokens").is_some());
+    assert!(json.get("input_tokens").is_some());
+    assert!(json.get("output_tokens").is_some());
+    assert!(json.get("avg_time_ms").is_some());
+    assert!(json.get("total_time_ms").is_some());
+    assert!(json.get("savings_pct").is_some());
+
+    // Verify no extra fields beyond schema
+    let allowed_fields = vec![
+        "date", "commands", "saved_tokens", "input_tokens", "output_tokens",
+        "avg_time_ms", "total_time_ms", "savings_pct"
+    ];
+    for (key, _) in json.as_object().unwrap().iter() {
+        assert!(allowed_fields.contains(&key.as_str()), "Unexpected field '{}' in serialized WeekStats", key);
+    }
+}
+
+// 17. MonthStats serialization test -- verify `date` field is present and no extra fields
+#[test]
+fn test_month_stats_serialization() {
+    let month_stats = MonthStats {
+        date: "2026-04-01".to_string(),
+        commands: 128,
+        input_tokens: 61200,
+        output_tokens: 15342,
+        saved_tokens: 45858,
+        savings_pct: 75.0,
+        total_time_ms: 33800,
+        avg_time_ms: 264,
+    };
+
+    let json_str = serde_json::to_string(&month_stats).expect("Failed to serialize MonthStats");
+    let json: serde_json::Value = serde_json::from_str(&json_str).expect("Failed to parse JSON");
+
+    // Verify `date` field is present
+    assert!(json.get("date").is_some(), "Missing 'date' field in serialized MonthStats");
+    assert_eq!(json.get("date").unwrap().as_str(), Some("2026-04-01"));
+
+    // Verify all required schema fields are present
+    assert!(json.get("commands").is_some());
+    assert!(json.get("saved_tokens").is_some());
+    assert!(json.get("input_tokens").is_some());
+    assert!(json.get("output_tokens").is_some());
+    assert!(json.get("avg_time_ms").is_some());
+    assert!(json.get("total_time_ms").is_some());
+    assert!(json.get("savings_pct").is_some());
+
+    // Verify no extra fields beyond schema
+    let allowed_fields = vec![
+        "date", "commands", "saved_tokens", "input_tokens", "output_tokens",
+        "avg_time_ms", "total_time_ms", "savings_pct"
+    ];
+    for (key, _) in json.as_object().unwrap().iter() {
+        assert!(allowed_fields.contains(&key.as_str()), "Unexpected field '{}' in serialized MonthStats", key);
+    }
+}

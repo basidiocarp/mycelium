@@ -281,8 +281,8 @@ impl Tracker {
     /// let tracker = Tracker::new()?;
     /// let weeks = tracker.get_by_week()?;
     /// for week in weeks {
-    ///     println!("{} to {}: {} tokens saved",
-    ///         week.week_start, week.week_end, week.saved_tokens);
+    ///     println!("{}: {} tokens saved",
+    ///         week.date, week.saved_tokens);
     /// }
     /// # Ok::<(), anyhow::Error>(())
     /// ```
@@ -325,7 +325,7 @@ impl Tracker {
             };
 
             Ok(WeekStats {
-                week_start: row.get(0)?,
+                date: row.get(0)?,
                 week_end: row.get(1)?,
                 commands,
                 input_tokens: input,
@@ -344,7 +344,7 @@ impl Tracker {
 
     /// Get monthly statistics grouped by month.
     ///
-    /// Returns one [`MonthStats`] per month (YYYY-MM format) with aggregated metrics.
+    /// Returns one [`MonthStats`] per month (YYYY-MM-01 format) with aggregated metrics.
     /// Results ordered chronologically.
     ///
     /// # Examples
@@ -356,7 +356,7 @@ impl Tracker {
     /// let months = tracker.get_by_month()?;
     /// for month in months {
     ///     println!("{}: {} tokens saved ({:.1}%)",
-    ///         month.month, month.saved_tokens, month.savings_pct);
+    ///         month.date, month.saved_tokens, month.savings_pct);
     /// }
     /// # Ok::<(), anyhow::Error>(())
     /// ```
@@ -369,7 +369,7 @@ impl Tracker {
         let (project_exact, project_glob) = project_filter_params(project_path);
         let mut stmt = self.conn.prepare(
             "SELECT
-                strftime('%Y-%m', timestamp) as month,
+                strftime('%Y-%m-01', timestamp) as month_start,
                 COUNT(*) as commands,
                 SUM(input_tokens) as input,
                 SUM(output_tokens) as output,
@@ -377,8 +377,8 @@ impl Tracker {
                 SUM(exec_time_ms) as total_time
              FROM commands
              WHERE (?1 IS NULL OR project_path = ?1 OR project_path GLOB ?2)
-             GROUP BY month
-             ORDER BY month DESC",
+             GROUP BY strftime('%Y-%m', timestamp)
+             ORDER BY strftime('%Y-%m', timestamp) DESC",
         )?;
 
         let rows = stmt.query_map(params![project_exact, project_glob], |row| {
@@ -398,7 +398,7 @@ impl Tracker {
             };
 
             Ok(MonthStats {
-                month: row.get(0)?,
+                date: row.get(0)?,
                 commands,
                 input_tokens: input,
                 output_tokens: row.get::<_, i64>(3)? as usize,

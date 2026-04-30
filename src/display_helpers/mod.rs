@@ -205,10 +205,10 @@ impl PeriodStats for WeekStats {
     }
 
     fn period(&self) -> String {
-        let start = if self.week_start.len() > 5 {
-            &self.week_start[5..]
+        let start = if self.date.len() > 5 {
+            &self.date[5..]
         } else {
-            &self.week_start
+            &self.date
         };
         let end = if self.week_end.len() > 5 {
             &self.week_end[5..]
@@ -265,7 +265,8 @@ impl PeriodStats for MonthStats {
     }
 
     fn period(&self) -> String {
-        self.month.clone()
+        // Schema-canonical date is YYYY-MM-01; display as YYYY-MM for the monthly column.
+        self.date.strip_suffix("-01").unwrap_or(&self.date).to_string()
     }
 
     fn commands(&self) -> usize {
@@ -333,7 +334,7 @@ mod tests {
     #[test]
     fn test_week_stats_trait() {
         let week = WeekStats {
-            week_start: "2026-01-20".to_string(),
+            date: "2026-01-20".to_string(),
             week_end: "2026-01-26".to_string(),
             commands: 50,
             input_tokens: 5000,
@@ -353,7 +354,7 @@ mod tests {
     #[test]
     fn test_month_stats_trait() {
         let month = MonthStats {
-            month: "2026-01".to_string(),
+            date: "2026-01-01".to_string(),
             commands: 200,
             input_tokens: 20000,
             output_tokens: 10000,

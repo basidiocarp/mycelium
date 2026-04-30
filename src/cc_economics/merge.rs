@@ -60,13 +60,13 @@ pub fn merge_weekly(
         }
     }
 
-    // Merge tracking data (week_start = legacy Saturday "2026-01-18")
-    // Convert Saturday to Monday for alignment
+    // Merge tracking data (date = week start date, e.g. "2026-01-18")
+    // Convert week start to Monday for alignment
     for entry in tracking {
-        let monday_key = match convert_saturday_to_monday(&entry.week_start) {
+        let monday_key = match convert_saturday_to_monday(&entry.date) {
             Some(m) => m,
             None => {
-                eprintln!("[!] Invalid week_start format: {}", entry.week_start);
+                eprintln!("[!] Invalid week date format: {}", entry.date);
                 continue;
             }
         };
@@ -101,9 +101,12 @@ pub fn merge_monthly(
         }
     }
 
-    // Merge tracking data
+    // Merge tracking data.
+    // MonthStats.date is canonical YYYY-MM-01 (schema-required); ccusage keys are YYYY-MM.
+    // Strip the `-01` suffix so tracking and ccusage rows merge into the same period.
     for entry in tracking {
-        map.entry(entry.month.clone())
+        let merge_key = entry.date.strip_suffix("-01").unwrap_or(&entry.date).to_string();
+        map.entry(merge_key)
             .or_insert_with_key(|k| PeriodEconomics::new(k))
             .set_tracking_from_month(&entry);
     }
@@ -250,7 +253,7 @@ mod tests {
         }];
 
         let out = vec![MonthStats {
-            month: "2026-01".to_string(),
+            date: "2026-01-01".to_string(),
             commands: 10,
             input_tokens: 800,
             output_tokens: 400,
@@ -290,7 +293,7 @@ mod tests {
     #[test]
     fn test_merge_monthly_only_mycelium() {
         let out = vec![MonthStats {
-            month: "2026-01".to_string(),
+            date: "2026-01-01".to_string(),
             commands: 10,
             input_tokens: 800,
             output_tokens: 400,
@@ -302,6 +305,7 @@ mod tests {
 
         let merged = merge_monthly(None, out);
         assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].label, "2026-01");
         assert!(merged[0].cc_cost.is_none());
         assert_eq!(merged[0].mycelium_commands, Some(10));
     }
@@ -310,7 +314,7 @@ mod tests {
     fn test_merge_monthly_sorted() {
         let out = vec![
             MonthStats {
-                month: "2026-03".to_string(),
+                date: "2026-03-01".to_string(),
                 commands: 5,
                 input_tokens: 100,
                 output_tokens: 50,
@@ -320,7 +324,7 @@ mod tests {
                 avg_time_ms: 0,
             },
             MonthStats {
-                month: "2026-01".to_string(),
+                date: "2026-01-01".to_string(),
                 commands: 10,
                 input_tokens: 200,
                 output_tokens: 100,

@@ -193,10 +193,10 @@ pub struct DayStats {
 /// Weeks start on Sunday (SQLite default).
 #[derive(Debug, Serialize)]
 pub struct WeekStats {
-    /// Week start date (YYYY-MM-DD)
-    pub week_start: String,
-    /// Week end date (YYYY-MM-DD)
-    pub week_end: String,
+    /// ISO week start date (YYYY-MM-DD)
+    pub date: String,
+    /// Week end date (YYYY-MM-DD) - internal use only
+    #[serde(skip_serializing)] pub week_end: String,
     /// Number of commands executed this week
     pub commands: usize,
     /// Total input tokens for this week
@@ -218,8 +218,8 @@ pub struct WeekStats {
 /// Serializable to JSON for export via `mycelium gain --monthly --format json`.
 #[derive(Debug, Serialize)]
 pub struct MonthStats {
-    /// Month identifier (YYYY-MM)
-    pub month: String,
+    /// ISO month start date (YYYY-MM-01)
+    pub date: String,
     /// Number of commands executed this month
     pub commands: usize,
     /// Total input tokens for this month
