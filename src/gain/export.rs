@@ -195,6 +195,30 @@ pub(crate) fn export_json_projects(tracker: &Tracker) -> Result<()> {
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn export_json_string(
+    tracker: &Tracker,
+    daily: bool,
+    weekly: bool,
+    monthly: bool,
+    all: bool,
+    history: bool,
+    limit: usize,
+    project_scope: Option<&str>,
+) -> Result<String> {
+    let export = build_export_data(tracker, daily, weekly, monthly, all, history, limit, project_scope)?;
+    Ok(serde_json::to_string_pretty(&export)?)
+}
+
+pub(crate) fn export_json_projects_string(tracker: &Tracker) -> Result<String> {
+    let mut export = build_export_data(tracker, false, false, false, false, false, 50, None)?;
+    let stats = tracker
+        .get_by_project()
+        .context("Failed to load per-project statistics from database")?;
+    export.by_project = Some(stats.into_iter().map(Into::into).collect());
+    Ok(serde_json::to_string_pretty(&export)?)
+}
+
 pub(crate) fn export_csv(
     tracker: &Tracker,
     daily: bool,

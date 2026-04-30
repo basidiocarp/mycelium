@@ -11,6 +11,24 @@ use anyhow::{Context, Result};
 pub(crate) use helpers::resolve_project_scope;
 
 #[allow(clippy::too_many_arguments)]
+pub(crate) fn gain_json_string(
+    tracker: &crate::tracking::Tracker,
+    daily: bool,
+    weekly: bool,
+    monthly: bool,
+    all: bool,
+    history: bool,
+    limit: usize,
+    project_scope: Option<&str>,
+) -> anyhow::Result<String> {
+    export::export_json_string(tracker, daily, weekly, monthly, all, history, limit, project_scope)
+}
+
+pub(crate) fn gain_projects_json_string(tracker: &crate::tracking::Tracker) -> anyhow::Result<String> {
+    export::export_json_projects_string(tracker)
+}
+
+#[allow(clippy::too_many_arguments)]
 pub fn run(
     project: Option<&str>,
     project_path: Option<&str>,

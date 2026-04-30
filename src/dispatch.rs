@@ -155,6 +155,10 @@ fn replay_captured_output(stdout: &str, stderr: &str) {
 
 /// Dispatch a parsed CLI command to its handler module.
 pub fn dispatch(cli: Cli) -> Result<()> {
+    if let crate::commands::Commands::ServeSocket { compact } = cli.command {
+        return crate::socket_server::run_socket_server(compact);
+    }
+
     if cli.json {
         return exec::dispatch_json(cli);
     }

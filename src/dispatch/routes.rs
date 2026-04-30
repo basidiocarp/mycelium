@@ -420,6 +420,8 @@ pub(super) fn dispatch_command(cli: Cli) -> Result<()> {
         Commands::Rewrite { cmd, explain } => {
             rewrite_cmd::run(&cmd, explain)?;
         }
+        // ServeSocket is handled early in dispatch::dispatch before routing reaches here.
+        Commands::ServeSocket { .. } => unreachable!("ServeSocket dispatched before routes"),
     }
 
     Ok(())

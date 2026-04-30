@@ -553,6 +553,14 @@ pub enum Commands {
         compare: Option<String>,
     },
 
+    /// Start local unix-socket service endpoint (for cap and other local clients)
+    #[command(hide = true)]
+    ServeSocket {
+        /// Enable compact output mode
+        #[arg(long)]
+        compact: bool,
+    },
+
     /// Discover missed Mycelium savings from Claude Code and Codex history
     #[command(display_order = 101)]
     Discover {
