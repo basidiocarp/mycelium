@@ -1,12 +1,18 @@
+#[cfg(unix)]
 use std::fs;
+#[cfg(unix)]
 use std::io::Write;
+#[cfg(unix)]
 use std::path::{Path, PathBuf};
+#[cfg(unix)]
 use std::process::Command;
 
+#[cfg(unix)]
 fn binary_path() -> &'static str {
     env!("CARGO_BIN_EXE_mycelium")
 }
 
+#[cfg(unix)]
 fn config_dir(home: &Path) -> PathBuf {
     #[cfg(target_os = "macos")]
     {
@@ -24,6 +30,7 @@ fn config_dir(home: &Path) -> PathBuf {
     }
 }
 
+#[cfg(unix)]
 fn write_shell_script(path: &Path, body: &str) {
     let mut file = fs::File::create(path).expect("create script");
     writeln!(file, "#!/bin/sh").expect("write shebang");
@@ -36,6 +43,7 @@ fn write_shell_script(path: &Path, body: &str) {
     }
 }
 
+#[cfg(unix)]
 fn write_plugin_config(home: &Path, plugin_dir: &Path) {
     let config_root = config_dir(home).join("mycelium");
     fs::create_dir_all(&config_root).expect("create config dir");
@@ -52,6 +60,7 @@ directory = "{}"
     .expect("write config");
 }
 
+#[cfg(unix)]
 fn run_mycelium(home: &Path, args: &[&str]) -> std::process::Output {
     Command::new(binary_path())
         .args(args)

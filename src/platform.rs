@@ -109,6 +109,7 @@ pub fn split_env_paths(value: &str) -> Vec<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
     use tempfile::TempDir;
 
     #[test]
