@@ -266,7 +266,10 @@ impl PeriodStats for MonthStats {
 
     fn period(&self) -> String {
         // Schema-canonical date is YYYY-MM-01; display as YYYY-MM for the monthly column.
-        self.date.strip_suffix("-01").unwrap_or(&self.date).to_string()
+        self.date
+            .strip_suffix("-01")
+            .unwrap_or(&self.date)
+            .to_string()
     }
 
     fn commands(&self) -> usize {

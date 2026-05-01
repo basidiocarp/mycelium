@@ -62,7 +62,11 @@ pub fn run(file: &Path, max_depth: usize, verbose: u8) -> Result<()> {
     let content = fs::read_to_string(file)
         .with_context(|| format!("Failed to read file: {}", file.display()))?;
 
-    reject_if_oversized(content.len(), MAX_JSON_BYTES, &format!("file {}", file.display()))?;
+    reject_if_oversized(
+        content.len(),
+        MAX_JSON_BYTES,
+        &format!("file {}", file.display()),
+    )?;
 
     let schema = filter_json_string(&content, max_depth)?;
     println!("{}", schema);

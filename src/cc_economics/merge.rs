@@ -105,7 +105,11 @@ pub fn merge_monthly(
     // MonthStats.date is canonical YYYY-MM-01 (schema-required); ccusage keys are YYYY-MM.
     // Strip the `-01` suffix so tracking and ccusage rows merge into the same period.
     for entry in tracking {
-        let merge_key = entry.date.strip_suffix("-01").unwrap_or(&entry.date).to_string();
+        let merge_key = entry
+            .date
+            .strip_suffix("-01")
+            .unwrap_or(&entry.date)
+            .to_string();
         map.entry(merge_key)
             .or_insert_with_key(|k| PeriodEconomics::new(k))
             .set_tracking_from_month(&entry);

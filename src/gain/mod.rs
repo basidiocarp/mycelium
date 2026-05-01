@@ -21,10 +21,21 @@ pub(crate) fn gain_json_string(
     limit: usize,
     project_scope: Option<&str>,
 ) -> anyhow::Result<String> {
-    export::export_json_string(tracker, daily, weekly, monthly, all, history, limit, project_scope)
+    export::export_json_string(
+        tracker,
+        daily,
+        weekly,
+        monthly,
+        all,
+        history,
+        limit,
+        project_scope,
+    )
 }
 
-pub(crate) fn gain_projects_json_string(tracker: &crate::tracking::Tracker) -> anyhow::Result<String> {
+pub(crate) fn gain_projects_json_string(
+    tracker: &crate::tracking::Tracker,
+) -> anyhow::Result<String> {
     export::export_json_projects_string(tracker)
 }
 

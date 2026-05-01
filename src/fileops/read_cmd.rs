@@ -39,7 +39,11 @@ pub fn run(
     let content = fs::read_to_string(file)
         .with_context(|| format!("Failed to read file: {}", file.display()))?;
 
-    reject_if_oversized(content.len(), MAX_READ_BYTES, &format!("file {}", file.display()))?;
+    reject_if_oversized(
+        content.len(),
+        MAX_READ_BYTES,
+        &format!("file {}", file.display()),
+    )?;
 
     // Detect language from extension
     let lang = file

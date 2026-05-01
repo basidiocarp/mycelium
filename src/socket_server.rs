@@ -72,14 +72,36 @@ fn write_response(writer: &mut (impl Write + ?Sized), response: &Value) {
 // ---------------------------------------------------------------------------
 
 fn handle_gain(params: &Value) -> Value {
-    let daily = params.get("daily").and_then(|v| v.as_bool()).unwrap_or(false);
-    let weekly = params.get("weekly").and_then(|v| v.as_bool()).unwrap_or(false);
-    let monthly = params.get("monthly").and_then(|v| v.as_bool()).unwrap_or(false);
+    let daily = params
+        .get("daily")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let weekly = params
+        .get("weekly")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let monthly = params
+        .get("monthly")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     let all = params.get("all").and_then(|v| v.as_bool()).unwrap_or(false);
-    let history = params.get("history").and_then(|v| v.as_bool()).unwrap_or(false);
-    let limit = params.get("limit").and_then(|v| v.as_u64()).map(|v| v as usize).unwrap_or(10);
-    let project_path = params.get("project_path").and_then(|v| v.as_str()).map(str::to_owned);
-    let projects = params.get("projects").and_then(|v| v.as_bool()).unwrap_or(false);
+    let history = params
+        .get("history")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let limit = params
+        .get("limit")
+        .and_then(|v| v.as_u64())
+        .map(|v| v as usize)
+        .unwrap_or(10);
+    let project_path = params
+        .get("project_path")
+        .and_then(|v| v.as_str())
+        .map(str::to_owned);
+    let projects = params
+        .get("projects")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
 
     let tracker = match crate::tracking::Tracker::new() {
         Ok(t) => t,

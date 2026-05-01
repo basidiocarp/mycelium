@@ -1,8 +1,8 @@
 //! CLI client for Rhizome — code intelligence via tree-sitter and LSP.
 
 use anyhow::{Context, Result, bail};
-use spore::logging::{SpanContext, subprocess_span, tool_span};
 use spore::McpClient;
+use spore::logging::{SpanContext, subprocess_span, tool_span};
 use std::path::Path;
 use std::time::Duration;
 

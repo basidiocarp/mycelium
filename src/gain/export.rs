@@ -207,7 +207,16 @@ pub(crate) fn export_json_string(
     limit: usize,
     project_scope: Option<&str>,
 ) -> Result<String> {
-    let export = build_export_data(tracker, daily, weekly, monthly, all, history, limit, project_scope)?;
+    let export = build_export_data(
+        tracker,
+        daily,
+        weekly,
+        monthly,
+        all,
+        history,
+        limit,
+        project_scope,
+    )?;
     Ok(serde_json::to_string_pretty(&export)?)
 }
 

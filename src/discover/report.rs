@@ -84,7 +84,11 @@ pub fn format_text(report: &DiscoverReport, limit: usize, verbose: bool) -> Stri
     out.push_str(&format!(
         "Already using Mycelium: {} commands ({}%)\n",
         report.already_mycelium,
-        report.already_mycelium.saturating_mul(100).checked_div(report.total_commands).unwrap_or(0)
+        report
+            .already_mycelium
+            .saturating_mul(100)
+            .checked_div(report.total_commands)
+            .unwrap_or(0)
     ));
 
     if report.supported.is_empty() && report.unsupported.is_empty() {

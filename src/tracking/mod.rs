@@ -196,7 +196,8 @@ pub struct WeekStats {
     /// ISO week start date (YYYY-MM-DD)
     pub date: String,
     /// Week end date (YYYY-MM-DD) - internal use only
-    #[serde(skip_serializing)] pub week_end: String,
+    #[serde(skip_serializing)]
+    pub week_end: String,
     /// Number of commands executed this week
     pub commands: usize,
     /// Total input tokens for this week

@@ -30,9 +30,17 @@ pub fn run(file1: &Path, file2: &Path, verbose: u8) -> Result<()> {
     }
 
     let content1 = fs::read_to_string(file1)?;
-    reject_if_oversized(content1.len(), MAX_DIFF_BYTES, &format!("{}", file1.display()))?;
+    reject_if_oversized(
+        content1.len(),
+        MAX_DIFF_BYTES,
+        &format!("{}", file1.display()),
+    )?;
     let content2 = fs::read_to_string(file2)?;
-    reject_if_oversized(content2.len(), MAX_DIFF_BYTES, &format!("{}", file2.display()))?;
+    reject_if_oversized(
+        content2.len(),
+        MAX_DIFF_BYTES,
+        &format!("{}", file2.display()),
+    )?;
     let raw = format!("{}\n---\n{}", content1, content2);
 
     let lines1: Vec<&str> = content1.lines().collect();

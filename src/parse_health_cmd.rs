@@ -55,7 +55,10 @@ pub fn run(days: u32) -> Result<()> {
         let (full, degraded, passthrough) = (counts[0], counts[1], counts[2]);
         let total = full + degraded + passthrough;
         let health_pct = full.saturating_mul(100).checked_div(total).unwrap_or(100);
-        let degradation_pct = (degraded + passthrough).saturating_mul(100).checked_div(total).unwrap_or(0);
+        let degradation_pct = (degraded + passthrough)
+            .saturating_mul(100)
+            .checked_div(total)
+            .unwrap_or(0);
 
         let health_str = format!("({}% healthy)", health_pct);
         let health_colored = if degradation_pct > 25 {
@@ -78,7 +81,10 @@ pub fn run(days: u32) -> Result<()> {
     }
 
     println!("{}", "─".repeat(60));
-    let overall_pct = total_full.saturating_mul(100).checked_div(total_all).unwrap_or(100);
+    let overall_pct = total_full
+        .saturating_mul(100)
+        .checked_div(total_all)
+        .unwrap_or(100);
     println!(
         "\nOverall: {}/{} commands parsed at Tier 1 ({}% healthy)",
         total_full, total_all, overall_pct

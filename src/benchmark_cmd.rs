@@ -230,7 +230,11 @@ fn print_summary(results: &[BenchResult], ci: bool) -> Result<()> {
         })
         .sum();
 
-    let savings_pct = total_raw.saturating_sub(total_filtered).saturating_mul(100).checked_div(total_raw).unwrap_or(0);
+    let savings_pct = total_raw
+        .saturating_sub(total_filtered)
+        .saturating_mul(100)
+        .checked_div(total_raw)
+        .unwrap_or(0);
 
     println!();
     println!(
