@@ -10,6 +10,7 @@ use anyhow::{Context, Result};
 
 pub(crate) use helpers::resolve_project_scope;
 
+#[cfg(unix)]
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn gain_json_string(
     tracker: &crate::tracking::Tracker,
@@ -33,6 +34,7 @@ pub(crate) fn gain_json_string(
     )
 }
 
+#[cfg(unix)]
 pub(crate) fn gain_projects_json_string(
     tracker: &crate::tracking::Tracker,
 ) -> anyhow::Result<String> {

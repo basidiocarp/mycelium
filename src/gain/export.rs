@@ -196,6 +196,7 @@ pub(crate) fn export_json_projects(tracker: &Tracker) -> Result<()> {
     Ok(())
 }
 
+#[cfg(unix)]
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn export_json_string(
     tracker: &Tracker,
@@ -220,6 +221,7 @@ pub(crate) fn export_json_string(
     Ok(serde_json::to_string_pretty(&export)?)
 }
 
+#[cfg(unix)]
 pub(crate) fn export_json_projects_string(tracker: &Tracker) -> Result<String> {
     let mut export = build_export_data(tracker, false, false, false, false, false, 50, None)?;
     let stats = tracker
