@@ -83,6 +83,10 @@ mod tests {
     #[test]
     #[ignore]
     fn test_get_structure_with_rhizome_returns_text() {
+        if spore::discover(spore::Tool::Rhizome).is_none() {
+            eprintln!("rhizome not in PATH — skipping integration test");
+            return;
+        }
         let path = PathBuf::from("src/rhizome_client.rs");
         let result = get_structure(&path);
         assert!(result.is_ok(), "expected Ok, got: {:?}", result);
