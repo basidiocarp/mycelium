@@ -263,11 +263,11 @@ warning: `mycelium` (bin) generated 2 warnings
         let output = filter_cargo_build(input);
         let input_tokens = count_tokens(input);
         let output_tokens = count_tokens(&output);
-        let savings = if input_tokens > 0 {
-            (input_tokens.saturating_sub(output_tokens)) * 100 / input_tokens
-        } else {
-            0
-        };
+        let savings = input_tokens
+            .saturating_sub(output_tokens)
+            .saturating_mul(100)
+            .checked_div(input_tokens)
+            .unwrap_or(0);
         assert!(
             savings >= 60,
             "Expected >= 60% token savings, got {}% ({} -> {} tokens)",
@@ -283,11 +283,11 @@ warning: `mycelium` (bin) generated 2 warnings
         let output = filter_cargo_clippy(input);
         let input_tokens = count_tokens(input);
         let output_tokens = count_tokens(&output);
-        let savings = if input_tokens > 0 {
-            (input_tokens.saturating_sub(output_tokens)) * 100 / input_tokens
-        } else {
-            0
-        };
+        let savings = input_tokens
+            .saturating_sub(output_tokens)
+            .saturating_mul(100)
+            .checked_div(input_tokens)
+            .unwrap_or(0);
         assert!(
             savings >= 60,
             "Expected >= 60% token savings, got {}% ({} -> {} tokens)",

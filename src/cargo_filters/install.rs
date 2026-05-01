@@ -346,11 +346,11 @@ error: aborting due to 2 previous errors
         let output = filter_cargo_install(input);
         let input_tokens = count_tokens(input);
         let output_tokens = count_tokens(&output);
-        let savings = if input_tokens > 0 {
-            (input_tokens.saturating_sub(output_tokens)) * 100 / input_tokens
-        } else {
-            0
-        };
+        let savings = input_tokens
+            .saturating_sub(output_tokens)
+            .saturating_mul(100)
+            .checked_div(input_tokens)
+            .unwrap_or(0);
         assert!(
             savings >= 60,
             "Expected >= 60% token savings, got {}% ({} -> {} tokens)",

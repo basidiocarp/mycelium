@@ -759,7 +759,7 @@ fn test_week_stats_serialization() {
     assert!(json.get("savings_pct").is_some());
 
     // Verify no extra fields beyond schema
-    let allowed_fields = vec![
+    let allowed_fields = [
         "date", "commands", "saved_tokens", "input_tokens", "output_tokens",
         "avg_time_ms", "total_time_ms", "savings_pct"
     ];
@@ -799,7 +799,7 @@ fn test_month_stats_serialization() {
     assert!(json.get("savings_pct").is_some());
 
     // Verify no extra fields beyond schema
-    let allowed_fields = vec![
+    let allowed_fields = [
         "date", "commands", "saved_tokens", "input_tokens", "output_tokens",
         "avg_time_ms", "total_time_ms", "savings_pct"
     ];
