@@ -183,14 +183,12 @@ fn bench(
         ("✓".green().to_string(), BenchStatus::Good)
     };
 
-    let savings = if raw_tokens > 0 {
-        format!(
-            "-{}%",
-            (raw_tokens.saturating_sub(filtered_tokens)) * 100 / raw_tokens
-        )
-    } else {
-        "--".to_string()
-    };
+    let savings = raw_tokens
+        .saturating_sub(filtered_tokens)
+        .saturating_mul(100)
+        .checked_div(raw_tokens)
+        .map(|pct| format!("-{}%", pct))
+        .unwrap_or_else(|| "--".to_string());
 
     println!(
         "  {} {:<20} {:>6} → {:>6}  ({})",
@@ -232,11 +230,7 @@ fn print_summary(results: &[BenchResult], ci: bool) -> Result<()> {
         })
         .sum();
 
-    let savings_pct = if total_raw > 0 {
-        (total_raw.saturating_sub(total_filtered)) * 100 / total_raw
-    } else {
-        0
-    };
+    let savings_pct = total_raw.saturating_sub(total_filtered).saturating_mul(100).checked_div(total_raw).unwrap_or(0);
 
     println!();
     println!(
@@ -271,7 +265,7 @@ fn print_summary(results: &[BenchResult], ci: bool) -> Result<()> {
 
     // CI mode: fail if less than 80% of tests show savings
     if ci {
-        let good_pct = if total > 0 { good * 100 / total } else { 0 };
+        let good_pct = good.saturating_mul(100).checked_div(total).unwrap_or(0);
         if good_pct < 80 {
             anyhow::bail!(
                 "Benchmark failed: {}% of tests show savings (minimum 80%)",

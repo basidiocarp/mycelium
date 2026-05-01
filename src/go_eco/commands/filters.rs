@@ -46,10 +46,8 @@ pub fn filter_go_test_json(output: &str) -> String {
         let pkg_result = packages.entry(package.clone()).or_default();
 
         match event.action.as_str() {
-            "pass" => {
-                if event.test.is_some() {
-                    pkg_result.pass += 1;
-                }
+            "pass" if event.test.is_some() => {
+                pkg_result.pass += 1;
             }
             "fail" => {
                 if let Some(test) = &event.test {
@@ -71,10 +69,8 @@ pub fn filter_go_test_json(output: &str) -> String {
                     }
                 }
             }
-            "skip" => {
-                if event.test.is_some() {
-                    pkg_result.skip += 1;
-                }
+            "skip" if event.test.is_some() => {
+                pkg_result.skip += 1;
             }
             "output" => {
                 // Collect output for current test

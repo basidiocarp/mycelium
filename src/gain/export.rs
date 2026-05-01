@@ -12,6 +12,7 @@ pub(crate) struct ExportData {
     pub(crate) summary: ExportSummary,
     // telemetry_summary is internal diagnostics; excluded from the public
     // mycelium-gain-v1 JSON contract (schema has additionalProperties: false).
+    #[allow(dead_code)]
     #[serde(skip_serializing)]
     pub(crate) telemetry_summary: TelemetrySummarySurface,
     pub(crate) by_command: Vec<ExportCommandStats>,

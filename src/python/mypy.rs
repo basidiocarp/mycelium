@@ -180,7 +180,7 @@ impl OutputParser for MypyParser {
             files.insert(err.file.as_str());
         }
         let mut by_code: Vec<(String, usize)> = by_code.into_iter().collect();
-        by_code.sort_by(|a, b| b.1.cmp(&a.1));
+        by_code.sort_by_key(|a| std::cmp::Reverse(a.1));
 
         ParseResult::Full(DiagnosticReport {
             tool: "mypy".to_string(),

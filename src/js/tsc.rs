@@ -179,7 +179,7 @@ impl OutputParser for TscParser {
             *by_code_map.entry(d.code.clone()).or_insert(0) += 1;
         }
         let mut by_code: Vec<(String, usize)> = by_code_map.into_iter().collect();
-        by_code.sort_by(|a, b| b.1.cmp(&a.1));
+        by_code.sort_by_key(|a| std::cmp::Reverse(a.1));
 
         let files_affected = {
             let mut files: std::collections::HashSet<&str> = std::collections::HashSet::new();

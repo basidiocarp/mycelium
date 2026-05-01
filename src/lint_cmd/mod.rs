@@ -122,17 +122,11 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
         "eslint" => {
             cmd.arg("-f").arg("json");
         }
-        "ruff" => {
-            // Force JSON output for ruff check
-            if !has_explicit_output_format(effective_args) {
-                cmd.arg("check").arg("--output-format=json");
-            }
+        "ruff" if !has_explicit_output_format(effective_args) => {
+            cmd.arg("check").arg("--output-format=json");
         }
-        "pylint" => {
-            // Force JSON2 output for pylint
-            if !has_explicit_output_format(effective_args) {
-                cmd.arg("--output-format=json2");
-            }
+        "pylint" if !has_explicit_output_format(effective_args) => {
+            cmd.arg("--output-format=json2");
         }
         "mypy" => {
             // mypy uses default text output (no special flags)
