@@ -787,6 +787,13 @@ pub enum Commands {
         #[arg(long)]
         explain: bool,
     },
+
+    /// Explain which filter would match a command and why (does not execute)
+    #[command(display_order = 120)]
+    Explain {
+        /// Command to explain (e.g. "git log -20" or "cargo test")
+        cmd: String,
+    },
 }
 
 #[cfg(test)]

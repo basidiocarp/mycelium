@@ -185,6 +185,21 @@ pub(super) fn run_spawned_command(
     // Stderr is already streamed live by the capture thread above.
     print!("{routed_stdout}");
 
+    // Append MYCELIUM_EXPLAIN annotation if enabled and command was rewritten
+    if std::env::var("MYCELIUM_EXPLAIN").is_ok() {
+        let resolution = rewrite_cmd::resolve_runtime_command(tracked_input);
+        if resolution.rewritten {
+            if !routed_stdout.is_empty() {
+                print!("\n");
+            }
+            print!(
+                "[mycelium] filter: {} | savings: ~{:.0}%",
+                resolution.source,
+                resolution.estimated_savings_pct.unwrap_or(0.0)
+            );
+        }
+    }
+
     // Track using the original output, not the routed output (for accurate token tracking)
     timer.track(tracked_input, tracked_output, &full_output, &full_output);
 
