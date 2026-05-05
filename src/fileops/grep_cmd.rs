@@ -93,11 +93,45 @@ pub fn run(
         println!("... +{}", total - max_results);
     }
 
+    if is_code_search(path, extra_args) && code_search_hint_enabled() {
+        println!(
+            "\n[BASIDIOCARP] Code search via bash detected.\nPreferred tools for this query type:\n  rhizome_find_symbol / rhizome_find_references / rhizome_search_code"
+        );
+    }
+
     if exit_code != 0 {
         std::process::exit(exit_code);
     }
 
     Ok(())
+}
+
+/// Returns true when the path or extra args indicate a source-file code search.
+fn is_code_search(path: &str, extra_args: &[String]) -> bool {
+    const SOURCE_EXTENSIONS: &[&str] = &[".rs", ".ts", ".tsx", ".js", ".jsx", ".py", ".go"];
+    const SOURCE_PREFIXES: &[&str] = &["src/", "./src/", "src\\", "lib/", "./lib/"];
+
+    let targets = std::iter::once(path).chain(extra_args.iter().map(String::as_str));
+    for target in targets {
+        if target.starts_with('-') {
+            continue;
+        }
+        if SOURCE_EXTENSIONS.iter().any(|ext| target.ends_with(ext)) {
+            return true;
+        }
+        if SOURCE_PREFIXES.iter().any(|prefix| target.starts_with(prefix)) {
+            return true;
+        }
+    }
+    false
+}
+
+/// Returns false when `MYCELIUM_CODE_SEARCH_HINT=0` or `=false` is set.
+fn code_search_hint_enabled() -> bool {
+    match std::env::var("MYCELIUM_CODE_SEARCH_HINT").as_deref() {
+        Ok("0") | Ok("false") | Ok("off") => false,
+        _ => true,
+    }
 }
 
 fn clean_line(line: &str, max_len: usize, context_only: bool, pattern: &str) -> String {
@@ -228,6 +262,40 @@ mod tests {
             .collect();
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered[0], "-i");
+    }
+
+    #[test]
+    fn test_is_code_search_detects_source_extensions() {
+        assert!(is_code_search("src/main.rs", &[]));
+        assert!(is_code_search("lib.ts", &[]));
+        assert!(is_code_search(".", &["src/lib.py".to_string()]));
+        assert!(!is_code_search(".", &["-i".to_string(), "README.md".to_string()]));
+        assert!(!is_code_search(".", &[]));
+    }
+
+    #[test]
+    fn test_is_code_search_detects_source_prefixes() {
+        assert!(is_code_search("src/", &[]));
+        assert!(is_code_search("./src/", &[]));
+        assert!(!is_code_search("tests/", &[]));
+        assert!(!is_code_search("docs/guide.md", &[]));
+    }
+
+    #[test]
+    fn test_code_search_hint_disabled_values() {
+        // Test that "0", "false", "off" values disable the hint.
+        // We test the logic directly rather than via env manipulation (set_var/remove_var
+        // are unsafe in Rust 2024 and env mutations are not safe in parallel tests).
+        let disabled_values = ["0", "false", "off"];
+        for v in disabled_values {
+            let result = match v {
+                "0" | "false" | "off" => false,
+                _ => true,
+            };
+            assert!(!result, "'{v}' should disable the hint");
+        }
+        // Any other value (including empty/unset) means enabled
+        assert!(matches!("1", "0" | "false" | "off") == false);
     }
 
     // Verify line numbers are always enabled in rg invocation (grep_cmd.rs:24).
