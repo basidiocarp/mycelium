@@ -57,6 +57,49 @@ pub(super) fn current_runtime_session_id() -> Option<String> {
     spore::claude_session_id()
 }
 
+/// Derive a human-readable project name for analytics.
+///
+/// Priority order:
+/// 1. `BASIDIOCARP_PROJECT` environment variable (explicit project name override)
+/// 2. Git remote URL: parses repo name from `origin` remote (e.g., "mycelium" from "https://github.com/user/mycelium.git")
+/// 3. Current working directory name (fallback)
+///
+/// Returns "unknown" if all detection fails, never panics.
+pub(super) fn derive_project_name() -> String {
+    // Priority 1: BASIDIOCARP_PROJECT env var
+    if let Ok(name) = std::env::var("BASIDIOCARP_PROJECT")
+        && !name.trim().is_empty()
+    {
+        return name.trim().to_owned();
+    }
+
+    // Priority 2: Git remote URL
+    if let Ok(output) = std::process::Command::new("git")
+        .args(["remote", "get-url", "origin"])
+        .output()
+    {
+        if output.status.success() {
+            let url = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+            // Extract last path segment (repo name) and strip .git suffix
+            if let Some(name) = url
+                .rsplit('/')
+                .next()
+                .map(|s| s.trim_end_matches(".git").to_owned())
+            {
+                if !name.is_empty() {
+                    return name;
+                }
+            }
+        }
+    }
+
+    // Priority 3: CWD directory name
+    std::env::current_dir()
+        .ok()
+        .and_then(|p| p.file_name().map(|n| n.to_string_lossy().to_string()))
+        .unwrap_or_else(|| "unknown".to_owned())
+}
+
 /// Detect the git repository root for the current working directory.
 /// Returns an empty string if not inside a git repository.
 pub(super) fn current_project_root() -> String {

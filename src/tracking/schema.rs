@@ -70,6 +70,11 @@ pub(super) fn init_schema(conn: &Connection) -> Result<()> {
         "CREATE INDEX IF NOT EXISTS idx_commands_session_id_timestamp ON commands(session_id, timestamp)",
         [],
     );
+    // Migration: add project_name column for analytics and project name resolution
+    let _ = conn.execute(
+        "ALTER TABLE commands ADD COLUMN project_name TEXT DEFAULT ''",
+        [],
+    );
     // Migration: add parse_tier column for parser framework observability
     let _ = conn.execute(
         "ALTER TABLE commands ADD COLUMN parse_tier INTEGER DEFAULT 0",

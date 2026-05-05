@@ -508,20 +508,27 @@ impl Tracker {
     /// are excluded.
     pub fn get_by_project(&self) -> Result<Vec<ProjectStats>> {
         let mut stmt = self.conn.prepare(
-            "SELECT project_path, COUNT(*), SUM(saved_tokens), AVG(savings_pct), MAX(timestamp)
-             FROM commands
-             WHERE project_path IS NOT NULL AND project_path != ''
-             GROUP BY project_path
-             ORDER BY SUM(saved_tokens) DESC",
+            "SELECT
+                c.project_path,
+                (SELECT project_name FROM commands WHERE project_path = c.project_path AND project_name != '' ORDER BY timestamp DESC LIMIT 1) as project_name,
+                COUNT(*),
+                SUM(c.saved_tokens),
+                AVG(c.savings_pct),
+                MAX(c.timestamp)
+             FROM commands c
+             WHERE c.project_path IS NOT NULL AND c.project_path != ''
+             GROUP BY c.project_path
+             ORDER BY SUM(c.saved_tokens) DESC",
         )?;
 
         let rows = stmt.query_map([], |row| {
             Ok(ProjectStats {
                 project_path: row.get(0)?,
-                commands: row.get(1)?,
-                saved_tokens: row.get(2)?,
-                avg_savings_pct: row.get(3)?,
-                last_used: row.get(4)?,
+                project_name: row.get::<_, Option<String>>(1)?.unwrap_or_default(),
+                commands: row.get(2)?,
+                saved_tokens: row.get(3)?,
+                avg_savings_pct: row.get(4)?,
+                last_used: row.get(5)?,
             })
         })?;
 

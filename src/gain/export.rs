@@ -65,6 +65,7 @@ impl From<CommandStats> for ExportCommandStats {
 #[derive(Serialize)]
 pub(crate) struct ExportProjectStats {
     pub(crate) project_path: String,
+    pub(crate) project_name: String,
     pub(crate) commands: i64,
     pub(crate) saved_tokens: i64,
     pub(crate) avg_savings_pct: f64,
@@ -75,6 +76,7 @@ impl From<crate::tracking::ProjectStats> for ExportProjectStats {
     fn from(value: crate::tracking::ProjectStats) -> Self {
         Self {
             project_path: value.project_path,
+            project_name: value.project_name,
             commands: value.commands,
             saved_tokens: value.saved_tokens,
             avg_savings_pct: value.avg_savings_pct,

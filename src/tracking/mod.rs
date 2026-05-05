@@ -40,7 +40,8 @@ use rusqlite::{Connection, params};
 use serde::Serialize;
 
 use utils::{
-    current_project_path_string, current_project_root, current_runtime_session_id, get_db_path,
+    current_project_path_string, current_project_root, current_runtime_session_id, derive_project_name,
+    get_db_path,
 };
 
 #[allow(unused_imports)]
@@ -242,6 +243,8 @@ pub struct MonthStats {
 pub struct ProjectStats {
     /// Canonical project directory path
     pub project_path: String,
+    /// Human-readable project name (from BASIDIOCARP_PROJECT, git remote, or directory name)
+    pub project_name: String,
     /// Total commands executed in this project
     pub commands: i64,
     /// Total tokens saved in this project
@@ -395,16 +398,18 @@ impl Tracker {
         };
 
         let project_path = current_project_path_string();
+        let project_name = derive_project_name();
         let session_id = current_runtime_session_id();
 
         self.conn.execute(
-            "INSERT INTO commands (timestamp, original_cmd, mycelium_cmd, project_path, session_id, input_tokens, output_tokens, saved_tokens, savings_pct, exec_time_ms, execution_kind)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            "INSERT INTO commands (timestamp, original_cmd, mycelium_cmd, project_path, project_name, session_id, input_tokens, output_tokens, saved_tokens, savings_pct, exec_time_ms, execution_kind)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
             params![
                 Utc::now().to_rfc3339(),
                 original_cmd,
                 mycelium_cmd,
                 project_path,
+                project_name,
                 session_id,
                 input_tokens as i64,
                 output_tokens as i64,
@@ -447,16 +452,18 @@ impl Tracker {
         };
 
         let project_path = current_project_path_string();
+        let project_name = derive_project_name();
         let session_id = current_runtime_session_id();
 
         self.conn.execute(
-            "INSERT INTO commands (timestamp, original_cmd, mycelium_cmd, project_path, session_id, input_tokens, output_tokens, saved_tokens, savings_pct, exec_time_ms, parse_tier, format_mode, execution_kind)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+            "INSERT INTO commands (timestamp, original_cmd, mycelium_cmd, project_path, project_name, session_id, input_tokens, output_tokens, saved_tokens, savings_pct, exec_time_ms, parse_tier, format_mode, execution_kind)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
             params![
                 Utc::now().to_rfc3339(),
                 original_cmd,
                 mycelium_cmd,
                 project_path,
+                project_name,
                 session_id,
                 input_tokens as i64,
                 output_tokens as i64,
@@ -481,16 +488,18 @@ impl Tracker {
         exec_time_ms: u64,
     ) -> Result<()> {
         let project_path = current_project_path_string();
+        let project_name = derive_project_name();
         let session_id = current_runtime_session_id();
 
         self.conn.execute(
-            "INSERT INTO commands (timestamp, original_cmd, mycelium_cmd, project_path, session_id, input_tokens, output_tokens, saved_tokens, savings_pct, exec_time_ms, execution_kind)
-             VALUES (?1, ?2, ?3, ?4, ?5, 0, 0, 0, 0.0, ?6, 'passthrough')",
+            "INSERT INTO commands (timestamp, original_cmd, mycelium_cmd, project_path, project_name, session_id, input_tokens, output_tokens, saved_tokens, savings_pct, exec_time_ms, execution_kind)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, 0, 0, 0.0, ?7, 'passthrough')",
             params![
                 Utc::now().to_rfc3339(),
                 original_cmd,
                 mycelium_cmd,
                 project_path,
+                project_name,
                 session_id,
                 exec_time_ms as i64,
             ],
