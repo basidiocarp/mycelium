@@ -138,6 +138,27 @@ fn write_tee_file(
     Some(filepath)
 }
 
+/// Parse a tee mode string into a TeeMode.
+/// Returns Some(mode) if the string is a valid mode, None otherwise.
+/// Invalid values are silently ignored (fail-open).
+fn parse_tee_mode_str(s: &str) -> Option<TeeMode> {
+    match s.to_lowercase().as_str() {
+        "failures" => Some(TeeMode::Failures),
+        "always" => Some(TeeMode::Always),
+        "never" => Some(TeeMode::Never),
+        _ => None,
+    }
+}
+
+/// Parse MYCELIUM_TEE_MODE env var into a TeeMode.
+/// Returns Some(mode) if the env var is set and valid, None otherwise.
+/// Invalid values are silently ignored (fail-open).
+fn parse_tee_mode_env() -> Option<TeeMode> {
+    std::env::var("MYCELIUM_TEE_MODE")
+        .ok()
+        .and_then(|v| parse_tee_mode_str(&v))
+}
+
 /// Write raw output to tee file if conditions are met.
 /// Returns file path on success, None if skipped/failed.
 pub fn tee_raw(raw: &str, command_slug: &str, exit_code: i32) -> Option<PathBuf> {
@@ -146,7 +167,13 @@ pub fn tee_raw(raw: &str, command_slug: &str, exit_code: i32) -> Option<PathBuf>
         return None;
     }
 
-    let config = Config::load().ok()?;
+    let mut config = Config::load().ok()?;
+
+    // Check MYCELIUM_TEE_MODE env override
+    if let Some(mode) = parse_tee_mode_env() {
+        config.tee.mode = mode;
+    }
+
     let tee_dir = get_tee_dir(&config)?;
 
     let tee_dir = should_tee(&config.tee, raw.len(), exit_code, Some(tee_dir))?;
@@ -397,5 +424,21 @@ directory = "/tmp/mycelium-tee"
 
         let mode: TeeMode = serde_json::from_str(r#""never""#).unwrap();
         assert_eq!(mode, TeeMode::Never);
+    }
+
+    #[test]
+    fn test_tee_mode_env_var_never() {
+        assert_eq!(parse_tee_mode_str("never"), Some(TeeMode::Never));
+    }
+
+    #[test]
+    fn test_tee_mode_env_var_always() {
+        assert_eq!(parse_tee_mode_str("always"), Some(TeeMode::Always));
+    }
+
+    #[test]
+    fn test_tee_mode_env_var_invalid_ignored() {
+        assert_eq!(parse_tee_mode_str("bogus"), None);
+        assert_eq!(parse_tee_mode_str(""), None);
     }
 }
