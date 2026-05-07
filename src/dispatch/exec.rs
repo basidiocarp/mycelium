@@ -190,7 +190,7 @@ pub(super) fn run_spawned_command(
         let resolution = rewrite_cmd::resolve_runtime_command(tracked_input);
         if resolution.rewritten {
             if !routed_stdout.is_empty() {
-                print!("\n");
+                println!();
             }
             print!(
                 "[mycelium] filter: {} | savings: ~{:.0}%",

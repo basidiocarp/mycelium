@@ -131,10 +131,10 @@ fn is_code_search(path: &str, extra_args: &[String]) -> bool {
 
 /// Returns false when `MYCELIUM_CODE_SEARCH_HINT=0` or `=false` is set.
 fn code_search_hint_enabled() -> bool {
-    match std::env::var("MYCELIUM_CODE_SEARCH_HINT").as_deref() {
-        Ok("0") | Ok("false") | Ok("off") => false,
-        _ => true,
-    }
+    !matches!(
+        std::env::var("MYCELIUM_CODE_SEARCH_HINT").as_deref(),
+        Ok("0") | Ok("false") | Ok("off")
+    )
 }
 
 fn clean_line(line: &str, max_len: usize, context_only: bool, pattern: &str) -> String {
@@ -294,14 +294,11 @@ mod tests {
         // are unsafe in Rust 2024 and env mutations are not safe in parallel tests).
         let disabled_values = ["0", "false", "off"];
         for v in disabled_values {
-            let result = match v {
-                "0" | "false" | "off" => false,
-                _ => true,
-            };
-            assert!(!result, "'{v}' should disable the hint");
+            let result = matches!(v, "0" | "false" | "off");
+            assert!(result, "'{v}' should disable the hint");
         }
         // Any other value (including empty/unset) means enabled
-        assert!(matches!("1", "0" | "false" | "off") == false);
+        assert!(!matches!("1", "0" | "false" | "off"));
     }
 
     // Verify line numbers are always enabled in rg invocation (grep_cmd.rs:24).
