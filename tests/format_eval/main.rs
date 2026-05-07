@@ -47,10 +47,7 @@ fn compact_json(input: &str) -> String {
         serde_json::to_string(&value).unwrap_or_else(|_| input.to_string())
     } else {
         // Non-JSON: collapse runs of whitespace to single space
-        input
-            .split_whitespace()
-            .collect::<Vec<_>>()
-            .join(" ")
+        input.split_whitespace().collect::<Vec<_>>().join(" ")
     }
 }
 

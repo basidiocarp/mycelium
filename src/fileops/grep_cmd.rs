@@ -119,7 +119,10 @@ fn is_code_search(path: &str, extra_args: &[String]) -> bool {
         if SOURCE_EXTENSIONS.iter().any(|ext| target.ends_with(ext)) {
             return true;
         }
-        if SOURCE_PREFIXES.iter().any(|prefix| target.starts_with(prefix)) {
+        if SOURCE_PREFIXES
+            .iter()
+            .any(|prefix| target.starts_with(prefix))
+        {
             return true;
         }
     }
@@ -269,7 +272,10 @@ mod tests {
         assert!(is_code_search("src/main.rs", &[]));
         assert!(is_code_search("lib.ts", &[]));
         assert!(is_code_search(".", &["src/lib.py".to_string()]));
-        assert!(!is_code_search(".", &["-i".to_string(), "README.md".to_string()]));
+        assert!(!is_code_search(
+            ".",
+            &["-i".to_string(), "README.md".to_string()]
+        ));
         assert!(!is_code_search(".", &[]));
     }
 

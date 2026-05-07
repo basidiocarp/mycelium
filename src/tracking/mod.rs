@@ -40,8 +40,8 @@ use rusqlite::{Connection, params};
 use serde::Serialize;
 
 use utils::{
-    current_project_path_string, current_project_root, current_runtime_session_id, derive_project_name,
-    get_db_path,
+    current_project_path_string, current_project_root, current_runtime_session_id,
+    derive_project_name, get_db_path,
 };
 
 #[allow(unused_imports)]
