@@ -187,8 +187,7 @@ pub(super) fn run_spawned_command(
     // disk reads inside tight loops; cwd is captured at command-dispatch time.
     let final_stdout = if routed_stdout == stdout.as_ref() {
         // Built-in filter was a no-op — consult TOML filters.
-        let (project_filters, user_filters) =
-            crate::filters::load_all_declarative_filters();
+        let (project_filters, user_filters) = crate::filters::load_all_declarative_filters();
         if let Some(matched) =
             crate::filters::find_matching_filter(tracked_input, &project_filters, &user_filters)
         {

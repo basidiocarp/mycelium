@@ -53,25 +53,27 @@ impl DeclarativeFilter {
     /// Construct a new filter, compiling regexes eagerly.
     /// Compilation failures are logged to stderr and stored as None.
     fn new(raw: RawDeclarativeFilter) -> Self {
-        let keep_regex = raw.keep_pattern.as_deref().and_then(|p| {
-            match Regex::new(p) {
+        let keep_regex = raw
+            .keep_pattern
+            .as_deref()
+            .and_then(|p| match Regex::new(p) {
                 Ok(r) => Some(r),
                 Err(e) => {
                     eprintln!("mycelium: failed to compile keep_pattern regex '{p}': {e}");
                     None
                 }
-            }
-        });
+            });
 
-        let drop_regex = raw.drop_pattern.as_deref().and_then(|p| {
-            match Regex::new(p) {
+        let drop_regex = raw
+            .drop_pattern
+            .as_deref()
+            .and_then(|p| match Regex::new(p) {
                 Ok(r) => Some(r),
                 Err(e) => {
                     eprintln!("mycelium: failed to compile drop_pattern regex '{p}': {e}");
                     None
                 }
-            }
-        });
+            });
 
         Self {
             command: raw.command,
@@ -255,7 +257,10 @@ pub fn load_declarative_filters(dir: &Path) -> Vec<DeclarativeFilter> {
         match toml::from_str::<RawDeclarativeFilter>(&contents) {
             Ok(raw) => filters.push(DeclarativeFilter::new(raw)),
             Err(e) => {
-                eprintln!("mycelium: failed to parse declarative filter {:?}: {e}", path);
+                eprintln!(
+                    "mycelium: failed to parse declarative filter {:?}: {e}",
+                    path
+                );
             }
         }
     }
@@ -298,7 +303,6 @@ pub fn find_matching_filter<'a>(
         .find(|f| f.matches(command))
         .or_else(|| user_filters.iter().find(|f| f.matches(command)))
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -348,7 +352,10 @@ mod tests {
         let f = make_filter("test", "truncate", Some(2), Some("IMPORTANT"), None);
         let input = "IMPORTANT\nline2\nline3\nline4\nline5";
         let result = f.apply(input);
-        assert!(result.output.contains("IMPORTANT"), "keep_pattern line outside tail must be kept");
+        assert!(
+            result.output.contains("IMPORTANT"),
+            "keep_pattern line outside tail must be kept"
+        );
         assert!(result.output.contains("line4"), "tail line must be kept");
         assert!(result.output.contains("line5"), "tail line must be kept");
     }
