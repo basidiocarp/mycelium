@@ -177,19 +177,39 @@ pub(super) fn run_spawned_command(
     let stderr = String::from_utf8_lossy(&stderr_bytes);
     let full_output = format!("{}{}", stdout, stderr);
 
-    // Apply content-aware routing to stdout before printing
+    // Apply content-aware routing to stdout before printing.
+    // Built-in (compiled) filter runs first and always takes precedence.
     let router = ContentRouter::default();
     let routed_stdout = router.route(&stdout);
 
-    // Print routed stdout after all output is captured.
+    // Apply TOML declarative filter as a fallback when the built-in filter
+    // produced no transformation. Load filters once here to avoid repeated
+    // disk reads inside tight loops; cwd is captured at command-dispatch time.
+    let final_stdout = if routed_stdout == stdout.as_ref() {
+        // Built-in filter was a no-op — consult TOML filters.
+        let (project_filters, user_filters) =
+            crate::filters::load_all_declarative_filters();
+        if let Some(matched) =
+            crate::filters::find_matching_filter(tracked_input, &project_filters, &user_filters)
+        {
+            let toml_result = matched.apply(&stdout);
+            toml_result.output
+        } else {
+            routed_stdout
+        }
+    } else {
+        routed_stdout
+    };
+
+    // Print the final filtered stdout after all output is captured.
     // Stderr is already streamed live by the capture thread above.
-    print!("{routed_stdout}");
+    print!("{final_stdout}");
 
     // Append MYCELIUM_EXPLAIN annotation if enabled and command was rewritten
     if std::env::var("MYCELIUM_EXPLAIN").is_ok() {
         let resolution = rewrite_cmd::resolve_runtime_command(tracked_input);
         if resolution.rewritten {
-            if !routed_stdout.is_empty() {
+            if !final_stdout.is_empty() {
                 println!();
             }
             print!(

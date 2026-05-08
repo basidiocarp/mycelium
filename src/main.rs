@@ -28,6 +28,7 @@ pub use fileops::tree_cmd;
 pub use fileops::wc_cmd;
 mod filter;
 mod filtered_cmd;
+mod filters;
 mod format_cmd;
 mod gain;
 mod go_eco;
