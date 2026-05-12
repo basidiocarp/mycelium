@@ -2,11 +2,9 @@
 use anyhow::{Context, Result};
 #[cfg_attr(not(unix), allow(unused_imports))]
 use std::fs;
-use std::io::Write;
 use std::path::Path;
 #[cfg(unix)]
 use std::path::PathBuf;
-use tempfile::NamedTempFile;
 
 #[cfg(unix)]
 use super::claude_md::resolve_claude_dir;
@@ -236,34 +234,10 @@ pub(crate) fn write_if_changed(
     }
 }
 
-/// Atomic write using tempfile + rename
+/// Atomic write using spore v0.6.0 primitives
 /// Prevents corruption on crash/interrupt
 pub(crate) fn atomic_write(path: &Path, content: &str) -> Result<()> {
-    let parent = path.parent().with_context(|| {
-        format!(
-            "Cannot write to {}: path has no parent directory",
-            path.display()
-        )
-    })?;
-
-    // Create temp file in same directory (ensures same filesystem for atomic rename)
-    let mut temp_file = NamedTempFile::new_in(parent)
-        .with_context(|| format!("Failed to create temp file in {}", parent.display()))?;
-
-    // Write content
-    temp_file
-        .write_all(content.as_bytes())
-        .with_context(|| format!("Failed to write {} bytes to temp file", content.len()))?;
-
-    // Atomic rename
-    temp_file.persist(path).with_context(|| {
-        format!(
-            "Failed to atomically replace {} (disk full?)",
-            path.display()
-        )
-    })?;
-
-    Ok(())
+    spore::atomic_write_bytes(path, content.as_bytes()).map_err(anyhow::Error::new)
 }
 
 #[cfg(test)]
