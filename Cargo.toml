@@ -43,6 +43,12 @@ which = "7"
 tree-sitter = "0.25"
 tree-sitter-bash = "0.25"
 
+[lints.rust]
+unsafe_code = "warn"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+
 [build-dependencies]
 clap = { version = "4", features = ["derive"] }
 clap_mangen = "0.2"

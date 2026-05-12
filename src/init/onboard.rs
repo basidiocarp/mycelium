@@ -31,7 +31,12 @@ extern "C" fn handle_sigint(_: i32) {
 #[cfg(unix)]
 fn install_sigint_handler() {
     INSTALL_SIGINT_HANDLER.call_once(|| unsafe {
-        libc::signal(libc::SIGINT, handle_sigint as *const () as usize);
+        // SAFETY: sigaction is async-signal-safe; sa_mask and sa_flags are fully initialized.
+        let mut sa: libc::sigaction = std::mem::zeroed();
+        sa.sa_sigaction = handle_sigint as *const () as libc::sighandler_t;
+        libc::sigemptyset(&mut sa.sa_mask);
+        sa.sa_flags = 0;
+        libc::sigaction(libc::SIGINT, &sa, std::ptr::null_mut());
     });
 }
 
