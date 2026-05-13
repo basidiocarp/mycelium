@@ -4,11 +4,12 @@ mod build;
 mod install;
 mod nextest;
 mod shared;
-mod test;
+pub(crate) mod test;
 
 pub(crate) use build::{filter_cargo_build, filter_cargo_clippy};
 pub(crate) use install::filter_cargo_install;
 pub(crate) use nextest::filter_cargo_nextest;
+pub(crate) use test::filter_cargo_test;
 
 /// Check whether raw output looks like cargo output.
 ///

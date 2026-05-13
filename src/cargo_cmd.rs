@@ -1,6 +1,7 @@
 //! Cargo command proxy that executes cargo subcommands and applies token-saving filters.
 use crate::cargo_filters::{
     filter_cargo_build, filter_cargo_clippy, filter_cargo_install, filter_cargo_nextest,
+    filter_cargo_test,
 };
 use crate::tracking;
 use anyhow::{Context, Result};
@@ -171,11 +172,11 @@ fn run_test(args: &[String], verbose: u8) -> Result<()> {
         &format!("cargo test {}", restored.join(" ")),
         &result.raw,
         |r| {
-            let output = result.filtered.clone();
+            let output = filter_cargo_test(r, show_passing);
             if crate::cargo_filters::looks_like_cargo_output(r) {
                 crate::filter::FilterResult::full(r, output)
             } else {
-                crate::filter::FilterResult::degraded(r, output)
+                crate::filter::FilterResult::degraded(r, result.filtered.clone())
             }
         },
     );

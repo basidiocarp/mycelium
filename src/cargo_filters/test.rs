@@ -1,7 +1,5 @@
-#[cfg(test)]
 use std::sync::OnceLock;
 
-#[cfg(test)]
 fn collapse_internal_frames(text: &str) -> String {
     let mut result = Vec::new();
     let mut internal_count = 0usize;
@@ -25,7 +23,6 @@ fn collapse_internal_frames(text: &str) -> String {
 }
 
 /// Aggregated test results for compact display
-#[cfg(test)]
 #[derive(Debug, Default, Clone)]
 pub(crate) struct AggregatedTestResult {
     passed: usize,
@@ -38,7 +35,6 @@ pub(crate) struct AggregatedTestResult {
     has_duration: bool,
 }
 
-#[cfg(test)]
 impl AggregatedTestResult {
     /// Parse a test result summary line
     /// Format: "test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s"
@@ -125,7 +121,6 @@ impl AggregatedTestResult {
 }
 
 /// Filter cargo test output - show failures + summary only
-#[cfg(test)]
 pub(crate) fn filter_cargo_test(output: &str, show_passing: bool) -> String {
     let mut failures: Vec<String> = Vec::new();
     let mut summary_lines: Vec<String> = Vec::new();
