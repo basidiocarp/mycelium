@@ -60,14 +60,9 @@ pub(super) fn run_commit(args: &[String], verbose: u8, global_args: &[String]) -
         );
     } else {
         eprintln!("FAILED: git commit");
-        if !stderr.trim().is_empty() {
-            eprintln!("{}", stderr);
-        }
-        if !stdout.trim().is_empty() {
-            eprintln!("{}", stdout);
-        }
         let _ = std::io::stdout().flush();
         let _ = std::io::stderr().flush();
+        let _ = std::io::stderr().write_all(&output.stderr);
         std::process::exit(output.status.code().unwrap_or(1));
     }
 

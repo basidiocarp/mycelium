@@ -38,10 +38,7 @@ pub fn run(
     // Check file size before loading
     let metadata = fs::metadata(file)?;
     if metadata.len() > MAX_READ_BYTES as u64 {
-        return Err(anyhow::anyhow!(
-            "file too large ({} bytes)",
-            metadata.len()
-        ));
+        return Err(anyhow::anyhow!("file too large ({} bytes)", metadata.len()));
     }
 
     // Read file content

@@ -6,6 +6,16 @@
 
 use serde_json::Value;
 
+/// Check whether input looks like unified diff output.
+fn looks_like_diff(input: &str) -> bool {
+    input.lines().any(|line| {
+        line.starts_with("diff --git")
+            || line.starts_with("--- a/")
+            || line.starts_with("+++ b/")
+            || line.starts_with("@@ ")
+    })
+}
+
 /// Detected content type of command output.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ContentType {
@@ -55,24 +65,9 @@ impl ContentRouter {
             return ContentType::Json;
         }
 
-        // Check for code/diffs (hunk markers, code blocks)
-        if output.contains("@@") || output.contains("```") {
+        // Check for code/diffs (hunk markers, code blocks, structural diff markers)
+        if output.contains("@@") || output.contains("```") || looks_like_diff(output) {
             return ContentType::Code;
-        }
-
-        // Diff heuristic: check if majority of first 50 lines start with +/-/space
-        let lines: Vec<&str> = output.lines().take(50).collect();
-        if !lines.is_empty() {
-            let diff_lines = lines
-                .iter()
-                .filter(|l| {
-                    let c = l.chars().next().unwrap_or(' ');
-                    c == '+' || c == '-' || c == ' '
-                })
-                .count();
-            if diff_lines * 2 > lines.len() {
-                return ContentType::Code;
-            }
         }
 
         // Structured heuristic: check if majority of first 100 lines contain : or |

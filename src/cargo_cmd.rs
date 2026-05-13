@@ -151,15 +151,20 @@ fn run_test(args: &[String], verbose: u8) -> Result<()> {
     let result = crate::streaming::execute_streaming("cargo", &all_args, |line| {
         if !show_passing && line.contains("... ok") {
             None
-        } else if line.starts_with("test result:")
-            || line.contains("FAILED")
-            || line.contains("error")
-            || line.is_empty()
-            || !line.starts_with("test ")
-        {
-            Some(line.to_string())
         } else {
-            None
+            let is_error_line = line.starts_with("error[")
+                || line.starts_with("error:")
+                || line.starts_with("  --> ")
+                || line.starts_with("FAILED");
+            if line.starts_with("test result:")
+                || is_error_line
+                || line.is_empty()
+                || !line.starts_with("test ")
+            {
+                Some(line.to_string())
+            } else {
+                None
+            }
         }
     })?;
 
@@ -180,6 +185,8 @@ fn run_test(args: &[String], verbose: u8) -> Result<()> {
             }
         },
     );
+
+    println!("{}", filter_result.output);
 
     timer.track(
         &format!("cargo test {}", restored.join(" ")),

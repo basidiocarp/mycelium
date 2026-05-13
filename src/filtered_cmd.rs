@@ -135,10 +135,7 @@ impl FilteredCommand {
             .spawn()
             .with_context(|| format!("Failed to run {}", self.tool_name))?;
 
-        let stderr_pipe = child
-            .stderr
-            .take()
-            .context("Failed to capture stderr")?;
+        let stderr_pipe = child.stderr.take().context("Failed to capture stderr")?;
 
         let stderr_thread = thread::spawn(move || {
             let mut buf = [0u8; 8192];

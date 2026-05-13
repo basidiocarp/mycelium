@@ -36,6 +36,10 @@ pub(super) fn run_status(args: &[String], verbose: u8, global_args: &[String]) -
         let filtered = filter_status_with_args(&stdout);
         print!("{}", filtered);
 
+        if !output.status.success() {
+            std::process::exit(output.status.code().unwrap_or(1));
+        }
+
         timer.track(
             &format!("git status {}", args.join(" ")),
             &format!("mycelium git status {}", args.join(" ")),
@@ -76,6 +80,11 @@ pub(super) fn run_status(args: &[String], verbose: u8, global_args: &[String]) -
     };
 
     println!("{}", formatted);
+
+    if !output.status.success() {
+        let _ = std::io::stderr().write_all(&output.stderr);
+        std::process::exit(output.status.code().unwrap_or(1));
+    }
 
     // Track for statistics
     timer.track("git status", "mycelium git status", &raw_output, &formatted);

@@ -114,6 +114,8 @@ pub(super) fn run_spawned_command(
     use std::process::Stdio;
     use std::thread;
 
+    const MAX_STDOUT_CAPTURE: usize = 64 * 1024 * 1024; // 64 MB cap
+
     let mut child = command
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -139,7 +141,10 @@ pub(super) fn run_spawned_command(
             if count == 0 {
                 break;
             }
-            captured.extend_from_slice(&buf[..count]);
+            if captured.len() < MAX_STDOUT_CAPTURE {
+                captured.extend_from_slice(&buf[..count]);
+            }
+            // Continue draining stdout even after cap is hit, but discard bytes past the cap
         }
 
         Ok(captured)
@@ -362,28 +367,37 @@ pub fn dispatch_json(cli: Cli) -> Result<()> {
         .args(&args)
         .output();
 
-    let envelope = match filtered_result {
+    let (envelope, exit_code) = match filtered_result {
         Ok(output) if output.status.success() || !output.stdout.is_empty() => {
             let filtered = String::from_utf8_lossy(&output.stdout).to_string();
-            json_output::wrap_output(
+            let exit_code = output.status.code().unwrap_or(0);
+            let envelope = json_output::wrap_output(
                 &original_cmd,
                 &format!("mycelium {original_cmd}"),
                 &filtered,
                 &raw_output,
                 project_path.as_deref(),
                 Some(&rewrite_resolution),
-            )
+            );
+            (envelope, exit_code)
         }
         Ok(output) => {
             let exit_code = output.status.code().unwrap_or(1);
             let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-            json_output::wrap_error(&stderr, exit_code)
+            let envelope = json_output::wrap_error(&stderr, exit_code);
+            (envelope, exit_code)
         }
-        Err(e) => json_output::wrap_error(&e.to_string(), 1),
+        Err(e) => {
+            let envelope = json_output::wrap_error(&e.to_string(), 1);
+            (envelope, 1)
+        }
     };
 
     let _ = cli;
 
     println!("{envelope}");
+    if exit_code != 0 {
+        std::process::exit(exit_code);
+    }
     Ok(())
 }
