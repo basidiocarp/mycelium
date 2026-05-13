@@ -26,6 +26,7 @@ fn main() {
     println!("cargo:rerun-if-changed=Cargo.toml");
 }
 
+#[allow(clippy::too_many_lines)]
 fn build_cli() -> clap::Command {
     clap::Command::new("mycelium")
         .version(env!("CARGO_PKG_VERSION"))
