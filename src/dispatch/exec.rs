@@ -4,6 +4,80 @@ use super::content_router::ContentRouter;
 use crate::commands::{Cli, Commands};
 use crate::{json_output, rewrite_cmd, tracking};
 
+/// Maximum bytes to capture from command stdout (64 MB).
+pub(crate) const MAX_STDOUT_CAPTURE: usize = 64 * 1024 * 1024;
+
+/// Run a command with bounded stdout capture.
+///
+/// Uses the same 64 MB cap as `run_spawned_command` and drains stderr to avoid deadlocks.
+/// This helper is used by family runners (JS, Python, etc.) instead of `cmd.output()` directly.
+pub(crate) fn run_bounded(
+    cmd: &mut std::process::Command,
+) -> std::io::Result<std::process::Output> {
+    use std::io::Read;
+    use std::process::Stdio;
+    use std::thread;
+
+    let mut child = cmd.stdout(Stdio::piped()).stderr(Stdio::piped()).spawn()?;
+
+    let stdout_pipe = child.stdout.take().ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::Other, "Failed to capture stdout")
+    })?;
+    let stderr_pipe = child.stderr.take().ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::Other, "Failed to capture stderr")
+    })?;
+
+    let stdout_handle = thread::spawn(move || -> std::io::Result<Vec<u8>> {
+        let mut reader = stdout_pipe;
+        let mut captured = Vec::new();
+        let mut buf = [0u8; 8192];
+
+        loop {
+            let count = reader.read(&mut buf)?;
+            if count == 0 {
+                break;
+            }
+            if captured.len() < MAX_STDOUT_CAPTURE {
+                captured.extend_from_slice(&buf[..count]);
+            }
+            // Continue draining stdout even after cap is hit, but discard bytes past the cap
+        }
+
+        Ok(captured)
+    });
+
+    let stderr_handle = thread::spawn(move || -> std::io::Result<Vec<u8>> {
+        let mut reader = stderr_pipe;
+        let mut captured = Vec::new();
+        let mut buf = [0u8; 8192];
+
+        loop {
+            let count = reader.read(&mut buf)?;
+            if count == 0 {
+                break;
+            }
+            captured.extend_from_slice(&buf[..count]);
+        }
+
+        Ok(captured)
+    });
+
+    let status = child.wait()?;
+
+    let stdout = stdout_handle
+        .join()
+        .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "stdout thread panicked"))??;
+    let stderr = stderr_handle
+        .join()
+        .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "stderr thread panicked"))??;
+
+    Ok(std::process::Output {
+        status,
+        stdout,
+        stderr,
+    })
+}
+
 pub(super) fn dispatch_proxy(args: &[std::ffi::OsString], cli: &Cli) -> Result<()> {
     if args.is_empty() {
         anyhow::bail!(
@@ -114,8 +188,6 @@ pub(super) fn run_spawned_command(
     use std::process::Stdio;
     use std::thread;
 
-    const MAX_STDOUT_CAPTURE: usize = 64 * 1024 * 1024; // 64 MB cap
-
     let mut child = command
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -182,7 +254,19 @@ pub(super) fn run_spawned_command(
     let stderr = String::from_utf8_lossy(&stderr_bytes);
     let full_output = format!("{}{}", stdout, stderr);
 
-    // Apply content-aware routing to stdout before printing.
+    // Route raw stdout through hyphae for chunked storage before any ContentRouter filtering.
+    // This ensures hyphae stores the complete unfiltered command output.
+    let hyphae_output = if crate::hyphae::is_available() {
+        let result = crate::hyphae::route_or_filter(&tracked_input, &stdout, |r| {
+            crate::filter::FilterResult::full(r, r.to_string())
+        });
+        result.output
+    } else {
+        // Hyphae not available — use raw output for display if no ContentRouter filter applies
+        stdout.to_string()
+    };
+
+    // Apply content-aware routing to stdout for display filtering.
     // Built-in (compiled) filter runs first and always takes precedence.
     let router = ContentRouter::default();
     let routed_stdout = router.route(&stdout);
@@ -190,7 +274,7 @@ pub(super) fn run_spawned_command(
     // Apply TOML declarative filter as a fallback when the built-in filter
     // produced no transformation. Load filters once here to avoid repeated
     // disk reads inside tight loops; cwd is captured at command-dispatch time.
-    let final_stdout = if routed_stdout == stdout.as_ref() {
+    let filtered_for_display = if routed_stdout == stdout.as_ref() {
         // Built-in filter was a no-op — consult TOML filters.
         let (project_filters, user_filters) = crate::filters::load_all_declarative_filters();
         if let Some(matched) =
@@ -205,21 +289,23 @@ pub(super) fn run_spawned_command(
         routed_stdout
     };
 
-    // Print the final filtered stdout after all output is captured.
-    // Stderr is already streamed live by the capture thread above.
-    // If no content-router filter applied, bypass the String conversion and write raw bytes.
-    let final_stdout_bytes = final_stdout.as_bytes();
-    if final_stdout_bytes == stdout_bytes.as_slice() {
-        std::io::stdout().write_all(&stdout_bytes)?;
+    // Choose what to print: if hyphae handled it, use hyphae's summary; otherwise use the
+    // ContentRouter-filtered text for display.
+    let output_to_print = if crate::hyphae::is_available() {
+        hyphae_output
     } else {
-        print!("{final_stdout}");
-    }
+        filtered_for_display.to_string()
+    };
+
+    // Print the final output after all filtering is complete.
+    // Stderr is already streamed live by the capture thread above.
+    print!("{output_to_print}");
 
     // Append MYCELIUM_EXPLAIN annotation if enabled and command was rewritten
     if std::env::var("MYCELIUM_EXPLAIN").is_ok() {
         let resolution = rewrite_cmd::resolve_runtime_command(tracked_input);
         if resolution.rewritten {
-            if !final_stdout.is_empty() {
+            if !output_to_print.is_empty() {
                 println!();
             }
             print!(
@@ -230,12 +316,13 @@ pub(super) fn run_spawned_command(
         }
     }
 
-    // Track using the original output, not the routed output (for accurate token tracking)
-    let final_full = if final_stdout_bytes == stdout_bytes.as_slice() {
-        full_output.clone()
-    } else {
-        format!("{}{}", final_stdout, String::from_utf8_lossy(&stderr_bytes))
-    };
+    // Track using the ContentRouter-filtered text (not hyphae's summary output) for accurate token tracking.
+    // This ensures token savings are computed against the actual filtered output users see, not hyphae chunk summaries.
+    let final_full = format!(
+        "{}{}",
+        filtered_for_display,
+        String::from_utf8_lossy(&stderr_bytes)
+    );
     timer.track(tracked_input, tracked_output, &full_output, &final_full);
 
     if !status.success() {

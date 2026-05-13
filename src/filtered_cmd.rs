@@ -154,10 +154,26 @@ impl FilteredCommand {
             captured
         });
 
-        let output = child.wait_with_output()?;
+        // Use bounded stdout reading instead of wait_with_output to cap at 64 MB
+        let mut stdout_bytes = Vec::new();
+        if let Some(mut stdout) = child.stdout.take() {
+            use std::io::Read;
+            let mut buf = [0u8; 8192];
+            loop {
+                let count = stdout.read(&mut buf)?;
+                if count == 0 {
+                    break;
+                }
+                if stdout_bytes.len() < crate::dispatch::exec::MAX_STDOUT_CAPTURE {
+                    stdout_bytes.extend_from_slice(&buf[..count]);
+                }
+                // Continue draining stdout even after cap is hit, but discard bytes past the cap
+            }
+        }
+        let status = child.wait()?;
         let stderr_bytes = stderr_thread.join().unwrap_or_default();
 
-        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stdout = String::from_utf8_lossy(&stdout_bytes);
         let stderr = String::from_utf8_lossy(&stderr_bytes);
         let combined = format!("{}{}", stdout, stderr);
 
@@ -168,7 +184,7 @@ impl FilteredCommand {
         };
 
         let filtered = (self.filter_fn)(&raw);
-        let exit_code = utils::exit_code(&output.status);
+        let exit_code = utils::exit_code(&status);
 
         let raw_label = format!("{} {}", self.tool_name, self.args.join(" "));
         let mycelium_label = self

@@ -57,7 +57,7 @@ fn run_list(depth: usize, args: &[String], verbose: u8) -> Result<()> {
         cmd.arg(arg);
     }
 
-    let output = cmd.output().context("Failed to run pnpm list")?;
+    let output = crate::dispatch::exec::run_bounded(&mut cmd).context("Failed to run pnpm list")?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -125,7 +125,8 @@ fn run_outdated(args: &[String], verbose: u8) -> Result<()> {
         cmd.arg(arg);
     }
 
-    let output = cmd.output().context("Failed to run pnpm outdated")?;
+    let output =
+        crate::dispatch::exec::run_bounded(&mut cmd).context("Failed to run pnpm outdated")?;
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
     let combined = format!("{}{}", stdout, stderr);
@@ -213,7 +214,8 @@ fn run_install(packages: &[String], args: &[String], verbose: u8) -> Result<()> 
         eprintln!("pnpm install running...");
     }
 
-    let output = cmd.output().context("Failed to run pnpm install")?;
+    let output =
+        crate::dispatch::exec::run_bounded(&mut cmd).context("Failed to run pnpm install")?;
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
 
