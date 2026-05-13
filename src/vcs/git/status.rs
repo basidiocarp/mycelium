@@ -5,6 +5,7 @@ use crate::vcs::git_filters::{
     format_worktree_porcelain,
 };
 use anyhow::{Context, Result};
+use std::io::Write;
 
 pub(super) fn run_status(args: &[String], verbose: u8, global_args: &[String]) -> Result<()> {
     let timer = tracking::TimedExecution::start();
@@ -16,6 +17,13 @@ pub(super) fn run_status(args: &[String], verbose: u8, global_args: &[String]) -
             .args(args)
             .output()
             .context("Failed to run git status")?;
+
+        if !output.status.success() {
+            let _ = std::io::stdout().flush();
+            let _ = std::io::stderr().flush();
+            std::io::stderr().write_all(&output.stderr).ok();
+            std::process::exit(output.status.code().unwrap_or(1));
+        }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -50,6 +58,13 @@ pub(super) fn run_status(args: &[String], verbose: u8, global_args: &[String]) -
         .args(["status", "--porcelain", "-b"])
         .output()
         .context("Failed to run git status")?;
+
+    if !output.status.success() {
+        let _ = std::io::stdout().flush();
+        let _ = std::io::stderr().flush();
+        std::io::stderr().write_all(&output.stderr).ok();
+        std::process::exit(output.status.code().unwrap_or(1));
+    }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
@@ -260,6 +275,12 @@ pub(super) fn run_branch(args: &[String], verbose: u8, global_args: &[String]) -
             cmd.arg(f.as_str());
         }
         let output = cmd.output().context("Failed to run git branch")?;
+        if !output.status.success() {
+            let _ = std::io::stdout().flush();
+            let _ = std::io::stderr().flush();
+            std::io::stderr().write_all(&output.stderr).ok();
+            std::process::exit(output.status.code().unwrap_or(1));
+        }
         let stdout = String::from_utf8_lossy(&output.stdout);
         for line in stdout.lines() {
             let line = line.trim();
@@ -285,6 +306,12 @@ pub(super) fn run_branch(args: &[String], verbose: u8, global_args: &[String]) -
             cmd.arg(f.as_str());
         }
         let output = cmd.output().context("Failed to run git branch -r")?;
+        if !output.status.success() {
+            let _ = std::io::stdout().flush();
+            let _ = std::io::stderr().flush();
+            std::io::stderr().write_all(&output.stderr).ok();
+            std::process::exit(output.status.code().unwrap_or(1));
+        }
         let stdout = String::from_utf8_lossy(&output.stdout);
         for line in stdout.lines() {
             let name = line.trim();
@@ -370,6 +397,13 @@ pub(super) fn run_worktree(args: &[String], verbose: u8, global_args: &[String])
         .args(["worktree", "list", "--porcelain"])
         .output()
         .context("Failed to run git worktree list --porcelain")?;
+
+    if !output.status.success() {
+        let _ = std::io::stdout().flush();
+        let _ = std::io::stderr().flush();
+        std::io::stderr().write_all(&output.stderr).ok();
+        std::process::exit(output.status.code().unwrap_or(1));
+    }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let raw = stdout.to_string();

@@ -80,14 +80,21 @@ impl TimedExecution {
         let input_tokens = estimate_tokens(input);
         let output_tokens = estimate_tokens(output);
 
-        if let Ok(tracker) = Tracker::new() {
-            let _ = tracker.record(
-                original_cmd,
-                mycelium_cmd,
-                input_tokens,
-                output_tokens,
-                elapsed_ms,
-            );
+        match Tracker::new() {
+            Ok(tracker) => {
+                if let Err(e) = tracker.record(
+                    original_cmd,
+                    mycelium_cmd,
+                    input_tokens,
+                    output_tokens,
+                    elapsed_ms,
+                ) {
+                    tracing::warn!(error = %e, "tracker.record failed");
+                }
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "tracker init failed");
+            }
         }
     }
 
@@ -115,8 +122,15 @@ impl TimedExecution {
         let _tool_span =
             tool_span("tracking_record_passthrough", &span_context(original_cmd)).entered();
         let elapsed_ms = self.start.elapsed().as_millis() as u64;
-        if let Ok(tracker) = Tracker::new() {
-            let _ = tracker.record_passthrough(original_cmd, mycelium_cmd, elapsed_ms);
+        match Tracker::new() {
+            Ok(tracker) => {
+                if let Err(e) = tracker.record_passthrough(original_cmd, mycelium_cmd, elapsed_ms) {
+                    tracing::warn!(error = %e, "tracker.record_passthrough failed");
+                }
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "tracker init failed");
+            }
         }
     }
 
@@ -144,16 +158,23 @@ impl TimedExecution {
         let input_tokens = estimate_tokens(input);
         let output_tokens = estimate_tokens(output);
 
-        if let Ok(tracker) = Tracker::new() {
-            let _ = tracker.record_with_parse_info(
-                original_cmd,
-                mycelium_cmd,
-                input_tokens,
-                output_tokens,
-                elapsed_ms,
-                parse_tier,
-                format_mode,
-            );
+        match Tracker::new() {
+            Ok(tracker) => {
+                if let Err(e) = tracker.record_with_parse_info(
+                    original_cmd,
+                    mycelium_cmd,
+                    input_tokens,
+                    output_tokens,
+                    elapsed_ms,
+                    parse_tier,
+                    format_mode,
+                ) {
+                    tracing::warn!(error = %e, "tracker.record_with_parse_info failed");
+                }
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "tracker init failed");
+            }
         }
     }
 }

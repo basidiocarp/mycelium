@@ -2,6 +2,7 @@
 use crate::tracking;
 use crate::vcs::git_filters::compact_diff;
 use anyhow::{Context, Result};
+use std::io::Write;
 
 pub(super) fn run_stash(
     subcommand: Option<&str>,
@@ -23,6 +24,12 @@ pub(super) fn run_stash(
                 .args(["stash", "list", "--format=%gd: %s"])
                 .output()
                 .context("Failed to run git stash list")?;
+            if !output.status.success() {
+                let _ = std::io::stdout().flush();
+                let _ = std::io::stderr().flush();
+                std::io::stderr().write_all(&output.stderr).ok();
+                std::process::exit(output.status.code().unwrap_or(1));
+            }
             let stdout = String::from_utf8_lossy(&output.stdout);
             let raw = stdout.to_string();
 
@@ -45,6 +52,12 @@ pub(super) fn run_stash(
                 cmd.arg(arg);
             }
             let output = cmd.output().context("Failed to run git stash show")?;
+            if !output.status.success() {
+                let _ = std::io::stdout().flush();
+                let _ = std::io::stderr().flush();
+                std::io::stderr().write_all(&output.stderr).ok();
+                std::process::exit(output.status.code().unwrap_or(1));
+            }
             let stdout = String::from_utf8_lossy(&output.stdout);
             let raw = stdout.to_string();
 

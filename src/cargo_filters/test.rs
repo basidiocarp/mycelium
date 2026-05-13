@@ -160,6 +160,7 @@ pub(crate) fn filter_cargo_test(output: &str, show_passing: bool) -> String {
             if line.starts_with("test result:") {
                 in_failure_section = false;
                 summary_lines.push(line.to_string());
+                continue;
             } else if line.starts_with("    ") || line.starts_with("---- ") {
                 current_failure.push(line.to_string());
             } else if line.trim().is_empty() && !current_failure.is_empty() {

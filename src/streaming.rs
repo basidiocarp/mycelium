@@ -5,7 +5,7 @@
 //! collecting raw output for token tracking.
 
 use anyhow::{Context, Result};
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, Write};
 use std::process::{Command, Stdio};
 
 /// Result of a streaming execution.
@@ -40,19 +40,31 @@ where
         .with_context(|| format!("Failed to spawn '{}'", cmd))?;
 
     let stdout = child.stdout.take().context("Failed to capture stdout")?;
-    let reader = BufReader::new(stdout);
+    let mut reader = std::io::BufReader::new(stdout);
 
     let mut raw_lines: Vec<String> = Vec::new();
     let mut filtered_lines: Vec<String> = Vec::new();
     let stdout_handle = std::io::stdout();
 
-    for line in reader.lines() {
-        let line = line.context("Failed to read line from child stdout")?;
-        raw_lines.push(line.clone());
-        if let Some(out) = filter_fn(&line) {
-            filtered_lines.push(out.clone());
-            let mut lock = stdout_handle.lock();
-            writeln!(lock, "{}", out).ok();
+    let mut buf = Vec::new();
+    loop {
+        buf.clear();
+        match reader.read_until(b'\n', &mut buf) {
+            Ok(0) => break,
+            Ok(_) => {
+                let line = String::from_utf8_lossy(&buf);
+                let line = line.trim_end_matches('\n').trim_end_matches('\r');
+                raw_lines.push(line.to_string());
+                if let Some(out) = filter_fn(line) {
+                    filtered_lines.push(out.clone());
+                    let mut lock = stdout_handle.lock();
+                    writeln!(lock, "{}", out).ok();
+                }
+            }
+            Err(e) => {
+                tracing::warn!("stream read error: {e}");
+                break;
+            }
         }
     }
 

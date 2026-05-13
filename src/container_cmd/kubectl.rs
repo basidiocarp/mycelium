@@ -2,6 +2,7 @@
 use crate::tracking;
 use anyhow::{Context, Result};
 use std::ffi::OsString;
+use std::io::Write;
 use std::process::Command;
 
 pub(crate) fn kubectl_pods(args: &[String], _verbose: u8) -> Result<()> {
@@ -14,6 +15,10 @@ pub(crate) fn kubectl_pods(args: &[String], _verbose: u8) -> Result<()> {
     }
 
     let output = cmd.output().context("Failed to run kubectl get pods")?;
+    if !output.status.success() {
+        let _ = std::io::stderr().write_all(&output.stderr);
+        std::process::exit(output.status.code().unwrap_or(1));
+    }
     let raw = String::from_utf8_lossy(&output.stdout).to_string();
     let mut out = String::new();
 
@@ -115,6 +120,10 @@ pub(crate) fn kubectl_services(args: &[String], _verbose: u8) -> Result<()> {
     }
 
     let output = cmd.output().context("Failed to run kubectl get services")?;
+    if !output.status.success() {
+        let _ = std::io::stderr().write_all(&output.stderr);
+        std::process::exit(output.status.code().unwrap_or(1));
+    }
     let raw = String::from_utf8_lossy(&output.stdout).to_string();
     let mut out = String::new();
 
@@ -195,6 +204,10 @@ pub(crate) fn kubectl_logs(args: &[String], _verbose: u8) -> Result<()> {
     }
 
     let output = cmd.output().context("Failed to run kubectl logs")?;
+    if !output.status.success() {
+        let _ = std::io::stderr().write_all(&output.stderr);
+        std::process::exit(output.status.code().unwrap_or(1));
+    }
     let raw = String::from_utf8_lossy(&output.stdout).to_string();
     let analyzed = crate::log_cmd::run_stdin_str(&raw);
     let out = format!("k8s: Logs for {}:\n{}", pod, analyzed);

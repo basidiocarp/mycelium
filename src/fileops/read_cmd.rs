@@ -35,15 +35,18 @@ pub fn run(
         eprintln!("Reading: {} (filter: {})", file.display(), level);
     }
 
+    // Check file size before loading
+    let metadata = fs::metadata(file)?;
+    if metadata.len() > MAX_READ_BYTES as u64 {
+        return Err(anyhow::anyhow!(
+            "file too large ({} bytes)",
+            metadata.len()
+        ));
+    }
+
     // Read file content
     let content = fs::read_to_string(file)
         .with_context(|| format!("Failed to read file: {}", file.display()))?;
-
-    reject_if_oversized(
-        content.len(),
-        MAX_READ_BYTES,
-        &format!("file {}", file.display()),
-    )?;
 
     // Detect language from extension
     let lang = file

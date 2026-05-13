@@ -1,6 +1,7 @@
 //! Commit, push, pull, and fetch handlers for git command proxy.
 use crate::tracking;
 use anyhow::{Context, Result};
+use std::io::Write;
 use std::process::Command;
 
 pub(super) fn build_commit_command(args: &[String], global_args: &[String]) -> Command {
@@ -65,10 +66,9 @@ pub(super) fn run_commit(args: &[String], verbose: u8, global_args: &[String]) -
         if !stdout.trim().is_empty() {
             eprintln!("{}", stdout);
         }
-        return Err(anyhow::anyhow!(
-            "git commit failed with exit code {}",
-            output.status.code().unwrap_or(1)
-        ));
+        let _ = std::io::stdout().flush();
+        let _ = std::io::stderr().flush();
+        std::process::exit(output.status.code().unwrap_or(1));
     }
 
     Ok(())

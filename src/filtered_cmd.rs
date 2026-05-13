@@ -117,6 +117,9 @@ impl FilteredCommand {
     ///   exit code, and key metrics (line count, byte count)
     pub fn run(self) -> Result<()> {
         use crate::{tee, tracking, utils};
+        use std::io::{Read, Write};
+        use std::process::Stdio;
+        use std::thread;
 
         let timer = tracking::TimedExecution::start();
 
@@ -124,14 +127,41 @@ impl FilteredCommand {
             eprintln!("Running: {} {}", self.tool_name, self.args.join(" "));
         }
 
-        let output = Command::new(&self.tool_name)
+        let mut child = Command::new(&self.tool_name)
             .args(&self.args)
             .envs(self.envs.iter().map(|(k, v)| (k.as_str(), v.as_str())))
-            .output()
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
             .with_context(|| format!("Failed to run {}", self.tool_name))?;
 
+        let stderr_pipe = child
+            .stderr
+            .take()
+            .context("Failed to capture stderr")?;
+
+        let stderr_thread = thread::spawn(move || {
+            let mut buf = [0u8; 8192];
+            let mut captured = Vec::new();
+            let mut out = std::io::stderr();
+            let mut reader = std::io::BufReader::new(stderr_pipe);
+            loop {
+                match reader.read(&mut buf) {
+                    Ok(0) | Err(_) => break,
+                    Ok(n) => {
+                        let _ = out.write_all(&buf[..n]);
+                        captured.extend_from_slice(&buf[..n]);
+                    }
+                }
+            }
+            captured
+        });
+
+        let output = child.wait_with_output()?;
+        let stderr_bytes = stderr_thread.join().unwrap_or_default();
+
         let stdout = String::from_utf8_lossy(&output.stdout);
-        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stderr = String::from_utf8_lossy(&stderr_bytes);
         let combined = format!("{}{}", stdout, stderr);
 
         let raw = if self.do_strip_ansi {

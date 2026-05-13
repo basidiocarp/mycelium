@@ -202,7 +202,13 @@ pub(super) fn run_spawned_command(
 
     // Print the final filtered stdout after all output is captured.
     // Stderr is already streamed live by the capture thread above.
-    print!("{final_stdout}");
+    // If no content-router filter applied, bypass the String conversion and write raw bytes.
+    let final_stdout_bytes = final_stdout.as_bytes();
+    if final_stdout_bytes == stdout_bytes.as_slice() {
+        std::io::stdout().write_all(&stdout_bytes)?;
+    } else {
+        print!("{final_stdout}");
+    }
 
     // Append MYCELIUM_EXPLAIN annotation if enabled and command was rewritten
     if std::env::var("MYCELIUM_EXPLAIN").is_ok() {
@@ -220,7 +226,12 @@ pub(super) fn run_spawned_command(
     }
 
     // Track using the original output, not the routed output (for accurate token tracking)
-    timer.track(tracked_input, tracked_output, &full_output, &full_output);
+    let final_full = if final_stdout_bytes == stdout_bytes.as_slice() {
+        full_output.clone()
+    } else {
+        format!("{}{}", final_stdout, String::from_utf8_lossy(&stderr_bytes))
+    };
+    timer.track(tracked_input, tracked_output, &full_output, &final_full);
 
     if !status.success() {
         let _ = std::io::stdout().flush();

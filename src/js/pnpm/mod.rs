@@ -178,7 +178,11 @@ fn run_outdated(args: &[String], verbose: u8) -> Result<()> {
         format_mode_str,
     );
 
-    Ok(())
+    // pnpm outdated exits non-zero when outdated packages exist (it is not an error).
+    // Always forward the real exit code instead of mapping non-zero to an anyhow error.
+    // This function always terminates via process::exit and never reaches Ok(()).
+    let exit_code = output.status.code().unwrap_or(1);
+    std::process::exit(exit_code);
 }
 
 fn run_install(packages: &[String], args: &[String], verbose: u8) -> Result<()> {

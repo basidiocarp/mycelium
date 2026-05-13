@@ -2,6 +2,7 @@
 use crate::tracking;
 use anyhow::{Context, Result};
 use std::ffi::OsString;
+use std::io::Write;
 use std::process::Command;
 
 pub(crate) fn docker_ps(_verbose: u8) -> Result<()> {
@@ -21,6 +22,11 @@ pub(crate) fn docker_ps(_verbose: u8) -> Result<()> {
         ])
         .output()
         .context("Failed to run docker ps")?;
+
+    if !output.status.success() {
+        let _ = std::io::stderr().write_all(&output.stderr);
+        std::process::exit(output.status.code().unwrap_or(1));
+    }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let mut out = String::new();
@@ -79,6 +85,11 @@ pub(crate) fn docker_images(_verbose: u8) -> Result<()> {
         .args(["images", "--format", "{{.Repository}}:{{.Tag}}\t{{.Size}}"])
         .output()
         .context("Failed to run docker images")?;
+
+    if !output.status.success() {
+        let _ = std::io::stderr().write_all(&output.stderr);
+        std::process::exit(output.status.code().unwrap_or(1));
+    }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let lines: Vec<&str> = stdout.lines().collect();

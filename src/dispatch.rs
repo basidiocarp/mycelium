@@ -106,7 +106,8 @@ pub fn run_fallback(parse_error: clap::Error) -> Result<()> {
                 );
                 tracking::record_parse_failure_silent(&raw_command, &error_message, false, None);
                 eprintln!("[mycelium: plugin raw capture failed: {}]", error);
-                parse_error.exit();
+                eprintln!("mycelium: failed to parse command: {parse_error}");
+                std::process::exit(127);
             }
         }
     }
@@ -129,7 +130,8 @@ pub fn run_fallback(parse_error: clap::Error) -> Result<()> {
         Err(error) => {
             tracking::record_parse_failure_silent(&raw_command, &error_message, false, None);
             eprintln!("[mycelium: fallback failed: {}]", error);
-            parse_error.exit();
+            eprintln!("mycelium: failed to parse command: {parse_error}");
+            std::process::exit(127);
         }
     }
 

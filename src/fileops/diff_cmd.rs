@@ -1,7 +1,7 @@
 //! Ultra-condensed file diff showing only changed lines without context.
 use crate::tracking;
 use crate::utils::truncate;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use std::fs;
 use std::path::Path;
 
@@ -29,18 +29,24 @@ pub fn run(file1: &Path, file2: &Path, verbose: u8) -> Result<()> {
         eprintln!("Comparing: {} vs {}", file1.display(), file2.display());
     }
 
+    // Check file sizes before loading
+    let metadata1 = fs::metadata(file1)?;
+    if metadata1.len() > MAX_DIFF_BYTES as u64 {
+        return Err(anyhow::anyhow!(
+            "file too large ({} bytes)",
+            metadata1.len()
+        ));
+    }
+    let metadata2 = fs::metadata(file2)?;
+    if metadata2.len() > MAX_DIFF_BYTES as u64 {
+        return Err(anyhow::anyhow!(
+            "file too large ({} bytes)",
+            metadata2.len()
+        ));
+    }
+
     let content1 = fs::read_to_string(file1)?;
-    reject_if_oversized(
-        content1.len(),
-        MAX_DIFF_BYTES,
-        &format!("{}", file1.display()),
-    )?;
     let content2 = fs::read_to_string(file2)?;
-    reject_if_oversized(
-        content2.len(),
-        MAX_DIFF_BYTES,
-        &format!("{}", file2.display()),
-    )?;
     let raw = format!("{}\n---\n{}", content1, content2);
 
     let lines1: Vec<&str> = content1.lines().collect();
