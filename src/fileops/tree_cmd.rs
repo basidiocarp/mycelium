@@ -92,7 +92,10 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
         );
     }
 
-    print!("{}", filtered);
+    let routed = crate::hyphae::route_or_filter("tree", &raw, |r| {
+        crate::filter::FilterResult::full(r, filtered.clone())
+    });
+    print!("{}", routed.output);
 
     Ok(())
 }

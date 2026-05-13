@@ -69,17 +69,20 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
     let filtered = filter_prettier_output(&raw);
     let code = exit_code(&output.status);
 
+    let routed = crate::hyphae::route_or_filter("prettier", &raw, |r| {
+        crate::filter::FilterResult::full(r, filtered.clone())
+    });
     if let Some(hint) = tee::tee_and_hint(&raw, "prettier", code) {
-        println!("{}\n{}", filtered, hint);
+        println!("{}\n{}", routed.output, hint);
     } else {
-        println!("{}", filtered);
+        println!("{}", routed.output);
     }
 
     timer.track(
         &format!("prettier {}", args.join(" ")),
         &format!("mycelium prettier {}", args.join(" ")),
         &raw,
-        &filtered,
+        &routed.output,
     );
 
     if code != 0 {

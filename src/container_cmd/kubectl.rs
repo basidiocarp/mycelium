@@ -105,8 +105,16 @@ pub(crate) fn kubectl_pods(args: &[String], _verbose: u8) -> Result<()> {
         }
     }
 
-    print!("{}", out);
-    timer.track("kubectl get pods", "mycelium kubectl pods", &raw, &out);
+    let routed = crate::hyphae::route_or_filter("kubectl get pods", &raw, |r| {
+        crate::filter::FilterResult::full(r, out.clone())
+    });
+    print!("{}", routed.output);
+    timer.track(
+        "kubectl get pods",
+        "mycelium kubectl pods",
+        &raw,
+        &routed.output,
+    );
     Ok(())
 }
 
@@ -183,8 +191,16 @@ pub(crate) fn kubectl_services(args: &[String], _verbose: u8) -> Result<()> {
         out.push_str(&format!("  ... +{} more", services.len() - 15));
     }
 
-    print!("{}", out);
-    timer.track("kubectl get svc", "mycelium kubectl svc", &raw, &out);
+    let routed = crate::hyphae::route_or_filter("kubectl get svc", &raw, |r| {
+        crate::filter::FilterResult::full(r, out.clone())
+    });
+    print!("{}", routed.output);
+    timer.track(
+        "kubectl get svc",
+        "mycelium kubectl svc",
+        &raw,
+        &routed.output,
+    );
     Ok(())
 }
 
@@ -211,12 +227,15 @@ pub(crate) fn kubectl_logs(args: &[String], _verbose: u8) -> Result<()> {
     let raw = String::from_utf8_lossy(&output.stdout).to_string();
     let analyzed = crate::log_cmd::run_stdin_str(&raw);
     let out = format!("k8s: Logs for {}:\n{}", pod, analyzed);
-    println!("{}", out);
+    let routed = crate::hyphae::route_or_filter(&format!("kubectl logs {}", pod), &raw, |r| {
+        crate::filter::FilterResult::full(r, out.clone())
+    });
+    println!("{}", routed.output);
     timer.track(
         &format!("kubectl logs {}", pod),
         "mycelium kubectl logs",
         &raw,
-        &out,
+        &routed.output,
     );
     Ok(())
 }

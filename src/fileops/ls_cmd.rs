@@ -176,7 +176,10 @@ fn run_compact_ls(show_all: bool, flags: &[String], paths: &[String], verbose: u
         );
     }
 
-    print!("{}", filtered);
+    let routed = crate::hyphae::route_or_filter("ls", &raw, |r| {
+        crate::filter::FilterResult::full(r, filtered.clone())
+    });
+    print!("{}", routed.output);
 
     Ok(())
 }

@@ -51,7 +51,10 @@ pub fn run_list(args: &[String], verbose: u8) -> Result<()> {
     let raw = format!("{}\n{}", stdout, stderr);
 
     let filtered = filter_pip_list(&stdout);
-    println!("{}", filtered);
+    let routed = crate::hyphae::route_or_filter("pip list", &raw, |r| {
+        crate::filter::FilterResult::full(r, filtered.clone())
+    });
+    println!("{}", routed.output);
 
     if !output.status.success() {
         std::process::exit(output.status.code().unwrap_or(1));
@@ -61,7 +64,7 @@ pub fn run_list(args: &[String], verbose: u8) -> Result<()> {
         &format!("{} list {}", base_cmd, args.join(" ")),
         &format!("mycelium {} list {}", base_cmd, args.join(" ")),
         &raw,
-        &filtered,
+        &routed.output,
     );
 
     Ok(())
@@ -104,7 +107,10 @@ pub fn run_outdated(args: &[String], verbose: u8) -> Result<()> {
     let raw = format!("{}\n{}", stdout, stderr);
 
     let filtered = filter_pip_outdated(&stdout);
-    println!("{}", filtered);
+    let routed = crate::hyphae::route_or_filter("pip list --outdated", &raw, |r| {
+        crate::filter::FilterResult::full(r, filtered.clone())
+    });
+    println!("{}", routed.output);
 
     if !output.status.success() {
         std::process::exit(output.status.code().unwrap_or(1));
@@ -114,7 +120,7 @@ pub fn run_outdated(args: &[String], verbose: u8) -> Result<()> {
         &format!("{} list --outdated {}", base_cmd, args.join(" ")),
         &format!("mycelium {} list --outdated {}", base_cmd, args.join(" ")),
         &raw,
-        &filtered,
+        &routed.output,
     );
 
     Ok(())

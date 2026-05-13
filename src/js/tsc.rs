@@ -53,10 +53,13 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
     };
 
     let exit_code = utils::exit_code(&output.status);
+    let routed = crate::hyphae::route_or_filter("tsc", &raw, |r| {
+        crate::filter::FilterResult::full(r, filtered.clone())
+    });
     if let Some(hint) = tee::tee_and_hint(&raw, "tsc", exit_code) {
-        println!("{}\n{}", filtered, hint);
+        println!("{}\n{}", routed.output, hint);
     } else {
-        println!("{}", filtered);
+        println!("{}", routed.output);
     }
 
     let raw_label = format!("{} {}", cmd, args.join(" "));
@@ -65,7 +68,7 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
         &raw_label,
         &mycelium_label,
         &raw,
-        &filtered,
+        &routed.output,
         parse_tier,
         "compact",
     );

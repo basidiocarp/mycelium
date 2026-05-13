@@ -161,12 +161,15 @@ pub fn run_compose_ps(verbose: u8) -> Result<()> {
     }
 
     let out = format_compose_ps(&structured);
-    println!("{}", out);
+    let routed = crate::hyphae::route_or_filter("docker compose ps", &raw, |r| {
+        crate::filter::FilterResult::full(r, out.clone())
+    });
+    println!("{}", routed.output);
     timer.track(
         "docker compose ps",
         "mycelium docker compose ps",
         &raw,
-        &out,
+        &routed.output,
     );
     Ok(())
 }
@@ -198,13 +201,16 @@ pub fn run_compose_logs(service: Option<&str>, verbose: u8) -> Result<()> {
     }
 
     let out = format_compose_logs(&raw);
-    println!("{}", out);
+    let routed = crate::hyphae::route_or_filter("docker compose logs", &raw, |r| {
+        crate::filter::FilterResult::full(r, out.clone())
+    });
+    println!("{}", routed.output);
     let svc_label = service.unwrap_or("all");
     timer.track(
         &format!("docker compose logs {}", svc_label),
         "mycelium docker compose logs",
         &raw,
-        &out,
+        &routed.output,
     );
     Ok(())
 }
@@ -236,13 +242,16 @@ pub fn run_compose_build(service: Option<&str>, verbose: u8) -> Result<()> {
     }
 
     let out = format_compose_build(&raw);
-    println!("{}", out);
+    let routed = crate::hyphae::route_or_filter("docker compose build", &raw, |r| {
+        crate::filter::FilterResult::full(r, out.clone())
+    });
+    println!("{}", routed.output);
     let svc_label = service.unwrap_or("all");
     timer.track(
         &format!("docker compose build {}", svc_label),
         "mycelium docker compose build",
         &raw,
-        &out,
+        &routed.output,
     );
     Ok(())
 }

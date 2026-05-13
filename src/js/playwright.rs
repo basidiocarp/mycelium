@@ -352,13 +352,16 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
         }
     };
 
-    println!("{}", filtered);
+    let routed = crate::hyphae::route_or_filter("playwright test", &raw, |r| {
+        crate::filter::FilterResult::full(r, filtered.clone())
+    });
+    println!("{}", routed.output);
 
     timer.track_with_parse_info(
         &format!("playwright {}", args.join(" ")),
         &format!("mycelium playwright {}", args.join(" ")),
         &raw,
-        &filtered,
+        &routed.output,
         parse_tier,
         format_mode_str,
     );

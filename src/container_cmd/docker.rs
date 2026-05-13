@@ -33,8 +33,11 @@ pub(crate) fn docker_ps(_verbose: u8) -> Result<()> {
 
     if stdout.trim().is_empty() {
         out.push_str("docker: 0 containers");
-        println!("{}", out);
-        timer.track("docker ps", "mycelium docker ps", &raw, &out);
+        let routed = crate::hyphae::route_or_filter("docker ps", &raw, |r| {
+            crate::filter::FilterResult::full(r, out.clone())
+        });
+        println!("{}", routed.output);
+        timer.track("docker ps", "mycelium docker ps", &raw, &routed.output);
         return Ok(());
     }
 
@@ -67,8 +70,11 @@ pub(crate) fn docker_ps(_verbose: u8) -> Result<()> {
         out.push_str(&format!("  ... +{} more", count - 15));
     }
 
-    print!("{}", out);
-    timer.track("docker ps", "mycelium docker ps", &raw, &out);
+    let routed = crate::hyphae::route_or_filter("docker ps", &raw, |r| {
+        crate::filter::FilterResult::full(r, out.clone())
+    });
+    print!("{}", routed.output);
+    timer.track("docker ps", "mycelium docker ps", &raw, &routed.output);
     Ok(())
 }
 
@@ -97,8 +103,16 @@ pub(crate) fn docker_images(_verbose: u8) -> Result<()> {
 
     if lines.is_empty() {
         out.push_str("docker: 0 images");
-        println!("{}", out);
-        timer.track("docker images", "mycelium docker images", &raw, &out);
+        let routed = crate::hyphae::route_or_filter("docker images", &raw, |r| {
+            crate::filter::FilterResult::full(r, out.clone())
+        });
+        println!("{}", routed.output);
+        timer.track(
+            "docker images",
+            "mycelium docker images",
+            &raw,
+            &routed.output,
+        );
         return Ok(());
     }
 
@@ -146,8 +160,16 @@ pub(crate) fn docker_images(_verbose: u8) -> Result<()> {
         out.push_str(&format!("  ... +{} more", lines.len() - 15));
     }
 
-    print!("{}", out);
-    timer.track("docker images", "mycelium docker images", &raw, &out);
+    let routed = crate::hyphae::route_or_filter("docker images", &raw, |r| {
+        crate::filter::FilterResult::full(r, out.clone())
+    });
+    print!("{}", routed.output);
+    timer.track(
+        "docker images",
+        "mycelium docker images",
+        &raw,
+        &routed.output,
+    );
     Ok(())
 }
 

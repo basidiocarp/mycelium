@@ -69,13 +69,16 @@ fn run_generate(args: &[String], verbose: u8) -> Result<()> {
     let raw = format!("{}\n{}", stdout, stderr);
     let filtered = filter_prisma_generate(&raw);
 
-    println!("{}", filtered);
+    let routed = crate::hyphae::route_or_filter("prisma generate", &raw, |r| {
+        crate::filter::FilterResult::full(r, filtered.clone())
+    });
+    println!("{}", routed.output);
 
     timer.track(
         "prisma generate",
         "mycelium prisma generate",
         &raw,
-        &filtered,
+        &routed.output,
     );
 
     Ok(())
@@ -130,9 +133,17 @@ fn run_migrate(subcommand: MigrateSubcommand, args: &[String], verbose: u8) -> R
         MigrateSubcommand::Deploy => filter_migrate_deploy(&raw),
     };
 
-    println!("{}", filtered);
+    let routed = crate::hyphae::route_or_filter(cmd_name, &raw, |r| {
+        crate::filter::FilterResult::full(r, filtered.clone())
+    });
+    println!("{}", routed.output);
 
-    timer.track(cmd_name, &format!("mycelium {}", cmd_name), &raw, &filtered);
+    timer.track(
+        cmd_name,
+        &format!("mycelium {}", cmd_name),
+        &raw,
+        &routed.output,
+    );
 
     Ok(())
 }
@@ -163,9 +174,17 @@ fn run_db_push(args: &[String], verbose: u8) -> Result<()> {
     let raw = format!("{}\n{}", stdout, stderr);
     let filtered = filter_db_push(&raw);
 
-    println!("{}", filtered);
+    let routed = crate::hyphae::route_or_filter("prisma db push", &raw, |r| {
+        crate::filter::FilterResult::full(r, filtered.clone())
+    });
+    println!("{}", routed.output);
 
-    timer.track("prisma db push", "mycelium prisma db push", &raw, &filtered);
+    timer.track(
+        "prisma db push",
+        "mycelium prisma db push",
+        &raw,
+        &routed.output,
+    );
 
     Ok(())
 }

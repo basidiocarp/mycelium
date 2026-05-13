@@ -86,18 +86,24 @@ pub fn run(
         grouper.add(&file_display, line_num, &cleaned);
     }
 
-    println!("{} in {}:", total, grouper.file_count());
-    println!("{}", grouper.format());
+    let mut output = String::new();
+    output.push_str(&format!("{} in {}:\n", total, grouper.file_count()));
+    output.push_str(&grouper.format());
 
     if total > max_results {
-        println!("... +{}", total - max_results);
+        output.push_str(&format!("... +{}\n", total - max_results));
     }
 
     if is_code_search(path, extra_args) && code_search_hint_enabled() {
-        println!(
-            "\n[BASIDIOCARP] Code search via bash detected.\nPreferred tools for this query type:\n  rhizome_find_symbol / rhizome_find_references / rhizome_search_code"
+        output.push_str(
+            "\n[BASIDIOCARP] Code search via bash detected.\nPreferred tools for this query type:\n  rhizome_find_symbol / rhizome_find_references / rhizome_search_code\n"
         );
     }
+
+    let routed = crate::hyphae::route_or_filter(&format!("grep {}", pattern), &stdout, |r| {
+        crate::filter::FilterResult::full(r, output.clone())
+    });
+    println!("{}", routed.output);
 
     if exit_code != 0 {
         std::process::exit(exit_code);

@@ -193,24 +193,28 @@ impl FilteredCommand {
         let slug = self.tee_slug.unwrap_or_else(|| self.tool_name.clone());
 
         // Check if filtered output exceeds the summary threshold
-        let (output_to_print, final_output) = if let Some(summary) =
+        let output_to_print = if let Some(summary) =
             summarizer::summarize(&filtered, &self.tool_name, DEFAULT_SUMMARY_THRESHOLD_TOKENS)
         {
             // Large output: use summary instead
-            let summary_with_status = format!("{}\nexit code: {}", summary.summary, exit_code);
-            (summary_with_status.clone(), summary_with_status)
+            format!("{}\nexit code: {}", summary.summary, exit_code)
         } else {
             // Small output: pass through unchanged
-            (filtered.clone(), filtered)
+            filtered.clone()
         };
 
+        // Route output through hyphae (chunking/summarization) or fall back to filtering
+        let routed = crate::hyphae::route_or_filter(&self.tool_name, &raw, |r| {
+            crate::filter::FilterResult::full(r, output_to_print.clone())
+        });
+
         if let Some(hint) = tee::tee_and_hint(&raw, &slug, exit_code) {
-            println!("{}\n{}", output_to_print, hint);
+            println!("{}\n{}", routed.output, hint);
         } else {
-            println!("{}", output_to_print);
+            println!("{}", routed.output);
         }
 
-        timer.track(&raw_label, &mycelium_label, &raw, &final_output);
+        timer.track(&raw_label, &mycelium_label, &raw, &routed.output);
 
         if exit_code != 0 {
             std::process::exit(exit_code);
