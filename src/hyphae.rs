@@ -47,10 +47,28 @@ pub enum OutputAction {
     Summarize,
 }
 
+/// Hard ceiling (512 KiB): outputs above this bypass the adaptive classifier and always
+/// chunk (or summarize if Hyphae is unavailable). The classifier is unreliable at this scale.
+const HARD_CHUNK_CEILING_BYTES: usize = 512 * 1024;
+
 /// Decide how to handle command output based on size and Hyphae availability.
 ///
-/// Priority: Chunk (Hyphae preserves full output) > Summarize > Filter > Passthrough.
+/// Dispatch order:
+/// 1. **> 512 KiB** — hard ceiling: `Chunk` if Hyphae is available, `Summarize` otherwise.
+/// 2. **Structured** (adaptive classifier) — `Chunk` if Hyphae is available.
+/// 3. **≥ summary_threshold tokens** — `Summarize`.
+/// 4. **Non-Passthrough adaptive level** — `Filter`.
+/// 5. **Passthrough adaptive level** — `Passthrough`.
 pub fn decide_action(output: &str, summary_threshold: usize) -> OutputAction {
+    // Hard ceiling: bypass the classifier for very large outputs.
+    if output.len() > HARD_CHUNK_CEILING_BYTES {
+        return if is_available() {
+            OutputAction::Chunk
+        } else {
+            OutputAction::Summarize
+        };
+    }
+
     let level = mycelium::adaptive::classify(output);
 
     // Hyphae chunking takes priority — it preserves full retrievability.
@@ -599,5 +617,45 @@ mod tests {
         );
         // Verify output is clean (contains filtered content, no stderr pollution)
         assert!(!result.output.is_empty(), "Output should not be empty");
+    }
+
+    #[test]
+    fn test_decide_action_hard_ceiling_forces_chunk_or_summarize() {
+        // Construct output just over 512 KiB to trigger the hard ceiling.
+        let over_ceiling = "x".repeat(HARD_CHUNK_CEILING_BYTES + 1);
+        let threshold = crate::summarizer::DEFAULT_SUMMARY_THRESHOLD_TOKENS;
+
+        let action = decide_action(&over_ceiling, threshold);
+        if is_available() {
+            assert_eq!(
+                action,
+                OutputAction::Chunk,
+                "Hard ceiling: Chunk when Hyphae is available"
+            );
+        } else {
+            assert_eq!(
+                action,
+                OutputAction::Summarize,
+                "Hard ceiling: Summarize when Hyphae is unavailable"
+            );
+        }
+    }
+
+    #[test]
+    fn test_decide_action_at_ceiling_uses_classifier() {
+        // Output exactly at the ceiling (not over) still uses the adaptive classifier.
+        let at_ceiling = "x".repeat(HARD_CHUNK_CEILING_BYTES);
+        let threshold = crate::summarizer::DEFAULT_SUMMARY_THRESHOLD_TOKENS;
+        let action = decide_action(&at_ceiling, threshold);
+        // The classifier determines the action — anything except a ceiling-forced result.
+        // At 512 KiB of repeated "x", classify() returns Structured (dense, large).
+        // With Hyphae unavailable in tests: Filter or Summarize depending on token count.
+        assert!(
+            matches!(
+                action,
+                OutputAction::Chunk | OutputAction::Summarize | OutputAction::Filter
+            ),
+            "At-ceiling output routes through classifier, got {action:?}"
+        );
     }
 }

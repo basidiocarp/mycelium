@@ -49,7 +49,7 @@ pub fn run(
 // MCP subprocess communication
 // ─────────────────────────────────────────────────────────────────────────────
 
-fn call_gather_context(
+pub(crate) fn call_gather_context(
     hyphae_bin: &str,
     task: &str,
     project: Option<&str>,
@@ -341,6 +341,44 @@ fn truncate_line(s: &str, max: usize) -> String {
         format!("{}...", &line[..max])
     } else {
         line.to_string()
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Init context injection helper
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Gather context for init injection (best-effort, no error propagation).
+///
+/// Used during `mycelium init` to optionally include recent memories in CLAUDE.md.
+/// Returns formatted context block if available, or empty string if hyphae is unavailable
+/// or times out.
+pub(crate) fn gather_context_for_init() -> String {
+    let hyphae_bin = match crate::hyphae::hyphae_binary() {
+        Some(bin) => bin,
+        None => return String::new(), // No hyphae available
+    };
+
+    // Best-effort call: detect project, gather context with modest budget
+    let detected = crate::hyphae_client::detect_project_identity();
+    let project = if detected.project.is_empty() {
+        None
+    } else {
+        Some(detected.project.as_str())
+    };
+
+    // Request context with a small budget (init doesn't need everything)
+    match call_gather_context(&hyphae_bin, "session_initialization", project, 1000, None) {
+        Ok(raw_json) => {
+            // Format as a markdown section for CLAUDE.md
+            if let Ok(briefing) = format_briefing("Recent Session Context", &raw_json) {
+                // Prefix with markdown header for the section
+                format!("## Recent Context\n\n{}\n", briefing)
+            } else {
+                String::new()
+            }
+        }
+        Err(_) => String::new(), // Silent failure: hyphae unavailable, timeout, etc.
     }
 }
 

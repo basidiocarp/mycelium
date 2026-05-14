@@ -13,7 +13,7 @@ use std::sync::{Mutex, MutexGuard};
 use std::time::Duration;
 
 use spore::logging::{SpanContext, subprocess_span, tool_span};
-use spore::{EcosystemError, McpClient, Tool};
+use spore::{EcosystemError, McpClient, SporeError, Tool};
 use tracing::{debug, warn};
 
 const COMMAND_OUTPUT_SCHEMA_VERSION: &str = "1.0";
@@ -91,6 +91,30 @@ fn get_or_connect() -> Result<MutexGuard<'static, Option<McpClient>>> {
 }
 
 /// ─────────────────────────────────────────────────────────────────────────────
+/// Error classification
+/// ─────────────────────────────────────────────────────────────────────────────
+
+/// Returns `true` for errors that indicate the subprocess connection is broken.
+///
+/// Transport errors evict the cached client so the next call reconnects.
+/// Application errors (bad JSON, RPC-level errors) leave the warm client in place
+/// and log a warning — the subprocess is still alive and usable.
+fn is_transport_error(e: &SporeError) -> bool {
+    match e {
+        SporeError::ToolNotFound(_) => true,
+        SporeError::Timeout(_) => true,
+        SporeError::SpawnFailed(io_err) => matches!(
+            io_err.kind(),
+            std::io::ErrorKind::BrokenPipe
+                | std::io::ErrorKind::ConnectionRefused
+                | std::io::ErrorKind::ConnectionReset
+                | std::io::ErrorKind::UnexpectedEof
+        ),
+        _ => false,
+    }
+}
+
+/// ─────────────────────────────────────────────────────────────────────────────
 /// Public API
 /// ─────────────────────────────────────────────────────────────────────────────
 ///
@@ -123,8 +147,12 @@ pub fn store_output(command: &str, output: &str, project: Option<&str>) -> Resul
     match client.call_tool("hyphae_store_command_output", arguments) {
         Ok(response) => parse_response(&response),
         Err(e) => {
-            *guard = None;
-            warn!("Hyphae tool call failed, dropping cached client: {e}");
+            if is_transport_error(&e) {
+                *guard = None;
+                warn!("Hyphae connection lost, evicting cached client: {e}");
+            } else {
+                warn!("Hyphae tool call failed (client retained): {e}");
+            }
             Err(anyhow!(
                 "{}",
                 EcosystemError::new(
@@ -503,5 +531,47 @@ mod tests {
         assert_eq!(identity.project, "scratch");
         assert!(identity.project_root.is_none());
         assert!(identity.worktree_id.is_none());
+    }
+
+    #[test]
+    fn test_is_transport_error_transport_variants() {
+        assert!(is_transport_error(&SporeError::ToolNotFound("hyphae".into())));
+        assert!(is_transport_error(&SporeError::Timeout(
+            std::time::Duration::from_secs(10)
+        )));
+        assert!(is_transport_error(&SporeError::SpawnFailed(
+            std::io::Error::from(std::io::ErrorKind::BrokenPipe)
+        )));
+        assert!(is_transport_error(&SporeError::SpawnFailed(
+            std::io::Error::from(std::io::ErrorKind::ConnectionRefused)
+        )));
+        assert!(is_transport_error(&SporeError::SpawnFailed(
+            std::io::Error::from(std::io::ErrorKind::UnexpectedEof)
+        )));
+        assert!(is_transport_error(&SporeError::SpawnFailed(
+            std::io::Error::from(std::io::ErrorKind::ConnectionReset)
+        )));
+    }
+
+    #[test]
+    fn test_is_transport_error_application_variants() {
+        assert!(!is_transport_error(&SporeError::RpcError {
+            code: -32600,
+            message: "invalid request".into()
+        }));
+        assert!(!is_transport_error(&SporeError::Config(
+            "missing field".into()
+        )));
+        assert!(!is_transport_error(&SporeError::Other(
+            "unexpected".into()
+        )));
+        // Network is an HTTP/DNS layer error, not a subprocess connection drop — retain client.
+        assert!(!is_transport_error(&SporeError::Network(
+            "dns timeout".into()
+        )));
+        // SpawnFailed with a non-connection IO error is not transport
+        assert!(!is_transport_error(&SporeError::SpawnFailed(
+            std::io::Error::from(std::io::ErrorKind::PermissionDenied)
+        )));
     }
 }

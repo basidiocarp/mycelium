@@ -747,10 +747,16 @@ fn run_claude_md_mode(global: bool, verbose: u8) -> Result<()> {
     if path.exists() {
         let existing = fs::read_to_string(&path)?;
         // upsert_mycelium_block handles all 4 cases: add, update, unchanged, malformed
-        let (new_content, action) = upsert_mycelium_block(&existing, MYCELIUM_INSTRUCTIONS);
+        let (mut new_content, action) = upsert_mycelium_block(&existing, MYCELIUM_INSTRUCTIONS);
 
         match action {
             MyceliumBlockUpsert::Added => {
+                // Optionally inject hyphae context after instructions
+                let context_block = context::gather_context_for_init();
+                if !context_block.is_empty() {
+                    new_content.push('\n');
+                    new_content.push_str(&context_block);
+                }
                 fs::write(&path, new_content)?;
                 println!(
                     "ok Added mycelium instructions to existing {}",
@@ -758,6 +764,12 @@ fn run_claude_md_mode(global: bool, verbose: u8) -> Result<()> {
                 );
             }
             MyceliumBlockUpsert::Updated => {
+                // Optionally inject hyphae context after instructions
+                let context_block = context::gather_context_for_init();
+                if !context_block.is_empty() {
+                    new_content.push('\n');
+                    new_content.push_str(&context_block);
+                }
                 fs::write(&path, new_content)?;
                 println!("ok Updated mycelium instructions in {}", path.display());
             }
@@ -792,7 +804,14 @@ fn run_claude_md_mode(global: bool, verbose: u8) -> Result<()> {
             }
         }
     } else {
-        fs::write(&path, MYCELIUM_INSTRUCTIONS)?;
+        let mut new_content = MYCELIUM_INSTRUCTIONS.to_string();
+        // Optionally inject hyphae context after instructions
+        let context_block = context::gather_context_for_init();
+        if !context_block.is_empty() {
+            new_content.push('\n');
+            new_content.push_str(&context_block);
+        }
+        fs::write(&path, new_content)?;
         println!("ok Created {} with mycelium instructions", path.display());
     }
 
