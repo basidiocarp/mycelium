@@ -121,17 +121,29 @@ pub(crate) fn validate_filter_output(
 
         // Rule 2: If savings < 20%, not worth the information loss.
         if savings < 0.20 {
+            tracing::debug!(
+                "filter rejected (rule 2 — savings below threshold): savings={:.1}%",
+                savings * 100.0
+            );
             return FilterResult::passthrough(raw);
         }
 
         // Rule 3: Degraded filter with modest savings — not worth the risk.
         if result.quality == FilterQuality::Degraded && savings < 0.40 {
+            tracing::debug!(
+                "filter rejected (rule 3 — degraded quality with insufficient savings): savings={:.1}%",
+                savings * 100.0
+            );
             return FilterResult::passthrough(raw);
         }
 
         // Rule 4: Suspiciously aggressive — >95% reduction on small output.
         let raw_lines = raw.lines().count();
         if raw_lines < 200 && savings > 0.95 {
+            tracing::debug!(
+                "filter rejected (rule 4 — excessive reduction on short content): savings={:.1}%",
+                savings * 100.0
+            );
             return FilterResult::passthrough(raw);
         }
     }

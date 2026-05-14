@@ -334,56 +334,161 @@ pub(super) fn run_spawned_command(
     Ok(())
 }
 
+/// Tools supported by mycelium for proxying and filtering.
+/// This list must remain synchronized with `is_operational_command`.
+///
+/// SECURITY: whitelist pattern — new tools are NOT executed
+/// until explicitly added here. A forgotten tool fails open (not executed)
+/// rather than creating false confidence about what's protected.
+const SUPPORTED_TOOLS: &[&str] = &[
+    "ls",
+    "tree",
+    "read",
+    "peek",
+    "git",
+    "gh",
+    "pnpm",
+    "err",
+    "test",
+    "json",
+    "deps",
+    "env",
+    "find",
+    "diff",
+    "log",
+    "docker",
+    "kubectl",
+    "summary",
+    "grep",
+    "wget",
+    "vitest",
+    "prisma",
+    "tsc",
+    "next",
+    "lint",
+    "prettier",
+    "playwright",
+    "cargo",
+    "npm",
+    "npx",
+    "curl",
+    "ruff",
+    "pytest",
+    "pip",
+    "go",
+    "golangci-lint",
+    "gt",
+    "invoke",
+];
+
 /// Returns true for commands that are invoked via the hook pipeline
 /// (i.e., commands that process rewritten shell commands).
 /// Meta commands (init, gain, verify, etc.) are excluded because
 /// they are run directly by the user, not through the hook.
 ///
-/// SECURITY: whitelist pattern — new commands are NOT integrity-checked
-/// until explicitly added here. A forgotten command fails open (no check)
+/// SECURITY: whitelist pattern — derives from SUPPORTED_TOOLS to ensure
+/// one canonical source of truth. A forgotten command fails open (no check)
 /// rather than creating false confidence about what's protected.
 pub fn is_operational_command(cmd: &Commands) -> bool {
-    matches!(
-        cmd,
-        Commands::Ls { .. }
-            | Commands::Tree { .. }
-            | Commands::Read { .. }
-            | Commands::Peek { .. }
-            | Commands::Git { .. }
-            | Commands::Gh { .. }
-            | Commands::Pnpm { .. }
-            | Commands::Err { .. }
-            | Commands::Test { .. }
-            | Commands::Json { .. }
-            | Commands::Deps { .. }
-            | Commands::Env { .. }
-            | Commands::Find { .. }
-            | Commands::Diff { .. }
-            | Commands::Log { .. }
-            | Commands::Docker { .. }
-            | Commands::Kubectl { .. }
-            | Commands::Summary { .. }
-            | Commands::Grep { .. }
-            | Commands::Wget { .. }
-            | Commands::Vitest { .. }
-            | Commands::Prisma { .. }
-            | Commands::Tsc { .. }
-            | Commands::Next { .. }
-            | Commands::Lint { .. }
-            | Commands::Prettier { .. }
-            | Commands::Playwright { .. }
-            | Commands::Cargo { .. }
-            | Commands::Npm { .. }
-            | Commands::Npx { .. }
-            | Commands::Curl { .. }
-            | Commands::Ruff { .. }
-            | Commands::Pytest { .. }
-            | Commands::Pip { .. }
-            | Commands::Go { .. }
-            | Commands::GolangciLint { .. }
-            | Commands::Gt { .. }
-            | Commands::Invoke { .. }
-    )
+    let cmd_name = match cmd {
+        Commands::Ls { .. } => "ls",
+        Commands::Tree { .. } => "tree",
+        Commands::Read { .. } => "read",
+        Commands::Peek { .. } => "peek",
+        Commands::Git { .. } => "git",
+        Commands::Gh { .. } => "gh",
+        Commands::Gt { .. } => "gt",
+        Commands::Cargo { .. } => "cargo",
+        Commands::Tsc { .. } => "tsc",
+        Commands::Next { .. } => "next",
+        Commands::Go { .. } => "go",
+        Commands::Lint { .. } => "lint",
+        Commands::Prettier { .. } => "prettier",
+        Commands::Format { .. } => return false, // not operational
+        Commands::Ruff { .. } => "ruff",
+        Commands::Mypy { .. } => return false, // not operational
+        Commands::GolangciLint { .. } => "golangci-lint",
+        Commands::Test { .. } => "test",
+        Commands::Vitest { .. } => "vitest",
+        Commands::Playwright { .. } => "playwright",
+        Commands::Pytest { .. } => "pytest",
+        Commands::Pnpm { .. } => "pnpm",
+        Commands::Pip { .. } => "pip",
+        Commands::Npm { .. } => "npm",
+        Commands::Npx { .. } => "npx",
+        Commands::Psql { .. } => return false, // not operational
+        Commands::Prisma { .. } => "prisma",
+        Commands::Curl { .. } => "curl",
+        Commands::Wget { .. } => "wget",
+        Commands::Docker { .. } => "docker",
+        Commands::Kubectl { .. } => "kubectl",
+        Commands::Terraform { .. } => return false, // not operational
+        Commands::Aws { .. } => return false,       // not operational
+        Commands::Atmos { .. } => return false,     // not operational
+        Commands::Json { .. } => "json",
+        Commands::Log { .. } => "log",
+        Commands::Err { .. } => "err",
+        Commands::Summary { .. } => "summary",
+        Commands::Env { .. } => "env",
+        Commands::Deps { .. } => "deps",
+        Commands::Gain { .. } => return false, // not operational
+        #[cfg(unix)]
+        Commands::ServeSocket { .. } => return false, // not operational
+        Commands::Discover { .. } => return false, // not operational
+        Commands::Learn { .. } => return false, // not operational
+        Commands::Context { .. } => return false, // not operational
+        Commands::Init { .. } => return false, // not operational
+        Commands::Config { .. } => return false, // not operational
+        Commands::Doctor => return false,      // not operational
+        Commands::Verify => return false,      // not operational
+        Commands::SelfUpdate { .. } => return false, // not operational
+        Commands::Completions { .. } => return false, // not operational
+        Commands::Proxy { .. } => return false, // not operational (handled separately)
+        Commands::Invoke { .. } => "invoke",
+        Commands::Benchmark { .. } => return false, // not operational
+        Commands::Plugin { .. } => return false,    // not operational
+        Commands::Wc { .. } => return false,        // not operational
+        Commands::ParseHealth { .. } => return false, // not operational
+        Commands::CcEconomics { .. } => return false, // not operational
+        Commands::HookAudit { .. } => return false, // not operational
+        Commands::Rewrite { .. } => return false,   // not operational
+        Commands::Explain { .. } => return false,   // not operational
+        Commands::Find { .. } => "find",
+        Commands::Grep { .. } => "grep",
+        Commands::Diff { .. } => "diff",
+    };
+    SUPPORTED_TOOLS.contains(&cmd_name)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::commands::Commands;
+
+    #[test]
+    fn test_is_operational_command_consistency_with_supported_tools() {
+        // Verify that is_operational_command returns true for commands in SUPPORTED_TOOLS.
+        // This enforces that both paths use the same canonical set.
+        let test_cases: Vec<(&str, Commands)> = vec![
+            ("ls", Commands::Ls { args: vec![] }),
+            ("tree", Commands::Tree { args: vec![] }),
+            ("npm", Commands::Npm { args: vec![] }),
+            ("npm", Commands::Npm { args: vec![] }),
+        ];
+
+        for (tool_name, cmd) in test_cases {
+            assert!(
+                is_operational_command(&cmd),
+                "is_operational_command should return true for {} command",
+                tool_name
+            );
+            assert!(
+                SUPPORTED_TOOLS.contains(&tool_name),
+                "{} should be in SUPPORTED_TOOLS",
+                tool_name
+            );
+        }
+    }
 }
 
 /// Re-invoke `mycelium` without `--json`, capture stdout, and wrap output in a JSON envelope.
@@ -401,40 +506,13 @@ pub fn dispatch_json(cli: Cli) -> Result<()> {
     // Only allow execution of tools that mycelium is designed to proxy.
     let raw_output = if !args.is_empty() {
         let tool_name = &args[0];
-        let allowed_tools = [
-            "git",
-            "gh",
-            "cargo",
-            "npm",
-            "pnpm",
-            "yarn",
-            "npx",
-            "ls",
-            "grep",
-            "tree",
-            "cat",
-            "find",
-            "docker",
-            "kubectl",
-            "curl",
-            "wget",
-            "vitest",
-            "pytest",
-            "ruff",
-            "go",
-            "tsc",
-            "next",
-            "prettier",
-            "playwright",
-            "prisma",
-        ];
 
         let base_name = std::path::Path::new(tool_name)
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or(tool_name);
 
-        if allowed_tools.contains(&base_name) {
+        if SUPPORTED_TOOLS.contains(&base_name) {
             let raw_result = std::process::Command::new(tool_name)
                 .args(&args[1..])
                 .output();

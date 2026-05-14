@@ -157,6 +157,24 @@ impl ContentRouter {
                 || line.contains("Warning")
                 || line.contains("WARNING")
                 || line.contains("FAIL")
+                || line.contains("panic")
+                || line.contains("PANIC")
+                || line.contains("fatal")
+                || line.contains("FATAL")
+                || line.contains("exception")
+                || line.contains("Exception")
+                || line.contains("traceback")
+                || line.contains("Traceback")
+                || line.contains("assertion")
+                || line.contains("Assertion")
+                || line.contains("killed")
+                || line.contains("Killed")
+                || line.contains("denied")
+                || line.contains("Denied")
+                || line.contains("aborted")
+                || line.contains("Aborted")
+                || line.contains("segfault")
+                || line.contains("SIGSEGV")
                 || line.starts_with("@@");
 
             if is_important {
@@ -396,5 +414,32 @@ mod tests {
 
         // General text should pass through unchanged
         assert_eq!(output, input);
+    }
+
+    #[test]
+    fn filter_code_keeps_panic_lines() {
+        let router = ContentRouter::default();
+        let input = "normal line\nthread 'main' panicked at 'assertion failed'\nmore output";
+        let output = router.filter_code(input);
+
+        assert!(output.contains("panicked"));
+    }
+
+    #[test]
+    fn filter_code_keeps_traceback_lines() {
+        let router = ContentRouter::default();
+        let input = "line 1\nTraceback (most recent call last):\n  File \"test.py\"\nline 4";
+        let output = router.filter_code(input);
+
+        assert!(output.contains("Traceback"));
+    }
+
+    #[test]
+    fn filter_code_keeps_sigsegv_lines() {
+        let router = ContentRouter::default();
+        let input = "execution started\nSegmentation fault: SIGSEGV\ncleanup";
+        let output = router.filter_code(input);
+
+        assert!(output.contains("SIGSEGV"));
     }
 }
