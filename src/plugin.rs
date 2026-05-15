@@ -241,9 +241,32 @@ fn plugin_command(plugin_path: &Path) -> Command {
 /// Kill a process by PID. Silently no-ops if the process has already exited.
 #[cfg(unix)]
 fn kill_process(pid: u32) {
-    let _ = std::process::Command::new("kill")
+    use tracing::warn;
+
+    let kill_binary =
+        crate::platform::command_path("kill").unwrap_or_else(|| std::path::PathBuf::from("kill"));
+
+    match std::process::Command::new(&kill_binary)
         .arg(pid.to_string())
-        .status();
+        .output()
+    {
+        Ok(output) => {
+            if !output.status.success() {
+                warn!(
+                    status = ?output.status.code(),
+                    pid = pid,
+                    "plugin kill failed"
+                );
+            }
+        }
+        Err(e) => {
+            warn!(
+                error = %e,
+                pid = pid,
+                "plugin kill command execution failed"
+            );
+        }
+    }
 }
 
 #[cfg(not(unix))]

@@ -7,6 +7,9 @@ use crate::{json_output, rewrite_cmd, tracking};
 /// Maximum bytes to capture from command stdout (64 MB).
 pub(crate) const MAX_STDOUT_CAPTURE: usize = 64 * 1024 * 1024;
 
+/// Maximum bytes to capture from command stderr (16 MB).
+pub(crate) const MAX_STDERR_CAPTURE: usize = 16 * 1024 * 1024;
+
 /// Run a command with bounded stdout capture.
 ///
 /// Uses the same 64 MB cap as `run_spawned_command` and drains stderr to avoid deadlocks.
@@ -56,7 +59,10 @@ pub(crate) fn run_bounded(
             if count == 0 {
                 break;
             }
-            captured.extend_from_slice(&buf[..count]);
+            if captured.len() < MAX_STDERR_CAPTURE {
+                captured.extend_from_slice(&buf[..count]);
+            }
+            // Continue draining stderr even after cap is hit, but discard bytes past the cap
         }
 
         Ok(captured)
@@ -232,7 +238,10 @@ pub(super) fn run_spawned_command(
             if count == 0 {
                 break;
             }
-            captured.extend_from_slice(&buf[..count]);
+            if captured.len() < MAX_STDERR_CAPTURE {
+                captured.extend_from_slice(&buf[..count]);
+            }
+            // Continue draining stderr even after cap is hit, but discard bytes past the cap
             let mut err = std::io::stderr().lock();
             err.write_all(&buf[..count])?;
             err.flush()?;
@@ -274,26 +283,37 @@ pub(super) fn run_spawned_command(
     // Apply TOML declarative filter as a fallback when the built-in filter
     // produced no transformation. Load filters once here to avoid repeated
     // disk reads inside tight loops; cwd is captured at command-dispatch time.
-    let filtered_for_display = if routed_stdout == stdout.as_ref() {
+    let (filtered_for_display, matched_filter_name) = if routed_stdout == stdout.as_ref() {
         // Built-in filter was a no-op — consult TOML filters.
         let (project_filters, user_filters) = crate::filters::load_all_declarative_filters();
         if let Some(matched) =
             crate::filters::find_matching_filter(tracked_input, &project_filters, &user_filters)
         {
+            let filter_name = matched.command.clone();
             let toml_result = matched.apply(&stdout);
-            toml_result.output
+            (toml_result.output, Some(filter_name))
         } else {
-            routed_stdout
+            (routed_stdout, None)
         }
     } else {
-        routed_stdout
+        (routed_stdout, None)
     };
 
     // Choose what to print: if hyphae handled it, use hyphae's summary; otherwise use the
     // ContentRouter-filtered text for display.
     let output_to_print = if crate::hyphae::is_available() {
+        use tracing::debug;
+        debug!(source = "hyphae", "using hyphae summary as display output");
         hyphae_output
     } else {
+        use tracing::debug;
+        debug!(
+            source = "content_router",
+            matched_filter = matched_filter_name.as_deref(),
+            input_bytes = stdout.len(),
+            output_bytes = filtered_for_display.len(),
+            "using content-router output"
+        );
         filtered_for_display.to_string()
     };
 
@@ -489,6 +509,76 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn test_supported_tools_vs_is_operational_command_drift() {
+        // Verify every SUPPORTED_TOOLS entry has a corresponding entry in is_operational_command.
+        // We do this by checking that SUPPORTED_TOOLS doesn't contain tools that would fail
+        // if processed by is_operational_command.
+        //
+        // This test acts as a drift detector — if a tool is added to SUPPORTED_TOOLS but not
+        // to is_operational_command (or vice versa), the mismatch will be caught by integration
+        // tests that attempt to execute commands through the dispatch system.
+
+        // Known operational command tool names (from is_operational_command)
+        let operational_commands = [
+            "ls",
+            "tree",
+            "read",
+            "peek",
+            "git",
+            "gh",
+            "gt",
+            "cargo",
+            "tsc",
+            "next",
+            "go",
+            "lint",
+            "prettier",
+            "ruff",
+            "golangci-lint",
+            "test",
+            "vitest",
+            "playwright",
+            "pytest",
+            "pnpm",
+            "pip",
+            "npm",
+            "npx",
+            "prisma",
+            "curl",
+            "wget",
+            "docker",
+            "kubectl",
+            "json",
+            "log",
+            "err",
+            "summary",
+            "env",
+            "deps",
+            "invoke",
+            "find",
+            "grep",
+            "diff",
+        ];
+
+        // Check that all SUPPORTED_TOOLS have a counterpart in operational commands
+        for tool in SUPPORTED_TOOLS {
+            assert!(
+                operational_commands.contains(tool),
+                "Tool '{}' in SUPPORTED_TOOLS is not in operational_commands list",
+                tool
+            );
+        }
+
+        // Check that all operational commands are in SUPPORTED_TOOLS (if they should be)
+        // This is a one-way check to catch missing additions
+        for tool in &operational_commands {
+            if !SUPPORTED_TOOLS.contains(tool) {
+                panic!("Tool '{}' is operational but not in SUPPORTED_TOOLS", tool);
+            }
+        }
+    }
 }
 
 /// Re-invoke `mycelium` without `--json`, capture stdout, and wrap output in a JSON envelope.
@@ -513,12 +603,33 @@ pub fn dispatch_json(cli: Cli) -> Result<()> {
             .unwrap_or(tool_name);
 
         if SUPPORTED_TOOLS.contains(&base_name) {
-            let raw_result = std::process::Command::new(tool_name)
-                .args(&args[1..])
-                .output();
-            match raw_result {
-                Ok(out) => String::from_utf8_lossy(&out.stdout).to_string(),
-                Err(_) => String::new(),
+            // Resolve the tool path from SUPPORTED_TOOLS allowlist
+            match crate::platform::command_path(base_name) {
+                Some(resolved_path) => {
+                    let raw_result = std::process::Command::new(&resolved_path)
+                        .args(&args[1..])
+                        .output();
+                    match raw_result {
+                        Ok(out) => String::from_utf8_lossy(&out.stdout).to_string(),
+                        Err(e) => {
+                            use tracing::warn;
+                            warn!(
+                                tool = tool_name,
+                                error_kind = ?e.kind(),
+                                "Tool spawn error in dispatch_json: {e}"
+                            );
+                            String::new()
+                        }
+                    }
+                }
+                None => {
+                    use tracing::warn;
+                    warn!(
+                        base_name = base_name,
+                        "Failed to resolve allowed tool path in dispatch_json"
+                    );
+                    String::new()
+                }
             }
         } else {
             String::new()

@@ -140,9 +140,9 @@ pub fn store_output(command: &str, output: &str, project: Option<&str>) -> Resul
 
     let mut guard = get_or_connect()?;
 
-    let client = guard
-        .as_mut()
-        .expect("connection should exist after get_or_connect");
+    let client = guard.as_mut().ok_or_else(|| {
+        anyhow!("Hyphae client should exist after get_or_connect, but guard is empty")
+    })?;
 
     match client.call_tool("hyphae_store_command_output", arguments) {
         Ok(response) => parse_response(&response),
@@ -535,7 +535,9 @@ mod tests {
 
     #[test]
     fn test_is_transport_error_transport_variants() {
-        assert!(is_transport_error(&SporeError::ToolNotFound("hyphae".into())));
+        assert!(is_transport_error(&SporeError::ToolNotFound(
+            "hyphae".into()
+        )));
         assert!(is_transport_error(&SporeError::Timeout(
             std::time::Duration::from_secs(10)
         )));
@@ -562,9 +564,7 @@ mod tests {
         assert!(!is_transport_error(&SporeError::Config(
             "missing field".into()
         )));
-        assert!(!is_transport_error(&SporeError::Other(
-            "unexpected".into()
-        )));
+        assert!(!is_transport_error(&SporeError::Other("unexpected".into())));
         // Network is an HTTP/DNS layer error, not a subprocess connection drop — retain client.
         assert!(!is_transport_error(&SporeError::Network(
             "dns timeout".into()

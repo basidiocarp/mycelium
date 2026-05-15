@@ -98,7 +98,9 @@ pub(crate) fn call_gather_context(
 
     std::thread::spawn(move || {
         let mut response = String::new();
-        let _ = stdout.read_to_string(&mut response);
+        if let Err(e) = stdout.read_to_string(&mut response) {
+            warn!("hyphae gather_context stdout read failed: {e}");
+        }
         let _ = tx.send(response);
     });
 

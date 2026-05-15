@@ -17,8 +17,7 @@ pub fn is_available() -> bool {
 pub fn hyphae_binary() -> Option<&'static str> {
     HYPHAE_BINARY_PATH
         .get_or_init(|| {
-            discover(Tool::Hyphae)
-                .map(|info| info.binary_path.to_str().unwrap_or("hyphae").to_string())
+            discover(Tool::Hyphae).map(|info| info.binary_path.to_string_lossy().to_string())
         })
         .as_deref()
 }
@@ -60,32 +59,57 @@ const HARD_CHUNK_CEILING_BYTES: usize = 512 * 1024;
 /// 4. **Non-Passthrough adaptive level** — `Filter`.
 /// 5. **Passthrough adaptive level** — `Passthrough`.
 pub fn decide_action(output: &str, summary_threshold: usize) -> OutputAction {
+    use tracing::debug;
+
     // Hard ceiling: bypass the classifier for very large outputs.
     if output.len() > HARD_CHUNK_CEILING_BYTES {
-        return if is_available() {
+        let action = if is_available() {
             OutputAction::Chunk
         } else {
             OutputAction::Summarize
         };
+        debug!(
+            decision = ?action,
+            output_bytes = output.len(),
+            "decide_action: hard ceiling exceeded"
+        );
+        return action;
     }
 
     let level = mycelium::adaptive::classify(output);
 
     // Hyphae chunking takes priority — it preserves full retrievability.
     if level == mycelium::adaptive::AdaptiveLevel::Structured && should_use_hyphae() {
+        debug!(
+            decision = "Chunk",
+            hyphae_chosen = true,
+            "decide_action: hyphae path selected/skipped"
+        );
         return OutputAction::Chunk;
     }
 
     // Summarize large outputs when Hyphae is unavailable.
     let tokens = crate::tracking::utils::estimate_tokens(output);
     if tokens >= summary_threshold {
+        debug!(
+            decision = "Summarize",
+            tokens = tokens,
+            threshold = summary_threshold,
+            "decide_action: hyphae path selected/skipped"
+        );
         return OutputAction::Summarize;
     }
 
-    match level {
+    let action = match level {
         mycelium::adaptive::AdaptiveLevel::Passthrough => OutputAction::Passthrough,
         _ => OutputAction::Filter,
-    }
+    };
+    debug!(
+        decision = ?action,
+        hyphae_chosen = false,
+        "decide_action: hyphae path selected/skipped"
+    );
+    action
 }
 
 fn get_summary_threshold() -> usize {
@@ -179,14 +203,16 @@ pub fn route_or_filter(
             if let Some(summary) = crate::summarizer::summarize(raw, command, summary_threshold) {
                 // Record summary silently (don't fail if tracking has issues)
                 if let Ok(tracker) = crate::tracking::Tracker::new() {
-                    let _ = tracker.record_summary(
+                    if let Err(e) = tracker.record_summary(
                         command,
                         &summary.summary,
                         summary.input_tokens,
                         summary.output_tokens,
                         0,    // exec_time_ms not available in this context
                         None, // exit_code not available
-                    );
+                    ) {
+                        warn!("Failed to record summary in hyphae tracking: {e}");
+                    }
                 }
                 FilterResult::full(raw, summary.summary)
             } else {

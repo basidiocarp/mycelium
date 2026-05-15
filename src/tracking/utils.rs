@@ -57,6 +57,40 @@ pub(super) fn current_runtime_session_id() -> Option<String> {
     spore::claude_session_id()
 }
 
+/// Get git remote URL with a 2-second timeout.
+fn get_git_remote_url() -> Option<String> {
+    use std::io::Read;
+    use std::process::Stdio;
+    use std::sync::mpsc;
+    use std::time::Duration;
+
+    let git =
+        crate::platform::command_path("git").unwrap_or_else(|| std::path::PathBuf::from("git"));
+    let mut child = std::process::Command::new(&git)
+        .args(["remote", "get-url", "origin"])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .ok()?;
+
+    let stdout = child.stdout.take()?;
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        let mut reader = stdout;
+        let mut output = Vec::new();
+        let _ = reader.read_to_end(&mut output);
+        let _ = tx.send(output);
+    });
+
+    match rx.recv_timeout(Duration::from_secs(2)) {
+        Ok(output_bytes) => Some(String::from_utf8_lossy(&output_bytes).trim().to_owned()),
+        Err(_) => {
+            let _ = child.kill();
+            None
+        }
+    }
+}
+
 /// Derive a human-readable project name for analytics.
 ///
 /// Priority order:
@@ -73,22 +107,16 @@ pub(super) fn derive_project_name() -> String {
         return name.trim().to_owned();
     }
 
-    // Priority 2: Git remote URL
-    if let Ok(output) = std::process::Command::new("git")
-        .args(["remote", "get-url", "origin"])
-        .output()
-    {
-        if output.status.success() {
-            let url = String::from_utf8_lossy(&output.stdout).trim().to_owned();
-            // Extract last path segment (repo name) and strip .git suffix
-            if let Some(name) = url
-                .rsplit('/')
-                .next()
-                .map(|s| s.trim_end_matches(".git").to_owned())
-            {
-                if !name.is_empty() {
-                    return name;
-                }
+    // Priority 2: Git remote URL (with 2-second timeout)
+    if let Some(url) = get_git_remote_url() {
+        // Extract last path segment (repo name) and strip .git suffix
+        if let Some(name) = url
+            .rsplit('/')
+            .next()
+            .map(|s| s.trim_end_matches(".git").to_owned())
+        {
+            if !name.is_empty() {
+                return name;
             }
         }
     }

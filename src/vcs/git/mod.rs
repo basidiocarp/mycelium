@@ -30,7 +30,9 @@ pub enum GitCommand {
 /// Create a git Command with global options (e.g. -C, -c, --git-dir, --work-tree)
 /// prepended before any subcommand arguments.
 pub(super) fn git_cmd(global_args: &[String]) -> Command {
-    let mut cmd = Command::new("git");
+    let git_binary =
+        crate::platform::command_path("git").unwrap_or_else(|| std::path::PathBuf::from("git"));
+    let mut cmd = Command::new(&git_binary);
     for arg in global_args {
         cmd.arg(arg);
     }
@@ -95,7 +97,13 @@ mod tests {
     fn test_git_cmd_no_global_args() {
         let cmd = git_cmd(&[]);
         let program = cmd.get_program();
-        assert_eq!(program, "git");
+        let program_str = program.to_string_lossy();
+        // Program can be either "git" or a resolved path ending in "git"
+        assert!(
+            program_str == "git" || program_str.ends_with("/git"),
+            "Expected git command, got: {}",
+            program_str
+        );
         let args: Vec<_> = cmd.get_args().collect();
         assert!(args.is_empty());
     }
