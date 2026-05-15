@@ -5,9 +5,9 @@ use clap::Parser;
 fn test_rewrite_explain_flag_parses() {
     let cli = Cli::try_parse_from(["mycelium", "rewrite", "--explain", "git status"]).unwrap();
     match cli.command {
-        Commands::Rewrite { cmd, explain } => {
-            assert!(explain);
-            assert_eq!(cmd, "git status");
+        Commands::Rewrite(r) => {
+            assert!(r.explain);
+            assert_eq!(r.cmd, "git status");
         }
         _ => panic!("Expected Rewrite command"),
     }
@@ -17,9 +17,9 @@ fn test_rewrite_explain_flag_parses() {
 fn test_invoke_command_parses() {
     let cli = Cli::try_parse_from(["mycelium", "invoke", "git", "status"]).unwrap();
     match cli.command {
-        Commands::Invoke { command, explain } => {
-            assert_eq!(command, vec!["git".to_string(), "status".to_string()]);
-            assert!(!explain);
+        Commands::Invoke(invoke) => {
+            assert_eq!(invoke.command, vec!["git".to_string(), "status".to_string()]);
+            assert!(!invoke.explain);
         }
         _ => panic!("Expected Invoke command"),
     }
@@ -29,12 +29,12 @@ fn test_invoke_command_parses() {
 fn test_invoke_preserves_single_argument_with_spaces() {
     let cli = Cli::try_parse_from(["mycelium", "invoke", "rg", "foo bar", "src"]).unwrap();
     match cli.command {
-        Commands::Invoke { command, explain } => {
+        Commands::Invoke(invoke) => {
             assert_eq!(
-                command,
+                invoke.command,
                 vec!["rg".to_string(), "foo bar".to_string(), "src".to_string()]
             );
-            assert!(!explain);
+            assert!(!invoke.explain);
         }
         _ => panic!("Expected Invoke command"),
     }
@@ -44,13 +44,9 @@ fn test_invoke_preserves_single_argument_with_spaces() {
 fn test_cc_economics_project_flag_parses() {
     let cli = Cli::try_parse_from(["mycelium", "economics", "--project"]).unwrap();
     match cli.command {
-        Commands::CcEconomics {
-            project,
-            project_path,
-            ..
-        } => {
-            assert!(project);
-            assert!(project_path.is_none());
+        Commands::CcEconomics(cc) => {
+            assert!(cc.project);
+            assert!(cc.project_path.is_none());
         }
         _ => panic!("Expected CcEconomics command"),
     }
@@ -60,13 +56,9 @@ fn test_cc_economics_project_flag_parses() {
 fn test_cc_economics_project_path_parses() {
     let cli = Cli::try_parse_from(["mycelium", "economics", "--project-path", "."]).unwrap();
     match cli.command {
-        Commands::CcEconomics {
-            project,
-            project_path,
-            ..
-        } => {
-            assert!(!project);
-            assert_eq!(project_path.as_deref(), Some("."));
+        Commands::CcEconomics(cc) => {
+            assert!(!cc.project);
+            assert_eq!(cc.project_path.as_deref(), Some("."));
         }
         _ => panic!("Expected CcEconomics command"),
     }
@@ -76,7 +68,7 @@ fn test_cc_economics_project_path_parses() {
 fn test_cc_economics_alias_still_parses() {
     let cli = Cli::try_parse_from(["mycelium", "cc-economics", "--project"]).unwrap();
     match cli.command {
-        Commands::CcEconomics { project, .. } => assert!(project),
+        Commands::CcEconomics(cc) => assert!(cc.project),
         _ => panic!("Expected CcEconomics command"),
     }
 }
@@ -85,9 +77,9 @@ fn test_cc_economics_alias_still_parses() {
 fn test_gain_project_bare_flag_parses() {
     let cli = Cli::try_parse_from(["mycelium", "gain", "--project"]).unwrap();
     match cli.command {
-        Commands::Gain { project, .. } => {
+        Commands::Gain(gain) => {
             // Bare --project uses default_missing_value "."
-            assert_eq!(project.as_deref(), Some("."));
+            assert_eq!(gain.project.as_deref(), Some("."));
         }
         _ => panic!("Expected Gain command"),
     }
@@ -97,8 +89,8 @@ fn test_gain_project_bare_flag_parses() {
 fn test_gain_project_name_parses() {
     let cli = Cli::try_parse_from(["mycelium", "gain", "--project", "mycelium"]).unwrap();
     match cli.command {
-        Commands::Gain { project, .. } => {
-            assert_eq!(project.as_deref(), Some("mycelium"));
+        Commands::Gain(gain) => {
+            assert_eq!(gain.project.as_deref(), Some("mycelium"));
         }
         _ => panic!("Expected Gain command"),
     }
@@ -110,8 +102,8 @@ fn test_gain_project_all_parses() {
     // resolve_project_scope to route to show_projects_table.
     let cli = Cli::try_parse_from(["mycelium", "gain", "--project", "all"]).unwrap();
     match cli.command {
-        Commands::Gain { project, .. } => {
-            assert_eq!(project.as_deref(), Some("all"));
+        Commands::Gain(gain) => {
+            assert_eq!(gain.project.as_deref(), Some("all"));
         }
         _ => panic!("Expected Gain command"),
     }
@@ -137,9 +129,9 @@ fn test_gain_project_conflicts_with_project_path() {
 fn test_gain_project_short_flag_parses() {
     let cli = Cli::try_parse_from(["mycelium", "gain", "-p"]).unwrap();
     match cli.command {
-        Commands::Gain { project, .. } => {
+        Commands::Gain(gain) => {
             // Bare -p uses default_missing_value "."
-            assert_eq!(project.as_deref(), Some("."));
+            assert_eq!(gain.project.as_deref(), Some("."));
         }
         _ => panic!("Expected Gain command"),
     }
@@ -149,8 +141,8 @@ fn test_gain_project_short_flag_parses() {
 fn test_gain_no_project_flag_is_none() {
     let cli = Cli::try_parse_from(["mycelium", "gain"]).unwrap();
     match cli.command {
-        Commands::Gain { project, .. } => {
-            assert!(project.is_none());
+        Commands::Gain(gain) => {
+            assert!(gain.project.is_none());
         }
         _ => panic!("Expected Gain command"),
     }
@@ -160,7 +152,7 @@ fn test_gain_no_project_flag_is_none() {
 fn test_gain_diagnostics_flag_parses() {
     let cli = Cli::try_parse_from(["mycelium", "gain", "--diagnostics"]).unwrap();
     match cli.command {
-        Commands::Gain { diagnostics, .. } => assert!(diagnostics),
+        Commands::Gain(gain) => assert!(gain.diagnostics),
         _ => panic!("Expected Gain command"),
     }
 }
@@ -169,9 +161,9 @@ fn test_gain_diagnostics_flag_parses() {
 fn test_gain_limit_flag_parses() {
     let cli = Cli::try_parse_from(["mycelium", "gain", "--history", "--limit", "25"]).unwrap();
     match cli.command {
-        Commands::Gain { history, limit, .. } => {
-            assert!(history);
-            assert_eq!(limit, 25);
+        Commands::Gain(gain) => {
+            assert!(gain.history);
+            assert_eq!(gain.limit, 25);
         }
         _ => panic!("Expected Gain command"),
     }
@@ -199,13 +191,9 @@ fn test_gain_diagnostics_conflicts_with_format() {
 fn test_gain_diagnostics_explain_flag_requires_diagnostics() {
     let cli = Cli::try_parse_from(["mycelium", "gain", "--diagnostics", "--explain"]).unwrap();
     match cli.command {
-        Commands::Gain {
-            diagnostics,
-            explain,
-            ..
-        } => {
-            assert!(diagnostics);
-            assert!(explain);
+        Commands::Gain(gain) => {
+            assert!(gain.diagnostics);
+            assert!(gain.explain);
         }
         _ => panic!("Expected Gain command"),
     }
@@ -221,38 +209,24 @@ fn test_gain_diagnostics_explain_flag_requires_diagnostics() {
 fn test_init_hook_modes_still_parse() {
     let cli = Cli::try_parse_from(["mycelium", "init", "--global", "--hook-only"]).unwrap();
     match cli.command {
-        Commands::Init {
-            global,
-            hook_only,
-            claude_md,
-            onboard,
-            show,
-            uninstall,
-            ..
-        } => {
-            assert!(global);
-            assert!(hook_only);
-            assert!(!claude_md);
-            assert!(!onboard);
-            assert!(!show);
-            assert!(!uninstall);
+        Commands::Init(init) => {
+            assert!(init.global);
+            assert!(init.hook_only);
+            assert!(!init.claude_md);
+            assert!(!init.onboard);
+            assert!(!init.show);
+            assert!(!init.uninstall);
         }
         _ => panic!("Expected Init command"),
     }
 
     let cli = Cli::try_parse_from(["mycelium", "init", "--claude-md"]).unwrap();
     match cli.command {
-        Commands::Init {
-            global,
-            hook_only,
-            claude_md,
-            onboard,
-            ..
-        } => {
-            assert!(!global);
-            assert!(!hook_only);
-            assert!(claude_md);
-            assert!(!onboard);
+        Commands::Init(init) => {
+            assert!(!init.global);
+            assert!(!init.hook_only);
+            assert!(init.claude_md);
+            assert!(!init.onboard);
         }
         _ => panic!("Expected Init command"),
     }
@@ -262,21 +236,13 @@ fn test_init_hook_modes_still_parse() {
 fn test_init_onboard_parses() {
     let cli = Cli::try_parse_from(["mycelium", "init", "--onboard"]).unwrap();
     match cli.command {
-        Commands::Init {
-            global,
-            hook_only,
-            claude_md,
-            onboard,
-            show,
-            uninstall,
-            ..
-        } => {
-            assert!(!global);
-            assert!(!hook_only);
-            assert!(!claude_md);
-            assert!(onboard);
-            assert!(!show);
-            assert!(!uninstall);
+        Commands::Init(init) => {
+            assert!(!init.global);
+            assert!(!init.hook_only);
+            assert!(!init.claude_md);
+            assert!(init.onboard);
+            assert!(!init.show);
+            assert!(!init.uninstall);
         }
         _ => panic!("Expected Init command"),
     }

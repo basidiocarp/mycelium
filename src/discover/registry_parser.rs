@@ -2,7 +2,7 @@ use tree_sitter::{Node, Parser, TreeCursor};
 
 use super::shell::{has_unsupported_shell_quoting, needs_shell_parser_fallback};
 
-pub(super) fn parser_allows_rewrite_shape(cmd: &str) -> bool {
+pub(crate) fn parser_allows_rewrite_shape(cmd: &str) -> bool {
     let trimmed = cmd.trim();
     if trimmed.is_empty()
         || trimmed.contains('\n')
@@ -28,7 +28,7 @@ pub(super) fn parser_allows_rewrite_shape(cmd: &str) -> bool {
     !root.has_error() && parsed_tree_is_safe(root, trimmed.as_bytes())
 }
 
-pub(super) fn rewrite_shape_requires_parser(cmd: &str) -> bool {
+pub(crate) fn rewrite_shape_requires_parser(cmd: &str) -> bool {
     needs_shell_parser_fallback(cmd)
 }
 

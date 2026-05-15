@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 
-use super::content_router::ContentRouter;
+use super::run::run_spawned_command;
 use crate::commands::{Cli, Commands};
 use crate::{json_output, rewrite_cmd, tracking};
 
@@ -242,175 +242,6 @@ pub(super) fn dispatch_invoke_command(command: &[String], explain: bool, cli: &C
     )
 }
 
-pub(super) fn run_spawned_command(
-    mut command: std::process::Command,
-    tracked_input: &str,
-    tracked_output: &str,
-    timer: tracking::TimedExecution,
-) -> Result<()> {
-    use std::io::{Read, Write};
-    use std::process::Stdio;
-    use std::thread;
-
-    let mut child = command
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .context("Failed to execute command")?;
-
-    let stdout_pipe = child
-        .stdout
-        .take()
-        .context("Failed to capture child stdout")?;
-    let stderr_pipe = child
-        .stderr
-        .take()
-        .context("Failed to capture child stderr")?;
-
-    let stdout_handle = thread::spawn(move || -> std::io::Result<Vec<u8>> {
-        let mut reader = stdout_pipe;
-        let mut captured = Vec::new();
-        let mut buf = [0u8; 8192];
-
-        loop {
-            let count = reader.read(&mut buf)?;
-            if count == 0 {
-                break;
-            }
-            if captured.len() < MAX_STDOUT_CAPTURE {
-                captured.extend_from_slice(&buf[..count]);
-            }
-            // Continue draining stdout even after cap is hit, but discard bytes past the cap
-        }
-
-        Ok(captured)
-    });
-
-    let stderr_handle = thread::spawn(move || -> std::io::Result<Vec<u8>> {
-        let mut reader = stderr_pipe;
-        let mut captured = Vec::new();
-        let mut buf = [0u8; 8192];
-
-        loop {
-            let count = reader.read(&mut buf)?;
-            if count == 0 {
-                break;
-            }
-            if captured.len() < MAX_STDERR_CAPTURE {
-                captured.extend_from_slice(&buf[..count]);
-            }
-            // Continue draining stderr even after cap is hit, but discard bytes past the cap
-            let mut err = std::io::stderr().lock();
-            err.write_all(&buf[..count])?;
-            err.flush()?;
-        }
-
-        Ok(captured)
-    });
-
-    let status = child.wait().context("Failed waiting for command")?;
-
-    let stdout_bytes = stdout_handle
-        .join()
-        .map_err(|_| anyhow::anyhow!("stdout streaming thread panicked"))??;
-    let stderr_bytes = stderr_handle
-        .join()
-        .map_err(|_| anyhow::anyhow!("stderr streaming thread panicked"))??;
-
-    let stdout = String::from_utf8_lossy(&stdout_bytes);
-    let stderr = String::from_utf8_lossy(&stderr_bytes);
-    let full_output = format!("{}{}", stdout, stderr);
-
-    // Route raw stdout through hyphae for chunked storage before any ContentRouter filtering.
-    // This ensures hyphae stores the complete unfiltered command output.
-    let hyphae_output = if crate::hyphae::is_available() {
-        let result = crate::hyphae::route_or_filter(&tracked_input, &stdout, |r| {
-            crate::filter::FilterResult::full(r, r.to_string())
-        });
-        result.output
-    } else {
-        // Hyphae not available — use raw output for display if no ContentRouter filter applies
-        stdout.to_string()
-    };
-
-    // Apply content-aware routing to stdout for display filtering.
-    // Built-in (compiled) filter runs first and always takes precedence.
-    let router = ContentRouter::default();
-    let routed_stdout = router.route(&stdout);
-
-    // Apply TOML declarative filter as a fallback when the built-in filter
-    // produced no transformation. Load filters once here to avoid repeated
-    // disk reads inside tight loops; cwd is captured at command-dispatch time.
-    let (filtered_for_display, matched_filter_name) = if routed_stdout == stdout.as_ref() {
-        // Built-in filter was a no-op — consult TOML filters.
-        let (project_filters, user_filters) = crate::filters::load_all_declarative_filters();
-        if let Some(matched) =
-            crate::filters::find_matching_filter(tracked_input, &project_filters, &user_filters)
-        {
-            let filter_name = matched.command.clone();
-            let toml_result = matched.apply(&stdout);
-            (toml_result.output, Some(filter_name))
-        } else {
-            (routed_stdout, None)
-        }
-    } else {
-        (routed_stdout, None)
-    };
-
-    // Choose what to print: if hyphae handled it, use hyphae's summary; otherwise use the
-    // ContentRouter-filtered text for display.
-    let output_to_print = if crate::hyphae::is_available() {
-        use tracing::debug;
-        debug!(source = "hyphae", "using hyphae summary as display output");
-        hyphae_output
-    } else {
-        use tracing::debug;
-        debug!(
-            source = "content_router",
-            matched_filter = matched_filter_name.as_deref(),
-            input_bytes = stdout.len(),
-            output_bytes = filtered_for_display.len(),
-            "using content-router output"
-        );
-        filtered_for_display.to_string()
-    };
-
-    // Print the final output after all filtering is complete.
-    // Stderr is already streamed live by the capture thread above.
-    print!("{output_to_print}");
-
-    // Append MYCELIUM_EXPLAIN annotation if enabled and command was rewritten
-    if std::env::var("MYCELIUM_EXPLAIN").is_ok() {
-        let resolution = rewrite_cmd::resolve_runtime_command(tracked_input);
-        if resolution.rewritten {
-            if !output_to_print.is_empty() {
-                println!();
-            }
-            print!(
-                "[mycelium] filter: {} | savings: ~{:.0}%",
-                resolution.source,
-                resolution.estimated_savings_pct.unwrap_or(0.0)
-            );
-        }
-    }
-
-    // Track using the ContentRouter-filtered text (not hyphae's summary output) for accurate token tracking.
-    // This ensures token savings are computed against the actual filtered output users see, not hyphae chunk summaries.
-    let final_full = format!(
-        "{}{}",
-        filtered_for_display,
-        String::from_utf8_lossy(&stderr_bytes)
-    );
-    timer.track(tracked_input, tracked_output, &full_output, &final_full);
-
-    if !status.success() {
-        let _ = std::io::stdout().flush();
-        let _ = std::io::stderr().flush();
-        std::process::exit(status.code().unwrap_or(1));
-    }
-
-    Ok(())
-}
 
 /// Tools supported by mycelium for proxying and filtering.
 /// This list must remain synchronized with `is_operational_command`.
@@ -469,71 +300,71 @@ const SUPPORTED_TOOLS: &[&str] = &[
 /// rather than creating false confidence about what's protected.
 pub fn is_operational_command(cmd: &Commands) -> bool {
     let cmd_name = match cmd {
-        Commands::Ls { .. } => "ls",
-        Commands::Tree { .. } => "tree",
-        Commands::Read { .. } => "read",
-        Commands::Peek { .. } => "peek",
-        Commands::Git { .. } => "git",
-        Commands::Gh { .. } => "gh",
-        Commands::Gt { .. } => "gt",
-        Commands::Cargo { .. } => "cargo",
-        Commands::Tsc { .. } => "tsc",
-        Commands::Next { .. } => "next",
-        Commands::Go { .. } => "go",
-        Commands::Lint { .. } => "lint",
-        Commands::Prettier { .. } => "prettier",
-        Commands::Format { .. } => return false, // not operational
-        Commands::Ruff { .. } => "ruff",
-        Commands::Mypy { .. } => return false, // not operational
-        Commands::GolangciLint { .. } => "golangci-lint",
-        Commands::Test { .. } => "test",
-        Commands::Vitest { .. } => "vitest",
-        Commands::Playwright { .. } => "playwright",
-        Commands::Pytest { .. } => "pytest",
-        Commands::Pnpm { .. } => "pnpm",
-        Commands::Pip { .. } => "pip",
-        Commands::Npm { .. } => "npm",
-        Commands::Npx { .. } => "npx",
-        Commands::Psql { .. } => return false, // not operational
-        Commands::Prisma { .. } => "prisma",
-        Commands::Curl { .. } => "curl",
-        Commands::Wget { .. } => "wget",
-        Commands::Docker { .. } => "docker",
-        Commands::Kubectl { .. } => "kubectl",
-        Commands::Terraform { .. } => return false, // not operational
-        Commands::Aws { .. } => return false,       // not operational
-        Commands::Atmos { .. } => return false,     // not operational
-        Commands::Json { .. } => "json",
-        Commands::Log { .. } => "log",
-        Commands::Err { .. } => "err",
-        Commands::Summary { .. } => "summary",
-        Commands::Env { .. } => "env",
-        Commands::Deps { .. } => "deps",
-        Commands::Gain { .. } => return false, // not operational
+        Commands::Ls(_) => "ls",
+        Commands::Tree(_) => "tree",
+        Commands::Read(_) => "read",
+        Commands::Peek(_) => "peek",
+        Commands::Git(_) => "git",
+        Commands::Gh(_) => "gh",
+        Commands::Gt(_) => "gt",
+        Commands::Cargo(_) => "cargo",
+        Commands::Tsc(_) => "tsc",
+        Commands::Next(_) => "next",
+        Commands::Go(_) => "go",
+        Commands::Lint(_) => "lint",
+        Commands::Prettier(_) => "prettier",
+        Commands::Format(_) => return false, // not operational
+        Commands::Ruff(_) => "ruff",
+        Commands::Mypy(_) => return false, // not operational
+        Commands::GolangciLint(_) => "golangci-lint",
+        Commands::Test(_) => "test",
+        Commands::Vitest(_) => "vitest",
+        Commands::Playwright(_) => "playwright",
+        Commands::Pytest(_) => "pytest",
+        Commands::Pnpm(_) => "pnpm",
+        Commands::Pip(_) => "pip",
+        Commands::Npm(_) => "npm",
+        Commands::Npx(_) => "npx",
+        Commands::Psql(_) => return false, // not operational
+        Commands::Prisma(_) => "prisma",
+        Commands::Curl(_) => "curl",
+        Commands::Wget(_) => "wget",
+        Commands::Docker(_) => "docker",
+        Commands::Kubectl(_) => "kubectl",
+        Commands::Terraform(_) => return false, // not operational
+        Commands::Aws(_) => return false,       // not operational
+        Commands::Atmos(_) => return false,     // not operational
+        Commands::Json(_) => "json",
+        Commands::Log(_) => "log",
+        Commands::Err(_) => "err",
+        Commands::Summary(_) => "summary",
+        Commands::Env(_) => "env",
+        Commands::Deps(_) => "deps",
+        Commands::Gain(_) => return false, // not operational
         #[cfg(unix)]
-        Commands::ServeSocket { .. } => return false, // not operational
-        Commands::Discover { .. } => return false, // not operational
-        Commands::Learn { .. } => return false, // not operational
-        Commands::Context { .. } => return false, // not operational
-        Commands::Init { .. } => return false, // not operational
-        Commands::Config { .. } => return false, // not operational
+        Commands::ServeSocket(_) => return false, // not operational
+        Commands::Discover(_) => return false, // not operational
+        Commands::Learn(_) => return false, // not operational
+        Commands::Context(_) => return false, // not operational
+        Commands::Init(_) => return false, // not operational
+        Commands::Config(_) => return false, // not operational
         Commands::Doctor => return false,      // not operational
         Commands::Verify => return false,      // not operational
-        Commands::SelfUpdate { .. } => return false, // not operational
-        Commands::Completions { .. } => return false, // not operational
-        Commands::Proxy { .. } => return false, // not operational (handled separately)
-        Commands::Invoke { .. } => "invoke",
-        Commands::Benchmark { .. } => return false, // not operational
-        Commands::Plugin { .. } => return false,    // not operational
-        Commands::Wc { .. } => return false,        // not operational
-        Commands::ParseHealth { .. } => return false, // not operational
-        Commands::CcEconomics { .. } => return false, // not operational
-        Commands::HookAudit { .. } => return false, // not operational
-        Commands::Rewrite { .. } => return false,   // not operational
-        Commands::Explain { .. } => return false,   // not operational
-        Commands::Find { .. } => "find",
-        Commands::Grep { .. } => "grep",
-        Commands::Diff { .. } => "diff",
+        Commands::SelfUpdate(_) => return false, // not operational
+        Commands::Completions(_) => return false, // not operational
+        Commands::Proxy(_) => return false, // not operational (handled separately)
+        Commands::Invoke(_) => "invoke",
+        Commands::Benchmark(_) => return false, // not operational
+        Commands::Plugin(_) => return false,    // not operational
+        Commands::Wc(_) => return false,        // not operational
+        Commands::ParseHealth(_) => return false, // not operational
+        Commands::CcEconomics(_) => return false, // not operational
+        Commands::HookAudit(_) => return false, // not operational
+        Commands::Rewrite(_) => return false,   // not operational
+        Commands::Explain(_) => return false,   // not operational
+        Commands::Find(_) => "find",
+        Commands::Grep(_) => "grep",
+        Commands::Diff(_) => "diff",
     };
     SUPPORTED_TOOLS.contains(&cmd_name)
 }
@@ -547,11 +378,12 @@ mod tests {
     fn test_is_operational_command_consistency_with_supported_tools() {
         // Verify that is_operational_command returns true for commands in SUPPORTED_TOOLS.
         // This enforces that both paths use the same canonical set.
+        use crate::commands::{Ls, Npm, Tree};
         let test_cases: Vec<(&str, Commands)> = vec![
-            ("ls", Commands::Ls { args: vec![] }),
-            ("tree", Commands::Tree { args: vec![] }),
-            ("npm", Commands::Npm { args: vec![] }),
-            ("npm", Commands::Npm { args: vec![] }),
+            ("ls", Commands::Ls(Ls { args: vec![] })),
+            ("tree", Commands::Tree(Tree { args: vec![] })),
+            ("npm", Commands::Npm(Npm { args: vec![] })),
+            ("npm", Commands::Npm(Npm { args: vec![] })),
         ];
 
         for (tool_name, cmd) in test_cases {

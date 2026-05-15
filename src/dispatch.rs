@@ -3,6 +3,7 @@ mod content_router;
 pub(crate) mod exec;
 mod families;
 mod routes;
+mod run;
 
 use anyhow::Result;
 use spore::logging::{SpanContext, subprocess_span, tool_span, workflow_span};
@@ -158,8 +159,8 @@ fn replay_captured_output(stdout: &str, stderr: &str) {
 /// Dispatch a parsed CLI command to its handler module.
 pub fn dispatch(cli: Cli) -> Result<()> {
     #[cfg(unix)]
-    if let crate::commands::Commands::ServeSocket { compact } = cli.command {
-        return crate::socket_server::run_socket_server(compact);
+    if let crate::commands::Commands::ServeSocket(ss) = cli.command {
+        return crate::socket_server::run_socket_server(ss.compact);
     }
 
     if cli.json {

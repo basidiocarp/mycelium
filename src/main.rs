@@ -158,12 +158,12 @@ mod tests {
     fn test_git_commit_single_message() {
         let cli = Cli::try_parse_from(["mycelium", "git", "commit", "-m", "fix: typo"]).unwrap();
         match cli.command {
-            Commands::Git {
-                command: GitCommands::Commit { args },
-                ..
-            } => {
-                assert_eq!(args, vec!["-m", "fix: typo"]);
-            }
+            Commands::Git(git) => match git.command {
+                GitCommands::Commit { args } => {
+                    assert_eq!(args, vec!["-m", "fix: typo"]);
+                }
+                _ => panic!("Expected Git Commit command"),
+            },
             _ => panic!("Expected Git Commit command"),
         }
     }
@@ -181,15 +181,15 @@ mod tests {
         ])
         .unwrap();
         match cli.command {
-            Commands::Git {
-                command: GitCommands::Commit { args },
-                ..
-            } => {
-                assert_eq!(
-                    args,
-                    vec!["-m", "feat: add support", "-m", "Body paragraph here."]
-                );
-            }
+            Commands::Git(git) => match git.command {
+                GitCommands::Commit { args } => {
+                    assert_eq!(
+                        args,
+                        vec!["-m", "feat: add support", "-m", "Body paragraph here."]
+                    );
+                }
+                _ => panic!("Expected Git Commit command"),
+            },
             _ => panic!("Expected Git Commit command"),
         }
     }
@@ -199,12 +199,12 @@ mod tests {
     fn test_git_commit_am_flag() {
         let cli = Cli::try_parse_from(["mycelium", "git", "commit", "-am", "quick fix"]).unwrap();
         match cli.command {
-            Commands::Git {
-                command: GitCommands::Commit { args },
-                ..
-            } => {
-                assert_eq!(args, vec!["-am", "quick fix"]);
-            }
+            Commands::Git(git) => match git.command {
+                GitCommands::Commit { args } => {
+                    assert_eq!(args, vec!["-am", "quick fix"]);
+                }
+                _ => panic!("Expected Git Commit command"),
+            },
             _ => panic!("Expected Git Commit command"),
         }
     }
@@ -214,12 +214,12 @@ mod tests {
         let cli =
             Cli::try_parse_from(["mycelium", "git", "commit", "--amend", "-m", "new msg"]).unwrap();
         match cli.command {
-            Commands::Git {
-                command: GitCommands::Commit { args },
-                ..
-            } => {
-                assert_eq!(args, vec!["--amend", "-m", "new msg"]);
-            }
+            Commands::Git(git) => match git.command {
+                GitCommands::Commit { args } => {
+                    assert_eq!(args, vec!["--amend", "-m", "new msg"]);
+                }
+                _ => panic!("Expected Git Commit command"),
+            },
             _ => panic!("Expected Git Commit command"),
         }
     }
@@ -235,17 +235,11 @@ mod tests {
         ])
         .unwrap();
         match cli.command {
-            Commands::Git {
-                no_pager,
-                no_optional_locks,
-                bare,
-                literal_pathspecs,
-                ..
-            } => {
-                assert!(no_pager);
-                assert!(no_optional_locks);
-                assert!(!bare);
-                assert!(!literal_pathspecs);
+            Commands::Git(git) => {
+                assert!(git.no_pager);
+                assert!(git.no_optional_locks);
+                assert!(!git.bare);
+                assert!(!git.literal_pathspecs);
             }
             _ => panic!("Expected Git command"),
         }
@@ -266,22 +260,22 @@ mod tests {
         ])
         .unwrap();
         match cli.command {
-            Commands::Git {
-                command: GitCommands::Commit { args },
-                ..
-            } => {
-                assert_eq!(
-                    args,
-                    vec![
-                        "--message",
-                        "title",
-                        "--message",
-                        "body",
-                        "--message",
-                        "footer"
-                    ]
-                );
-            }
+            Commands::Git(git) => match git.command {
+                GitCommands::Commit { args } => {
+                    assert_eq!(
+                        args,
+                        vec![
+                            "--message",
+                            "title",
+                            "--message",
+                            "body",
+                            "--message",
+                            "footer"
+                        ]
+                    );
+                }
+                _ => panic!("Expected Git Commit command"),
+            },
             _ => panic!("Expected Git Commit command"),
         }
     }
@@ -297,11 +291,12 @@ mod tests {
         let cli = Cli::try_parse_from(["mycelium", "atmos", "terraform", "plan", "--stack", "dev"])
             .unwrap();
         match cli.command {
-            Commands::Atmos {
-                command: AtmosCommands::Terraform { args },
-            } => {
-                assert_eq!(args, vec!["plan", "--stack", "dev"]);
-            }
+            Commands::Atmos(atmos) => match atmos.command {
+                AtmosCommands::Terraform { args } => {
+                    assert_eq!(args, vec!["plan", "--stack", "dev"]);
+                }
+                _ => panic!("Expected Atmos Terraform command"),
+            },
             _ => panic!("Expected Atmos Terraform command"),
         }
     }
@@ -342,8 +337,8 @@ mod tests {
         );
         if let Ok(cli) = result {
             match cli.command {
-                Commands::Git { directory, .. } => {
-                    assert_eq!(directory, vec!["/path"]);
+                Commands::Git(git) => {
+                    assert_eq!(git.directory, vec!["/path"]);
                 }
                 _ => panic!("Expected Git command"),
             }
@@ -356,7 +351,7 @@ mod tests {
         assert!(result.is_ok());
         if let Ok(cli) = result {
             match cli.command {
-                Commands::Gain { failures, .. } => assert!(failures),
+                Commands::Gain(gain) => assert!(gain.failures),
                 _ => panic!("Expected Gain command"),
             }
         }
@@ -368,7 +363,7 @@ mod tests {
         assert!(result.is_ok());
         if let Ok(cli) = result {
             match cli.command {
-                Commands::Gain { failures, .. } => assert!(failures),
+                Commands::Gain(gain) => assert!(gain.failures),
                 _ => panic!("Expected Gain command"),
             }
         }

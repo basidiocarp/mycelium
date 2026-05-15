@@ -1,0 +1,404 @@
+use super::*;
+
+#[test]
+fn test_is_available_does_not_panic() {
+    // In CI/test environment, hyphae is likely not installed
+    // This test just verifies the function doesn't panic
+    let _available = is_available();
+}
+
+#[test]
+fn test_decide_action_small_output() {
+    let small = "hello world\n";
+    assert_eq!(
+        decide_action(small, crate::summarizer::DEFAULT_SUMMARY_THRESHOLD_TOKENS),
+        OutputAction::Passthrough
+    );
+}
+
+#[test]
+fn test_decide_action_medium_output() {
+    // ~600 tokens (2400 chars / 4) — between passthrough (500) and light (2000) thresholds,
+    // with enough lines to avoid the ≤5-line passthrough override.
+    let medium = format!("{}\n", "a".repeat(24)).repeat(100); // ~600 tokens, 100 lines
+    assert_eq!(
+        decide_action(&medium, crate::summarizer::DEFAULT_SUMMARY_THRESHOLD_TOKENS),
+        OutputAction::Filter
+    );
+}
+
+#[test]
+fn test_decide_action_large_output() {
+    // ~3000 tokens (12000 chars / 4) — above the light (2000) threshold → Structured.
+    // With Hyphae available: Chunk; without: Filter.
+    let large = format!("{}\n", "a".repeat(100)).repeat(120); // ~3000 tokens, 120 lines
+    if is_available() {
+        assert_eq!(
+            decide_action(&large, crate::summarizer::DEFAULT_SUMMARY_THRESHOLD_TOKENS),
+            OutputAction::Chunk
+        );
+    } else {
+        assert_eq!(
+            decide_action(&large, crate::summarizer::DEFAULT_SUMMARY_THRESHOLD_TOKENS),
+            OutputAction::Filter
+        );
+    }
+}
+
+#[test]
+fn test_route_or_filter_passthrough() {
+    let small = "hello\n";
+    let result = route_or_filter("test", small, |r| {
+        crate::filter::FilterResult::full(r, "FILTERED".to_string())
+    });
+    assert_eq!(result.output, small);
+    assert_eq!(result.quality, crate::filter::FilterQuality::Passthrough);
+}
+
+#[test]
+fn test_route_or_filter_applies_filter() {
+    // Medium input: ~600 tokens → filtered to ~300 tokens (50% savings).
+    // 50% savings passes Rule 2, and the savings aren't suspiciously aggressive.
+    // Using 100 lines so it routes through Filter action (token count > 500).
+    let medium = format!("{}\n", "a".repeat(24)).repeat(100); // ~600 tokens, 100 lines
+    let filtered_output = format!("{}\n", "a".repeat(24)).repeat(50); // ~300 tokens, 50% savings
+    let result = route_or_filter("test", &medium, move |r| {
+        crate::filter::FilterResult::full(r, filtered_output)
+    });
+    // Result should contain filtered output (possibly with header prepended)
+    assert!(
+        result.output.contains(&"a".repeat(24)),
+        "Filter output should be present"
+    );
+    assert_ne!(result.output, medium, "Should not be raw passthrough");
+}
+
+#[test]
+fn test_route_or_filter_large_output() {
+    // Large output (>2000 tokens) — routes through Hyphae if available,
+    // otherwise falls back to filter (which may itself be validated back to raw).
+    let large = format!("{}\n", "a".repeat(100)).repeat(120); // ~3000 tokens, 120 lines
+    let result = route_or_filter("test", &large, |r| {
+        crate::filter::FilterResult::full(r, "FILTERED".to_string())
+    });
+    if is_available() {
+        // Hyphae available: either a Hyphae summary, or filter output (or raw on
+        // validation fallback if Hyphae fails internally)
+        assert!(
+            result.output.contains("[mycelium→hyphae]") || !result.output.is_empty(),
+            "Expected non-empty result from Hyphae or filter fallback"
+        );
+    } else {
+        // No Hyphae: filter runs, then validate_filter_output fires.
+        // "FILTERED" has >95% reduction on <200 lines → raw fallback.
+        assert_eq!(
+            result.output, large,
+            "Large output without Hyphae: validation returns raw"
+        );
+    }
+}
+
+#[test]
+fn test_route_or_filter_empty_filter_falls_back_to_raw() {
+    // A filter that returns empty should fall back to raw output.
+    // Use content above the 500-token passthrough threshold so it routes through Filter.
+    let medium = format!("{}\n", "a".repeat(24)).repeat(100); // ~600 tokens, 100 lines
+    let result = route_or_filter("test", &medium, |r| {
+        crate::filter::FilterResult::full(r, String::new())
+    });
+    assert_eq!(
+        result.output, medium,
+        "Empty filter output should fall back to raw"
+    );
+}
+
+#[test]
+fn test_route_or_filter_whitespace_filter_falls_back_to_raw() {
+    // Use content above the 500-token passthrough threshold.
+    let medium = format!("{}\n", "a".repeat(24)).repeat(100); // ~600 tokens, 100 lines
+    let result = route_or_filter("test", &medium, |r| {
+        crate::filter::FilterResult::full(r, "   \n  ".to_string())
+    });
+    assert_eq!(
+        result.output, medium,
+        "Whitespace-only filter output should fall back to raw"
+    );
+}
+
+// ── validate_filter_output: rule-by-rule tests ────────────────────────────
+
+#[test]
+fn test_validate_rule1_empty_filtered_returns_raw() {
+    let raw = "some output\nwith content\n";
+    let result =
+        validate_filter_output(raw, crate::filter::FilterResult::full(raw, String::new()));
+    assert_eq!(
+        result.output, raw,
+        "Rule 1: empty filtered should return raw"
+    );
+}
+
+#[test]
+fn test_validate_rule1_whitespace_filtered_returns_raw() {
+    let raw = "some output\nwith content\n";
+    let result = validate_filter_output(
+        raw,
+        crate::filter::FilterResult::full(raw, "   \n  ".to_string()),
+    );
+    assert_eq!(
+        result.output, raw,
+        "Rule 1: whitespace-only filtered should return raw"
+    );
+}
+
+#[test]
+fn test_validate_rule1_empty_raw_returns_empty_filtered() {
+    // When raw is empty, filtering empty to empty is fine
+    let result =
+        validate_filter_output("", crate::filter::FilterResult::full("", String::new()));
+    assert_eq!(
+        result.output, "",
+        "Rule 1: empty filtered from empty raw is ok"
+    );
+}
+
+#[test]
+fn test_validate_rule2_low_savings_returns_raw() {
+    // Raw: 100 tokens, filtered: 90 tokens → 10% savings — below 20% threshold
+    let raw = "a".repeat(400); // ~100 tokens
+    let filtered = "a".repeat(360); // ~90 tokens (10% savings)
+    let result =
+        validate_filter_output(&raw, crate::filter::FilterResult::full(&raw, filtered));
+    assert_eq!(result.output, raw, "Rule 2: <20% savings should return raw");
+}
+
+#[test]
+fn test_validate_rule2_sufficient_savings_returns_filtered() {
+    // Raw: 100 tokens, filtered: 70 tokens → 30% savings — above 20% threshold
+    let raw = "a".repeat(400); // ~100 tokens
+    let filtered = "a".repeat(280); // ~70 tokens (30% savings)
+    let result = validate_filter_output(
+        &raw,
+        crate::filter::FilterResult::full(&raw, filtered.clone()),
+    );
+    assert_eq!(
+        result.output, filtered,
+        "Rule 2: ≥20% savings should return filtered"
+    );
+}
+
+// ── Rule 3: Degraded quality with <40% savings → raw fallback ──────────
+
+#[test]
+fn test_validate_rule3_degraded_low_savings_returns_raw() {
+    // Degraded filter with 30% savings (<40% threshold) → raw fallback
+    let raw = "word word word word\n".repeat(50); // ~250 tokens
+    let filtered = "word word word word\n".repeat(35); // ~175 tokens → 30% savings
+    let result =
+        validate_filter_output(&raw, crate::filter::FilterResult::degraded(&raw, filtered));
+    assert_eq!(
+        result.output, raw,
+        "Rule 3: Degraded + <40% savings should return raw"
+    );
+}
+
+#[test]
+fn test_validate_rule3_degraded_high_savings_passes() {
+    // Degraded filter with 50% savings (≥40% threshold) → keep filtered
+    let raw = "word word word word\n".repeat(50); // ~250 tokens
+    let filtered = "word word word word\n".repeat(25); // ~125 tokens → 50% savings
+    let result = validate_filter_output(
+        &raw,
+        crate::filter::FilterResult::degraded(&raw, filtered.clone()),
+    );
+    assert_eq!(
+        result.output, filtered,
+        "Rule 3: Degraded + ≥40% savings should keep filtered"
+    );
+}
+
+#[test]
+fn test_validate_rule3_full_quality_low_savings_passes() {
+    // Full quality with 25% savings — Rule 3 only applies to Degraded
+    let raw = "word word word word\n".repeat(50); // ~250 tokens
+    let filtered = "word word word word\n".repeat(37); // ~185 tokens → ~26% savings
+    let result = validate_filter_output(
+        &raw,
+        crate::filter::FilterResult::full(&raw, filtered.clone()),
+    );
+    assert_eq!(
+        result.output, filtered,
+        "Rule 3: Full quality bypasses degraded check"
+    );
+}
+
+// ── Rule 4: Suspiciously aggressive on small output ──────────────────
+
+#[test]
+fn test_validate_rule4_aggressive_small_output_returns_raw() {
+    // Raw: 50 lines, filtered: 1 line → >95% reduction on <200 lines
+    let raw = "line of content here\n".repeat(50); // 50 lines, substantial tokens
+    let filtered = "x".to_string(); // essentially empty — >95% reduction
+    let result =
+        validate_filter_output(&raw, crate::filter::FilterResult::full(&raw, filtered));
+    assert_eq!(
+        result.output, raw,
+        "Rule 4: >95% reduction on <200 lines should return raw"
+    );
+}
+
+#[test]
+fn test_validate_rule4_aggressive_large_output_passes() {
+    // Raw: 200+ lines → rule 4 does not apply (raw_lines >= 200)
+    let raw = "line of content here\n".repeat(200); // exactly 200 lines
+    // filtered: just 1 token — >95% savings, but raw_lines is not < 200
+    let filtered = "x".to_string();
+    // With 200 lines, rule 4 doesn't fire; rule 2 might fire if savings > 0.20
+    // ~200*5=1000 tokens raw, 1 token filtered → 99.9% savings > 20%
+    // Rule 4: raw_lines < 200 is false (200 is not < 200), so filtered passes
+    let result = validate_filter_output(
+        &raw,
+        crate::filter::FilterResult::full(&raw, filtered.clone()),
+    );
+    assert_eq!(
+        result.output, filtered,
+        "Rule 4: ≥200 lines allows aggressive reduction"
+    );
+}
+
+#[test]
+fn test_validate_all_rules_pass_returns_filtered() {
+    // 50 lines, 40% savings, not suspiciously aggressive
+    let raw = "word word word word\n".repeat(50); // ~250 tokens
+    let filtered = "word word word word\n".repeat(30); // ~150 tokens → 40% savings
+    let result = validate_filter_output(
+        &raw,
+        crate::filter::FilterResult::full(&raw, filtered.clone()),
+    );
+    assert_eq!(
+        result.output, filtered,
+        "All rules pass: should return filtered output"
+    );
+}
+
+#[test]
+fn test_format_chunk_summary() {
+    let summary = crate::hyphae_client::ChunkSummary {
+        summary: "5 tests passed".to_string(),
+        document_id: "abc123".to_string(),
+        chunk_count: 3,
+    };
+    let result = format_chunk_summary("cargo test", &summary);
+    assert!(result.contains("[mycelium→hyphae]"));
+    assert!(result.contains("cargo test"));
+    assert!(result.contains("5 tests passed"));
+    assert!(result.contains("abc123"));
+    assert!(result.contains("hyphae_get_command_chunks"));
+}
+
+#[test]
+fn test_add_filter_header_format() {
+    let raw = "line 1\nline 2\nline 3\nline 4\nline 5\n";
+    let filtered = "line 1\nline 5\n";
+    let result = add_filter_header("git log", raw, filtered);
+
+    // Verify header is present
+    assert!(result.starts_with("[mycelium filtered"));
+    // Verify header contains line count
+    assert!(result.contains("5→2 lines"));
+    // Verify header contains token count
+    assert!(result.contains("tokens"));
+    // Verify header contains savings percentage
+    assert!(result.contains("%"));
+    // Verify header contains proxy command
+    assert!(result.contains("`mycelium proxy git log` for raw"));
+    // Verify filtered output follows header
+    assert!(result.contains("line 1\nline 5"));
+}
+
+#[test]
+fn test_add_filter_header_no_savings() {
+    let raw = "hello";
+    let filtered = "hello";
+    let result = add_filter_header("cmd", raw, filtered);
+
+    // Even with no compression, header should show 0% savings
+    assert!(result.contains("(0%)"));
+    assert!(result.contains("1→1 lines"));
+}
+
+#[test]
+fn test_get_summary_threshold_returns_default_without_config() {
+    // When no config file is present (typical test environment),
+    // the threshold should fall back to the default.
+    let threshold = get_summary_threshold();
+    assert_eq!(
+        threshold,
+        crate::summarizer::DEFAULT_SUMMARY_THRESHOLD_TOKENS
+    );
+}
+
+#[test]
+fn test_hyphae_fallback_stderr_not_polluted() {
+    // Verify that when Hyphae chunking would fail, the error message
+    // is not written to the command output. The error is now logged via
+    // tracing::warn! and will not pollute the output that reaches the user.
+    //
+    // This test demonstrates that OutputAction::Filter route works correctly
+    // when Hyphae is unavailable (which is tested by test_decide_action_large_output).
+    // The specific Hyphae error path (with mocked failure) cannot be easily tested
+    // here without full mocking infrastructure, but the fallback logic is verified
+    // by this test which shows that filter fallback produces clean output.
+    let medium = format!("{}\n", "a".repeat(24)).repeat(100); // ~600 tokens, 100 lines
+    let result = route_or_filter("test", &medium, |r| {
+        crate::filter::FilterResult::full(r, format!("{}\n", "a".repeat(24)).repeat(50))
+    });
+
+    // Verify the error message is NOT in the output
+    assert!(
+        !result.output.contains("[mycelium] Hyphae chunking failed"),
+        "Error message should not appear in command output"
+    );
+    // Verify output is clean (contains filtered content, no stderr pollution)
+    assert!(!result.output.is_empty(), "Output should not be empty");
+}
+
+#[test]
+fn test_decide_action_hard_ceiling_forces_chunk_or_summarize() {
+    // Construct output just over 512 KiB to trigger the hard ceiling.
+    let over_ceiling = "x".repeat(HARD_CHUNK_CEILING_BYTES + 1);
+    let threshold = crate::summarizer::DEFAULT_SUMMARY_THRESHOLD_TOKENS;
+
+    let action = decide_action(&over_ceiling, threshold);
+    if is_available() {
+        assert_eq!(
+            action,
+            OutputAction::Chunk,
+            "Hard ceiling: Chunk when Hyphae is available"
+        );
+    } else {
+        assert_eq!(
+            action,
+            OutputAction::Summarize,
+            "Hard ceiling: Summarize when Hyphae is unavailable"
+        );
+    }
+}
+
+#[test]
+fn test_decide_action_at_ceiling_uses_classifier() {
+    // Output exactly at the ceiling (not over) still uses the adaptive classifier.
+    let at_ceiling = "x".repeat(HARD_CHUNK_CEILING_BYTES);
+    let threshold = crate::summarizer::DEFAULT_SUMMARY_THRESHOLD_TOKENS;
+    let action = decide_action(&at_ceiling, threshold);
+    // The classifier determines the action — anything except a ceiling-forced result.
+    // At 512 KiB of repeated "x", classify() returns Structured (dense, large).
+    // With Hyphae unavailable in tests: Filter or Summarize depending on token count.
+    assert!(
+        matches!(
+            action,
+            OutputAction::Chunk | OutputAction::Summarize | OutputAction::Filter
+        ),
+        "At-ceiling output routes through classifier, got {action:?}"
+    );
+}

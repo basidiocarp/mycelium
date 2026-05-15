@@ -16,7 +16,7 @@ fn env_prefix() -> &'static Regex {
 /// If a task runner is being used as a clear direct-execution wrapper, return the underlying command.
 ///
 /// This intentionally only recognizes explicit raw-command forms rather than opaque recipe names.
-pub(super) fn split_task_runner_command(cmd: &str) -> Option<TaskRunnerCommand<'_>> {
+pub(crate) fn split_task_runner_command(cmd: &str) -> Option<TaskRunnerCommand<'_>> {
     let trimmed = cmd.trim();
     if trimmed.is_empty() {
         return None;
@@ -73,18 +73,18 @@ pub(super) fn split_task_runner_command(cmd: &str) -> Option<TaskRunnerCommand<'
     None
 }
 
-pub(super) fn unwrap_task_runner_command(cmd: &str) -> Option<&str> {
+pub(crate) fn unwrap_task_runner_command(cmd: &str) -> Option<&str> {
     split_task_runner_command(cmd).map(|command| command.inner)
 }
 
-pub(super) fn unwrap_all_task_runner_commands(mut cmd: &str) -> &str {
+pub(crate) fn unwrap_all_task_runner_commands(mut cmd: &str) -> &str {
     while let Some(wrapper) = split_task_runner_command(cmd) {
         cmd = wrapper.inner;
     }
     cmd
 }
 
-pub(super) fn strip_env_prefix_segments(cmd: &str) -> (String, String) {
+pub(crate) fn strip_env_prefix_segments(cmd: &str) -> (String, String) {
     let stripped_cow = env_prefix().replace(cmd.trim(), "");
     let env_prefix_len = cmd.trim().len() - stripped_cow.len();
     let trimmed = cmd.trim();
@@ -94,7 +94,7 @@ pub(super) fn strip_env_prefix_segments(cmd: &str) -> (String, String) {
     )
 }
 
-pub(super) fn contains_unquoted_sequence(cmd: &str, pattern: &[u8]) -> bool {
+pub(crate) fn contains_unquoted_sequence(cmd: &str, pattern: &[u8]) -> bool {
     let trimmed = cmd.trim();
     if trimmed.is_empty() || pattern.is_empty() {
         return false;
@@ -149,7 +149,7 @@ pub(super) fn contains_unquoted_sequence(cmd: &str, pattern: &[u8]) -> bool {
     false
 }
 
-pub(super) fn split_shell_words(cmd: &str) -> Vec<String> {
+pub(crate) fn split_shell_words(cmd: &str) -> Vec<String> {
     let trimmed = cmd.trim();
     if trimmed.is_empty() {
         return Vec::new();
@@ -202,7 +202,7 @@ pub(super) fn split_shell_words(cmd: &str) -> Vec<String> {
     words
 }
 
-pub(super) fn command_has_structured_gh_output(cmd: &str) -> bool {
+pub(crate) fn command_has_structured_gh_output(cmd: &str) -> bool {
     let (_, cmd_clean) = strip_env_prefix_segments(cmd);
     let effective = unwrap_all_task_runner_commands(&cmd_clean);
     let words = split_shell_words(effective);
@@ -260,7 +260,7 @@ pub(super) fn command_has_structured_gh_output(cmd: &str) -> bool {
     false
 }
 
-pub(super) fn has_unsafe_shell_syntax(cmd: &str) -> bool {
+pub(crate) fn has_unsafe_shell_syntax(cmd: &str) -> bool {
     let trimmed = cmd.trim();
     if trimmed.is_empty() {
         return false;
@@ -316,7 +316,7 @@ pub(super) fn has_unsafe_shell_syntax(cmd: &str) -> bool {
     false
 }
 
-pub(super) fn needs_shell_parser_fallback(cmd: &str) -> bool {
+pub(crate) fn needs_shell_parser_fallback(cmd: &str) -> bool {
     let trimmed = cmd.trim();
     !trimmed.is_empty()
         && trimmed.bytes().any(|b| {
@@ -340,6 +340,6 @@ pub(super) fn needs_shell_parser_fallback(cmd: &str) -> bool {
         })
 }
 
-pub(super) fn has_unsupported_shell_quoting(cmd: &str) -> bool {
+pub(crate) fn has_unsupported_shell_quoting(cmd: &str) -> bool {
     contains_unquoted_sequence(cmd, b"$'") || contains_unquoted_sequence(cmd, b"$\"")
 }

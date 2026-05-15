@@ -1,6 +1,7 @@
 //! Analyzes Claude Code and Codex session history to find commands that could benefit from Mycelium.
 pub mod provider;
 pub mod registry;
+pub mod rewriter;
 mod report;
 pub mod rules;
 
