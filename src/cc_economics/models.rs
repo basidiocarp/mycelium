@@ -92,6 +92,7 @@ impl PeriodEconomics {
         self.mycelium_savings_pct = Some(stats.savings_pct);
     }
 
+    #[allow(clippy::cast_precision_loss)]
     pub fn set_tracking_from_month(&mut self, stats: &MonthStats) {
         self.mycelium_commands = Some(stats.commands);
         self.mycelium_saved_tokens = Some(stats.saved_tokens);
@@ -104,6 +105,7 @@ impl PeriodEconomics {
         });
     }
 
+    #[allow(clippy::cast_precision_loss)]
     pub fn compute_weighted_metrics(&mut self) {
         // Weighted input CPT derivation using API price ratios
         if let (Some(cost), Some(saved)) = (self.cc_cost, self.mycelium_saved_tokens)
@@ -130,6 +132,7 @@ impl PeriodEconomics {
         }
     }
 
+    #[allow(clippy::cast_precision_loss)]
     pub fn compute_dual_metrics(&mut self) {
         if let (Some(cost), Some(saved)) = (self.cc_cost, self.mycelium_saved_tokens) {
             // Blended CPT (cost / total_tokens including cache)

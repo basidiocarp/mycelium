@@ -129,6 +129,7 @@ fn get_summary_threshold() -> usize {
 /// 2. If savings < 20%, filtering isn't worth the information loss.
 /// 3. If filter reported Degraded quality and savings < 40%, prefer raw.
 /// 4. If >95% reduction on output <200 lines, the result is suspiciously aggressive.
+#[allow(clippy::cast_precision_loss)]
 pub(crate) fn validate_filter_output(
     raw: &str,
     result: crate::filter::FilterResult,
@@ -273,6 +274,7 @@ fn format_chunk_summary(command: &str, summary: &crate::hyphae_client::ChunkSumm
 /// - Token count reduction (raw → filtered)
 /// - Compression percentage
 /// - How to get raw output via `mycelium proxy`
+#[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 fn add_filter_header(command: &str, raw: &str, filtered: &str) -> String {
     let raw_lines = raw.lines().count();
     let filtered_lines = filtered.lines().count();

@@ -21,7 +21,7 @@ pub struct Config {
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct HooksConfig {
-    /// Commands to exclude from auto-rewrite (e.g. ["curl", "playwright"]).
+    /// Commands to exclude from auto-rewrite (e.g. `["curl", "playwright"]`).
     /// Survives `mycelium init -g` re-runs since config.toml is user-owned.
     #[serde(default)]
     pub exclude_commands: Vec<String>,
@@ -227,6 +227,7 @@ pub struct CompactionTuning {
 }
 
 impl CompactionProfile {
+    #[must_use] 
     pub fn tuning(self) -> CompactionTuning {
         match self {
             Self::Debug => CompactionTuning {
@@ -323,6 +324,7 @@ impl Config {
         config_path()
     }
 
+    #[must_use] 
     pub fn compaction_tuning(&self) -> CompactionTuning {
         let mut tuning = self.filters.compaction_profile.tuning();
         if let Some(adaptive) = &self.filters.adaptive {
@@ -344,16 +346,16 @@ pub fn config_path() -> Result<PathBuf> {
     dead_code,
     reason = "Library consumers use this through the curated lib.rs re-export"
 )]
+#[must_use] 
 pub fn current_compaction_profile() -> CompactionProfile {
     Config::load()
         .map(|config| config.filters.compaction_profile)
         .unwrap_or_default()
 }
 
+#[must_use] 
 pub fn current_compaction_tuning() -> CompactionTuning {
-    Config::load()
-        .map(|config| config.compaction_tuning())
-        .unwrap_or_else(|_| CompactionProfile::default().tuning())
+    Config::load().map_or_else(|_| CompactionProfile::default().tuning(), |config| config.compaction_tuning())
 }
 
 pub fn show_config() -> Result<()> {

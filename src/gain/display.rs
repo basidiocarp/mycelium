@@ -9,6 +9,7 @@ use crate::utils::format_tokens;
 use anyhow::{Context, Result};
 
 /// Render the default summary view (KPI block + by-command table + optional graph/history/quota).
+#[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 pub(crate) fn show_summary(
     tracker: &Tracker,
     project_scope: Option<&str>,
@@ -249,6 +250,7 @@ pub(crate) fn show_status(tracker: &Tracker) -> Result<()> {
     Ok(())
 }
 
+#[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 fn print_ascii_graph(data: &[(String, usize)]) {
     if data.is_empty() {
         return;
@@ -298,6 +300,7 @@ pub(crate) fn print_monthly(tracker: &Tracker, project_scope: Option<&str>) -> R
 }
 
 /// Render per-project breakdown table (`--projects`).
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 pub(crate) fn show_projects_table(tracker: &Tracker) -> Result<()> {
     let stats = tracker
         .get_by_project()

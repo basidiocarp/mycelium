@@ -39,6 +39,11 @@ impl Default for PluginConfig {
 /// Load [plugins] section from the mycelium config file, falling back to defaults.
 /// Reads independently to avoid a circular dependency with config.rs.
 fn load_plugin_config() -> PluginConfig {
+    #[derive(Deserialize)]
+    struct PartialConfig {
+        plugins: Option<PluginConfig>,
+    }
+
     let Ok(config_path) = crate::config::config_path() else {
         return PluginConfig::default();
     };
@@ -47,15 +52,9 @@ fn load_plugin_config() -> PluginConfig {
         return PluginConfig::default();
     }
 
-    let content = match std::fs::read_to_string(&config_path) {
-        Ok(c) => c,
-        Err(_) => return PluginConfig::default(),
+    let Ok(content) = std::fs::read_to_string(&config_path) else {
+        return PluginConfig::default();
     };
-
-    #[derive(Deserialize)]
-    struct PartialConfig {
-        plugins: Option<PluginConfig>,
-    }
 
     toml::from_str::<PartialConfig>(&content)
         .ok()
@@ -68,6 +67,7 @@ fn load_plugin_config() -> PluginConfig {
 /// Looks for `<command>.sh` (preferred) then `<command>` in the plugin directory.
 /// Returns `None` if plugins are disabled, the directory doesn't exist, or no
 /// matching executable passes security validation.
+#[must_use] 
 pub fn find_plugin(command: &str) -> Option<PathBuf> {
     let config = load_plugin_config();
     find_plugin_in_dir_with_config(&config, command)
@@ -272,8 +272,7 @@ fn plugin_command(plugin_path: &Path) -> Command {
 fn is_executable(path: &Path) -> bool {
     use std::os::unix::fs::PermissionsExt;
     std::fs::metadata(path)
-        .map(|m| m.permissions().mode() & 0o111 != 0)
-        .unwrap_or(false)
+        .is_ok_and(|m| m.permissions().mode() & 0o111 != 0)
 }
 
 #[cfg(not(unix))]
@@ -283,7 +282,7 @@ fn is_executable(_path: &Path) -> bool {
 
 /// Security check: reject world-writable plugins or plugins not owned by the current user.
 ///
-/// Ownership is verified via libc::getuid(). This is more reliable than the UID env var,
+/// Ownership is verified via `libc::getuid()`. This is more reliable than the UID env var,
 /// which is not guaranteed to be set by all shells.
 #[cfg(unix)]
 fn is_secure(path: &Path) -> bool {
@@ -306,6 +305,7 @@ fn is_secure(path: &Path) -> bool {
 
 /// Get the current process's effective user ID.
 #[cfg(unix)]
+#[allow(unsafe_code)]
 fn current_uid() -> u32 {
     // SAFETY: getuid() is always safe to call and has no preconditions
     unsafe { libc::getuid() }

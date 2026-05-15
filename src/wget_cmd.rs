@@ -179,6 +179,7 @@ fn get_file_size(filename: &str) -> u64 {
     std::fs::metadata(filename).map(|m| m.len()).unwrap_or(0)
 }
 
+#[allow(clippy::cast_precision_loss)]
 fn format_size(bytes: u64) -> String {
     if bytes == 0 {
         return "?".to_string();

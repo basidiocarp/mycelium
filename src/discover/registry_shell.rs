@@ -298,7 +298,6 @@ pub(super) fn has_unsafe_shell_syntax(cmd: &str) -> bool {
             _ if in_single || in_double => {
                 i += 1;
             }
-            b'`' => return true,
             b'$' if i + 1 < len && bytes[i + 1] == b'(' => return true,
             b'|' => {
                 if i + 1 < len && bytes[i + 1] == b'|' {
@@ -307,7 +306,7 @@ pub(super) fn has_unsafe_shell_syntax(cmd: &str) -> bool {
                     return true;
                 }
             }
-            b'<' | b'>' | b'(' | b')' | b'{' | b'}' => return true,
+            b'`' | b'<' | b'>' | b'(' | b')' | b'{' | b'}' => return true,
             _ => {
                 i += 1;
             }

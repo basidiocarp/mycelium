@@ -31,6 +31,7 @@ fn differs_only_by_path(a: &str, b: &str) -> bool {
 }
 
 /// Scan a sequence of commands for error-then-fix patterns within a sliding window.
+#[must_use] 
 pub fn find_corrections(commands: &[CommandExecution]) -> Vec<CorrectionPair> {
     let mut corrections = Vec::new();
 
@@ -123,6 +124,7 @@ fn extract_diff_token(wrong: &str, right: &str) -> String {
 }
 
 /// Group correction pairs by base command and diff token, returning deduplicated rules.
+#[must_use] 
 pub fn deduplicate_corrections(pairs: Vec<CorrectionPair>) -> Vec<CorrectionRule> {
     use std::collections::HashMap;
 

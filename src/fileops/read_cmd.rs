@@ -22,6 +22,7 @@ fn reject_if_oversized(len: usize, max_bytes: usize, label: &str) -> Result<()> 
 }
 
 /// Read a file with language-aware filtering to strip comments and whitespace.
+#[allow(clippy::cast_precision_loss)]
 pub fn run(
     file: &Path,
     level: FilterLevel,
@@ -130,6 +131,7 @@ pub fn run(
 }
 
 /// Read from stdin with language-aware filtering (uses Unknown language detection).
+#[allow(clippy::cast_precision_loss)]
 pub fn run_stdin(
     level: FilterLevel,
     max_lines: Option<usize>,

@@ -323,10 +323,10 @@ pub(super) fn dispatch_command(cli: Cli) -> Result<()> {
             min_occurrences,
         } => {
             learn::run(
-                project,
+                project.as_deref(),
                 all,
                 since,
-                format,
+                &format,
                 write_rules,
                 min_confidence,
                 min_occurrences,

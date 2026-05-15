@@ -29,6 +29,7 @@ extern "C" fn handle_sigint(_: i32) {
 }
 
 #[cfg(unix)]
+#[allow(unsafe_code)]
 fn install_sigint_handler() {
     INSTALL_SIGINT_HANDLER.call_once(|| unsafe {
         // SAFETY: sigaction is async-signal-safe; sa_mask and sa_flags are fully initialized.

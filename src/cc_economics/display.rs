@@ -92,22 +92,17 @@ pub fn display_summary(tracker: &Tracker, verbose: u8, project_scope: Option<&st
         format_usd(totals.cc_cost)
     );
     println!("  Token breakdown:");
-    println!(
-        "    Input:                      {}",
-        format_tokens(totals.cc_input_tokens as usize)
+    #[allow(clippy::cast_possible_truncation)]
+    let (tok_input, tok_output, tok_cache_write, tok_cache_read) = (
+        format_tokens(totals.cc_input_tokens as usize),
+        format_tokens(totals.cc_output_tokens as usize),
+        format_tokens(totals.cc_cache_create_tokens as usize),
+        format_tokens(totals.cc_cache_read_tokens as usize),
     );
-    println!(
-        "    Output:                     {}",
-        format_tokens(totals.cc_output_tokens as usize)
-    );
-    println!(
-        "    Cache writes:               {}",
-        format_tokens(totals.cc_cache_create_tokens as usize)
-    );
-    println!(
-        "    Cache reads:                {}",
-        format_tokens(totals.cc_cache_read_tokens as usize)
-    );
+    println!("    Input:                      {}", tok_input);
+    println!("    Output:                     {}", tok_output);
+    println!("    Cache writes:               {}", tok_cache_write);
+    println!("    Cache reads:                {}", tok_cache_read);
     println!();
 
     println!(

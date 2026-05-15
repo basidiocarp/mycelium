@@ -15,6 +15,7 @@ pub enum ErrorType {
 
 impl ErrorType {
     /// Return a human-readable label for this error type.
+    #[must_use] 
     pub fn as_str(&self) -> &str {
         match self {
             ErrorType::UnknownFlag => "Unknown Flag",
@@ -104,6 +105,7 @@ fn user_rejection_re() -> &'static Regex {
 }
 
 /// Filters out user rejections - requires actual error-indicating content.
+#[must_use] 
 pub fn is_command_error(is_error: bool, output: &str) -> bool {
     if !is_error {
         return false;
@@ -124,6 +126,7 @@ pub fn is_command_error(is_error: bool, output: &str) -> bool {
 }
 
 /// Check if error is a compilation/test error (TDD cycle, not CLI correction).
+#[must_use] 
 pub fn is_tdd_cycle_error(_error_type: &ErrorType, output: &str) -> bool {
     if output.contains("error[E") || output.contains("aborting due to") {
         return true;
@@ -167,6 +170,7 @@ pub fn is_tdd_cycle_error(_error_type: &ErrorType, output: &str) -> bool {
 }
 
 /// Classify command output into a specific error type using regex patterns.
+#[must_use] 
 pub fn classify_error(output: &str) -> ErrorType {
     if unknown_flag_re().is_match(output) {
         ErrorType::UnknownFlag
@@ -189,6 +193,7 @@ fn env_prefix_re() -> &'static Regex {
 }
 
 /// Extract base command (first 1-2 tokens, stripping any KEY=VALUE env prefixes and sudo).
+#[must_use] 
 pub fn extract_base_command(cmd: &str) -> String {
     let trimmed = cmd.trim();
     let stripped = env_prefix_re().replace(trimmed, "");
@@ -202,6 +207,7 @@ pub fn extract_base_command(cmd: &str) -> String {
 
 /// Calculate similarity between two commands using Jaccard similarity.
 /// Same base command = 0.5 base score + up to 0.5 from argument similarity.
+#[must_use] 
 pub fn command_similarity(a: &str, b: &str) -> f64 {
     let base_a = extract_base_command(a);
     let base_b = extract_base_command(b);
@@ -233,7 +239,9 @@ pub fn command_similarity(a: &str, b: &str) -> f64 {
         return 0.5;
     }
 
-    0.5 + (intersection as f64 / union as f64) * 0.5
+    #[allow(clippy::cast_precision_loss)]
+    let result = 0.5 + (intersection as f64 / union as f64) * 0.5;
+    result
 }
 
 #[cfg(test)]

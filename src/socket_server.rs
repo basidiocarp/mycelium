@@ -71,6 +71,7 @@ fn write_response(writer: &mut (impl Write + ?Sized), response: &Value) {
 // mycelium_gain handler
 // ---------------------------------------------------------------------------
 
+#[allow(clippy::cast_possible_truncation)]
 fn handle_gain(params: &Value) -> Value {
     let daily = params
         .get("daily")

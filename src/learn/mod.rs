@@ -15,10 +15,10 @@ use report::{format_console_report, write_rules_file};
 
 /// Scan Claude Code and Codex sessions for error-then-correction patterns and report learned rules.
 pub fn run(
-    project: Option<String>,
+    project: Option<&str>,
     all: bool,
     since: u64,
-    format: String,
+    format: &str,
     write_rules: bool,
     min_confidence: f64,
     min_occurrences: usize,
@@ -29,15 +29,14 @@ pub fn run(
     // Discover sessions across available Claude Code and Codex histories.
     let mut sessions: Vec<(SessionSource, std::path::PathBuf)> = Vec::new();
     for source in available_sources() {
-        let project_filter = project_filter_for_source(source, project.as_deref(), all, &cwd_str);
+        let project_filter = project_filter_for_source(source, project, all, &cwd_str);
         let discovered = discover_sessions(source, project_filter.as_deref(), Some(since))?;
         sessions.extend(discovered.into_iter().map(|path| (source, path)));
     }
 
     if sessions.is_empty() {
         println!(
-            "No Claude Code or Codex sessions found in the last {} days.",
-            since
+            "No Claude Code or Codex sessions found in the last {since} days."
         );
         return Ok(());
     }
@@ -46,10 +45,7 @@ pub fn run(
     let mut all_commands: Vec<CommandExecution> = Vec::new();
 
     for (source, session_path) in &sessions {
-        let extracted = match extract_commands(*source, session_path) {
-            Ok(cmds) => cmds,
-            Err(_) => continue, // Skip malformed sessions
-        };
+        let Ok(extracted) = extract_commands(*source, session_path) else { continue }; // Skip malformed sessions
 
         for ext_cmd in extracted {
             // Only process commands with output content
@@ -90,43 +86,40 @@ pub fn run(
     rules.retain(|r| r.occurrences >= min_occurrences);
 
     // Output
-    match format.as_str() {
-        "json" => {
-            // JSON output
-            let json = serde_json::json!({
-                "sessions_scanned": sessions.len(),
-                "total_corrections": filtered.len(),
-                "rules": rules.iter().map(|r| serde_json::json!({
-                    "wrong": r.wrong_pattern,
-                    "right": r.right_pattern,
-                    "error_type": r.error_type.as_str(),
-                    "occurrences": r.occurrences,
-                    "base_command": r.base_command,
-                })).collect::<Vec<_>>(),
-            });
-            println!("{}", serde_json::to_string_pretty(&json)?);
-        }
-        _ => {
-            // Text output
-            let report = format_console_report(&rules, filtered.len(), sessions.len(), since);
-            print!("{}", report);
+    if format == "json" {
+        // JSON output
+        let json = serde_json::json!({
+            "sessions_scanned": sessions.len(),
+            "total_corrections": filtered.len(),
+            "rules": rules.iter().map(|r| serde_json::json!({
+                "wrong": r.wrong_pattern,
+                "right": r.right_pattern,
+                "error_type": r.error_type.as_str(),
+                "occurrences": r.occurrences,
+                "base_command": r.base_command,
+            })).collect::<Vec<_>>(),
+        });
+        println!("{}", serde_json::to_string_pretty(&json)?);
+    } else {
+        // Text output
+        let report = format_console_report(&rules, filtered.len(), sessions.len(), since);
+        print!("{report}");
 
-            if write_rules && !rules.is_empty() {
-                let rules_path = ".claude/rules/cli-corrections.md";
-                write_rules_file(&rules, rules_path)?;
-                println!("\nWritten to: {}", rules_path);
+        if write_rules && !rules.is_empty() {
+            let rules_path = ".claude/rules/cli-corrections.md";
+            write_rules_file(&rules, rules_path)?;
+            println!("\nWritten to: {rules_path}");
 
-                // Also write machine-readable JSON for `mycelium rewrite` hook integration.
-                let json_corrections: Vec<UserCorrection> = rules
-                    .iter()
-                    .map(|r| UserCorrection {
-                        wrong: r.wrong_pattern.clone(),
-                        right: r.right_pattern.clone(),
-                    })
-                    .collect();
-                write_corrections_json(&json_corrections, CORRECTIONS_JSON)?;
-                println!("Written to: {} (used by rewrite hook)", CORRECTIONS_JSON);
-            }
+            // Also write machine-readable JSON for `mycelium rewrite` hook integration.
+            let json_corrections: Vec<UserCorrection> = rules
+                .iter()
+                .map(|r| UserCorrection {
+                    wrong: r.wrong_pattern.clone(),
+                    right: r.right_pattern.clone(),
+                })
+                .collect();
+            write_corrections_json(&json_corrections, CORRECTIONS_JSON)?;
+            println!("Written to: {CORRECTIONS_JSON} (used by rewrite hook)");
         }
     }
 

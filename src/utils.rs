@@ -92,6 +92,7 @@ pub fn execute_command(cmd: &str, args: &[&str]) -> Result<(String, String, i32)
 /// assert_eq!(format_tokens(59_234), "59.2K");
 /// assert_eq!(format_tokens(694), "694");
 /// ```
+#[allow(clippy::cast_precision_loss)]
 pub fn format_tokens(n: usize) -> String {
     if n >= 1_000_000 {
         format!("{:.1}M", n as f64 / 1_000_000.0)

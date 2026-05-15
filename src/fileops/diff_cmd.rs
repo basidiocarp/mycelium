@@ -1,7 +1,7 @@
 //! Ultra-condensed file diff showing only changed lines without context.
 use crate::tracking;
 use crate::utils::truncate;
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use std::fs;
 use std::path::Path;
 
@@ -177,6 +177,7 @@ fn compute_diff(lines1: &[&str], lines2: &[&str]) -> DiffResult {
     }
 }
 
+#[allow(clippy::cast_precision_loss)]
 fn similarity(a: &str, b: &str) -> f64 {
     let a_chars: std::collections::HashSet<char> = a.chars().collect();
     let b_chars: std::collections::HashSet<char> = b.chars().collect();

@@ -1,4 +1,5 @@
 //! Language-aware code filtering with configurable levels (none, minimal, aggressive).
+use std::fmt::Write as _;
 use regex::Regex;
 use std::str::FromStr;
 use std::sync::OnceLock;
@@ -18,7 +19,7 @@ impl FromStr for FilterLevel {
             "none" => Ok(FilterLevel::None),
             "minimal" => Ok(FilterLevel::Minimal),
             "aggressive" => Ok(FilterLevel::Aggressive),
-            _ => Err(format!("Unknown filter level: {}", s)),
+            _ => Err(format!("Unknown filter level: {s}")),
         }
     }
 }
@@ -54,6 +55,7 @@ pub struct FilterResult {
 
 impl FilterResult {
     /// Build a result for successfully filtered output.
+    #[must_use] 
     pub fn full(input: &str, output: String) -> Self {
         let input_tokens = crate::tracking::utils::estimate_tokens(input);
         let output_tokens = crate::tracking::utils::estimate_tokens(&output);
@@ -66,6 +68,7 @@ impl FilterResult {
     }
 
     /// Build a result when the filter partially matched the input format.
+    #[must_use] 
     pub fn degraded(input: &str, output: String) -> Self {
         let input_tokens = crate::tracking::utils::estimate_tokens(input);
         let output_tokens = crate::tracking::utils::estimate_tokens(&output);
@@ -78,6 +81,7 @@ impl FilterResult {
     }
 
     /// Build a result when the filter fell back to raw passthrough.
+    #[must_use] 
     pub fn passthrough(content: &str) -> Self {
         let tokens = crate::tracking::utils::estimate_tokens(content);
         Self {
@@ -124,6 +128,7 @@ pub enum Language {
 }
 
 impl Language {
+    #[must_use] 
     pub fn from_extension(ext: &str) -> Self {
         match ext.to_lowercase().as_str() {
             "rs" => Language::Rust,
@@ -140,6 +145,7 @@ impl Language {
         }
     }
 
+    #[must_use] 
     pub fn comment_patterns(&self) -> CommentPatterns {
         match self {
             Language::Rust => CommentPatterns {
@@ -250,6 +256,7 @@ fn multiple_blank_lines() -> &'static Regex {
 }
 
 impl FilterStrategy for MinimalFilter {
+    #[allow(clippy::too_many_lines)]
     fn filter(&self, content: &str, lang: &Language) -> String {
         let patterns = lang.comment_patterns();
         let mut result = String::with_capacity(content.len());
@@ -291,17 +298,15 @@ impl FilterStrategy for MinimalFilter {
                                 || is_noise_comment(stripped)
                                 || is_noise_comment(l.trim())
                         });
-                        if !all_noise {
-                            if code_seen {
-                                for l in block_buf.drain(..) {
-                                    result.push_str(&l);
-                                    result.push('\n');
-                                }
-                            } else {
-                                preamble_buf.append(&mut block_buf);
+                        if all_noise {
+                            block_buf.clear();
+                        } else if code_seen {
+                            for l in block_buf.drain(..) {
+                                result.push_str(&l);
+                                result.push('\n');
                             }
                         } else {
-                            block_buf.clear();
+                            preamble_buf.append(&mut block_buf);
                         }
                     }
                     continue;
@@ -453,8 +458,10 @@ impl FilterStrategy for AggressiveFilter {
             let close_braces = trimmed.matches('}').count();
 
             if in_impl_body {
-                brace_depth += open_braces as i32;
-                brace_depth -= close_braces as i32;
+                #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+                { brace_depth += open_braces as i32; }
+                #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+                { brace_depth -= close_braces as i32; }
 
                 impl_body_buf.push(line.to_string());
 
@@ -468,7 +475,7 @@ impl FilterStrategy for AggressiveFilter {
                     } else {
                         let n = impl_body_buf.len();
                         impl_body_buf.clear();
-                        result.push_str(&format!("    // ... ({n} lines)\n"));
+                        writeln!(result, "    // ... ({n} lines)").ok();
                     }
                 }
                 continue;
@@ -494,6 +501,7 @@ impl FilterStrategy for AggressiveFilter {
     }
 }
 
+#[must_use] 
 pub fn get_filter(level: FilterLevel) -> Box<dyn FilterStrategy> {
     match level {
         FilterLevel::None => Box::new(NoFilter),
@@ -502,6 +510,7 @@ pub fn get_filter(level: FilterLevel) -> Box<dyn FilterStrategy> {
     }
 }
 
+#[must_use] 
 pub fn smart_truncate(content: &str, max_lines: usize, _lang: &Language) -> String {
     let lines: Vec<&str> = content.lines().collect();
     if lines.len() <= max_lines {
@@ -526,7 +535,7 @@ pub fn smart_truncate(content: &str, max_lines: usize, _lang: &Language) -> Stri
         if is_important || kept_lines < max_lines / 2 {
             // Emit omission marker when transitioning from skip to keep
             if skipped_count > 0 {
-                result.push(format!("    // ... {} lines omitted", skipped_count));
+                result.push(format!("    // ... {skipped_count} lines omitted"));
                 skipped_count = 0;
             }
             result.push((*line).to_string());

@@ -31,7 +31,8 @@ pub enum Classification {
     Ignored,
 }
 
-/// Average token counts per category for estimation when no output_len available.
+/// Average token counts per category for estimation when no `output_len` available.
+#[must_use] 
 pub fn category_avg_tokens(category: &str, subcmd: &str) -> usize {
     match category {
         "Git" => match subcmd {
@@ -46,9 +47,7 @@ pub fn category_avg_tokens(category: &str, subcmd: &str) -> usize {
         "Files" => 100,
         "Build" => 300,
         "Infra" => 120,
-        "Network" => 150,
         "GitHub" => 200,
-        "PackageManager" => 150,
         _ => 150,
     }
 }
@@ -173,6 +172,7 @@ pub(crate) fn rewrite_primary_command(cmd: &str) -> Option<String> {
     effective.split_whitespace().next().map(ToString::to_string)
 }
 
+#[must_use] 
 pub fn split_command_chain(cmd: &str) -> Vec<&str> {
     compound::split_command_chain(cmd)
 }
@@ -211,8 +211,7 @@ fn rewrite_segment_passthrough_reason(cmd: &str, excluded: &[String]) -> Option<
         let first_segment = trimmed.split('|').next().unwrap_or(trimmed).trim();
         if diagnostic_passthrough_base(first_segment) {
             return Some(format!(
-                "first pipe segment `{}` is a diagnostic passthrough command",
-                first_segment
+                "first pipe segment `{first_segment}` is a diagnostic passthrough command"
             ));
         }
     }
@@ -307,6 +306,7 @@ pub(crate) fn display_command_for_discover(cmd: &str) -> String {
 }
 
 /// Classify a single (already-split) command.
+#[must_use] 
 pub fn classify_command(cmd: &str) -> Classification {
     let trimmed = cmd.trim();
     if trimmed.is_empty() {
@@ -349,16 +349,14 @@ pub fn classify_command(cmd: &str) -> Classification {
                     .subcmd_status
                     .iter()
                     .find(|(s, _)| *s == subcmd)
-                    .map(|(_, st)| *st)
-                    .unwrap_or(super::report::MyceliumStatus::Existing);
+                    .map_or(super::report::MyceliumStatus::Existing, |(_, st)| *st);
 
                 // Check if this subcommand has custom savings
                 let savings = rule
                     .subcmd_savings
                     .iter()
                     .find(|(s, _)| *s == subcmd)
-                    .map(|(_, pct)| *pct)
-                    .unwrap_or(rule.savings_pct);
+                    .map_or(rule.savings_pct, |(_, pct)| *pct);
 
                 (savings, status)
             } else {
@@ -424,6 +422,7 @@ fn extract_base_command(cmd: &str) -> &str {
 /// Handles compound commands (`&&`, `||`, `;`) by rewriting each segment independently.
 /// Piped commands are left unchanged because downstream stages expect raw stdout,
 /// not Mycelium's summarized output.
+#[must_use] 
 pub fn rewrite_command(cmd: &str, excluded: &[String]) -> Option<String> {
     let trimmed = cmd.trim();
     if trimmed.is_empty() {
@@ -461,6 +460,7 @@ pub fn rewrite_command(cmd: &str, excluded: &[String]) -> Option<String> {
 }
 
 /// Rewrite a compound command (with `&&`, `||`, `;`, `|`) by rewriting each segment.
+#[allow(clippy::too_many_lines)]
 fn rewrite_compound(cmd: &str, excluded: &[String]) -> Option<String> {
     let bytes = cmd.as_bytes();
     let len = bytes.len();
@@ -603,12 +603,12 @@ fn rewrite_head_numeric(cmd: &str) -> Option<String> {
     if let Some(caps) = head_n().captures(cmd) {
         let n = caps.get(1)?.as_str();
         let file = caps.get(2)?.as_str();
-        return Some(format!("mycelium read {} --max-lines {}", file, n));
+        return Some(format!("mycelium read {file} --max-lines {n}"));
     }
     if let Some(caps) = head_lines().captures(cmd) {
         let n = caps.get(1)?.as_str();
         let file = caps.get(2)?.as_str();
-        return Some(format!("mycelium read {} --max-lines {}", file, n));
+        return Some(format!("mycelium read {file} --max-lines {n}"));
     }
     // head with any other flag (e.g. -c, -q): skip rewriting to avoid clap errors
     if cmd.starts_with("head -") {
@@ -713,7 +713,7 @@ fn rewrite_find_to_fd(cmd: &str) -> Option<String> {
     if let Some(candidate) = words.get(index)
         && !candidate.starts_with('-')
     {
-        path = candidate.clone();
+        path.clone_from(candidate);
         index += 1;
     }
 

@@ -25,17 +25,17 @@ impl CodexProvider {
     }
 
     /// Whether Codex history is available.
+    #[must_use] 
     pub fn history_root_exists() -> bool {
         dirs::home_dir()
-            .map(|home| home.join(".codex").join("sessions").exists())
-            .unwrap_or(false)
+            .is_some_and(|home| home.join(".codex").join("sessions").exists())
     }
 
     pub(super) fn discover_sessions_in(
         root: &Path,
         project_filter: Option<&str>,
         since_days: Option<u64>,
-    ) -> Result<Vec<PathBuf>> {
+    ) -> Vec<PathBuf> {
         let cutoff = cutoff_time(since_days);
         let mut sessions = Vec::new();
 
@@ -43,7 +43,7 @@ impl CodexProvider {
             .git_ignore(false)
             .follow_links(false)
             .build()
-            .filter_map(|e| e.ok())
+            .filter_map(std::result::Result::ok)
         {
             let file_path = walk_entry.path();
             if file_path.extension().and_then(|e| e.to_str()) != Some("jsonl") {
@@ -68,7 +68,7 @@ impl CodexProvider {
             sessions.push(file_path.to_path_buf());
         }
 
-        Ok(sessions)
+        sessions
     }
 
     fn session_cwd(path: &Path) -> Result<Option<String>> {
@@ -77,10 +77,7 @@ impl CodexProvider {
         let reader = BufReader::new(file);
 
         for line in reader.lines() {
-            let line = match line {
-                Ok(l) => l,
-                Err(_) => continue,
-            };
+            let Ok(line) = line else { continue };
 
             if !line.contains("\"session_meta\"") {
                 continue;
@@ -114,8 +111,7 @@ impl CodexProvider {
     fn parse_exec_output(raw_output: &str) -> (usize, String, bool) {
         let content = raw_output
             .split_once("\nOutput:\n")
-            .map(|(_, tail)| tail)
-            .unwrap_or(raw_output);
+            .map_or(raw_output, |(_, tail)| tail);
         let output_len = content.len();
         let output_preview: String = content.chars().take(1000).collect();
 
@@ -140,10 +136,7 @@ impl CodexProvider {
         let mut sequence_counter = 0;
 
         for line in reader.lines() {
-            let line = match line {
-                Ok(l) => l,
-                Err(_) => continue,
-            };
+            let Ok(line) = line else { continue };
 
             if !line.contains("\"function_call\"") && !line.contains("\"function_call_output\"") {
                 continue;
@@ -191,8 +184,7 @@ impl CodexProvider {
         for (tool_id, command, sequence_index) in pending_tool_uses {
             let (output_len, output_content, is_error) = tool_results
                 .get(&tool_id)
-                .map(|(len, content, err)| (Some(*len), Some(content.clone()), *err))
-                .unwrap_or((None, None, false));
+                .map_or((None, None, false), |(len, content, err)| (Some(*len), Some(content.clone()), *err));
 
             commands.push(ExtractedCommand {
                 command,
@@ -214,7 +206,7 @@ impl SessionProvider for CodexProvider {
         since_days: Option<u64>,
     ) -> Result<Vec<PathBuf>> {
         let sessions_dir = Self::sessions_dir()?;
-        Self::discover_sessions_in(&sessions_dir, project_filter, since_days)
+        Ok(Self::discover_sessions_in(&sessions_dir, project_filter, since_days))
     }
 
     fn extract_commands(&self, path: &Path) -> Result<Vec<ExtractedCommand>> {

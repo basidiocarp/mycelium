@@ -1,5 +1,6 @@
 //! Mycelium library interface — curated helpers for embedding rewrite, filtering,
 //! and tracking behavior in other tools.
+#![allow(clippy::missing_errors_doc)]
 pub mod adaptive;
 #[path = "config.rs"]
 pub mod config;

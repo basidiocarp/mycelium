@@ -82,13 +82,10 @@ fn get_git_remote_url() -> Option<String> {
         let _ = tx.send(output);
     });
 
-    match rx.recv_timeout(Duration::from_secs(2)) {
-        Ok(output_bytes) => Some(String::from_utf8_lossy(&output_bytes).trim().to_owned()),
-        Err(_) => {
-            let _ = child.kill();
-            let _ = child.wait(); // reap to avoid zombie accumulation
-            None
-        }
+    if let Ok(output_bytes) = rx.recv_timeout(Duration::from_secs(2)) { Some(String::from_utf8_lossy(&output_bytes).trim().to_owned()) } else {
+        let _ = child.kill();
+        let _ = child.wait(); // reap to avoid zombie accumulation
+        None
     }
 }
 
@@ -96,7 +93,7 @@ fn get_git_remote_url() -> Option<String> {
 ///
 /// Priority order:
 /// 1. `BASIDIOCARP_PROJECT` environment variable (explicit project name override)
-/// 2. Git remote URL: parses repo name from `origin` remote (e.g., "mycelium" from "https://github.com/user/mycelium.git")
+/// 2. Git remote URL: parses repo name from `origin` remote (e.g., "mycelium" from "<https://github.com/user/mycelium.git>")
 /// 3. Current working directory name (fallback)
 ///
 /// Returns "unknown" if all detection fails, never panics.
@@ -154,7 +151,7 @@ fn canonicalize_pathbuf(path: PathBuf) -> PathBuf {
     path.canonicalize().unwrap_or(path)
 }
 
-/// Resolve the SQLite database path.
+/// Resolve the `SQLite` database path.
 ///
 /// Priority:
 /// 1. `override_path` argument (used in tests to avoid mutating the environment)
@@ -239,14 +236,14 @@ pub(crate) fn project_filter_params(
     }
 }
 
-/// Escape special characters in a path for use in SQLite GLOB patterns.
+/// Escape special characters in a path for use in `SQLite` GLOB patterns.
 ///
 /// GLOB patterns use *, ?, [, and ] as metacharacters. This function escapes
 /// them so they are treated as literal characters.
 fn escape_glob_pattern(path: &str) -> String {
     path.chars()
         .map(|c| match c {
-            '*' | '?' | '[' | ']' => format!("[{}]", c),
+            '*' | '?' | '[' | ']' => format!("[{c}]"),
             _ => c.to_string(),
         })
         .collect()
@@ -312,11 +309,12 @@ fn span_context(command: &str) -> SpanContext {
 /// assert_eq!(estimate_tokens("abcde"), 2); // 5 chars = ceil(1.25) = 2
 /// assert_eq!(estimate_tokens("hello world"), 3); // 11 chars = ceil(2.75) = 3
 /// ```
+#[must_use] 
 pub fn estimate_tokens(text: &str) -> usize {
     spore::tokens::estimate(text)
 }
 
-/// Format OsString args for tracking display.
+/// Format `OsString` args for tracking display.
 ///
 /// Joins arguments with spaces, converting each to UTF-8 (lossy).
 ///
@@ -329,6 +327,7 @@ pub fn estimate_tokens(text: &str) -> usize {
 /// let args = vec![OsString::from("status"), OsString::from("--short")];
 /// assert_eq!(args_display(&args), "status --short");
 /// ```
+#[must_use] 
 pub fn args_display(args: &[OsString]) -> String {
     args.iter()
         .map(|a| a.to_string_lossy())

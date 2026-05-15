@@ -22,6 +22,7 @@ pub enum AdaptiveLevel {
 /// - `≤500 tokens` → `Passthrough`
 /// - `≤2000 tokens` → `Light`
 /// - `>2000 tokens` → `Structured`
+#[must_use] 
 pub fn classify_by_tokens(content: &str) -> AdaptiveLevel {
     let tokens = estimate_tokens(content);
 
@@ -38,6 +39,7 @@ pub fn classify_by_tokens(content: &str) -> AdaptiveLevel {
 ///
 /// Token estimation is the primary signal. Line count ≤5 is a hard passthrough
 /// override for very sparse outputs that fall below the token threshold anyway.
+#[must_use] 
 pub fn classify_with_tuning(content: &str, tuning: CompactionTuning) -> AdaptiveLevel {
     let tokens = estimate_tokens(content);
 
@@ -60,6 +62,7 @@ pub fn classify_with_tuning(content: &str, tuning: CompactionTuning) -> Adaptive
 }
 
 /// Classify content with a named profile's default thresholds.
+#[must_use] 
 pub fn classify_with_profile(content: &str, profile: CompactionProfile) -> AdaptiveLevel {
     classify_with_tuning(content, profile.tuning())
 }
@@ -69,6 +72,7 @@ pub fn classify_with_profile(content: &str, profile: CompactionProfile) -> Adapt
 /// - `< 50 lines AND < 2048 bytes` → `Passthrough`
 /// - `50–500 lines` → `Light`
 /// - `> 500 lines` → `Structured`
+#[must_use] 
 pub fn classify(content: &str) -> AdaptiveLevel {
     classify_with_tuning(content, current_compaction_tuning())
 }

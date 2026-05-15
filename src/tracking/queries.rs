@@ -51,10 +51,10 @@ impl Tracker {
 
         let rows = stmt.query_map(params![project_exact, project_glob], |row| {
             Ok((
-                row.get::<_, i64>(0)? as usize,
-                row.get::<_, i64>(1)? as usize,
-                row.get::<_, i64>(2)? as usize,
-                row.get::<_, i64>(3)? as u64,
+                usize::try_from(row.get::<_, i64>(0)?).unwrap_or(0),
+                usize::try_from(row.get::<_, i64>(1)?).unwrap_or(0),
+                usize::try_from(row.get::<_, i64>(2)?).unwrap_or(0),
+                u64::try_from(row.get::<_, i64>(3)?).unwrap_or(0),
             ))
         })?;
 
@@ -67,6 +67,7 @@ impl Tracker {
             total_time_ms += time_ms;
         }
 
+        #[allow(clippy::cast_precision_loss)]
         let avg_savings_pct = if total_input > 0 {
             (total_saved as f64 / total_input as f64) * 100.0
         } else {
@@ -74,7 +75,7 @@ impl Tracker {
         };
 
         let avg_time_ms = if total_commands > 0 {
-            total_time_ms / total_commands as u64
+            total_time_ms / u64::try_from(total_commands).unwrap_or(1)
         } else {
             0
         };
@@ -110,13 +111,14 @@ impl Tracker {
              LIMIT ?3",
         )?;
 
-        let rows = stmt.query_map(params![project_exact, project_glob, limit as i64], |row| {
+        let rows = stmt.query_map(params![project_exact, project_glob, i64::try_from(limit).unwrap_or(i64::MAX)], |row| {
             Ok(CommandStats {
                 command: row.get(0)?,
-                count: row.get::<_, i64>(1)? as usize,
-                input_tokens: row.get::<_, i64>(2)? as usize,
-                tokens_saved: row.get::<_, i64>(3)? as usize,
+                count: usize::try_from(row.get::<_, i64>(1)?).unwrap_or(0),
+                input_tokens: usize::try_from(row.get::<_, i64>(2)?).unwrap_or(0),
+                tokens_saved: usize::try_from(row.get::<_, i64>(3)?).unwrap_or(0),
                 savings_pct: row.get(4)?,
+                #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
                 exec_time_ms: row.get::<_, f64>(5)? as u64,
             })
         })?;
@@ -136,7 +138,7 @@ impl Tracker {
         )?;
 
         let rows = stmt.query_map(params![project_exact, project_glob], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)? as usize))
+            Ok((row.get::<_, String>(0)?, usize::try_from(row.get::<_, i64>(1)?).unwrap_or(0)))
         })?;
 
         let mut result: Vec<_> = rows.collect::<Result<Vec<_>, _>>()?;
@@ -183,15 +185,15 @@ impl Tracker {
             .query_map(params![project_exact, project_glob], |row| {
                 Ok(PassthroughCommandStat {
                     command: row.get(0)?,
-                    count: row.get::<_, i64>(1)? as usize,
-                    total_exec_time_ms: row.get::<_, i64>(2)? as u64,
+                    count: usize::try_from(row.get::<_, i64>(1)?).unwrap_or(0),
+                    total_exec_time_ms: u64::try_from(row.get::<_, i64>(2)?).unwrap_or(0),
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(PassthroughSummary {
-            total_commands: total_commands as usize,
-            total_exec_time_ms: total_exec_time_ms as u64,
+            total_commands: usize::try_from(total_commands).unwrap_or(0),
+            total_exec_time_ms: u64::try_from(total_exec_time_ms).unwrap_or(0),
             top_commands,
         })
     }
@@ -236,17 +238,18 @@ impl Tracker {
         )?;
 
         let rows = stmt.query_map(params![project_exact, project_glob], |row| {
-            let input = row.get::<_, i64>(2)? as usize;
-            let saved = row.get::<_, i64>(4)? as usize;
-            let commands = row.get::<_, i64>(1)? as usize;
-            let total_time = row.get::<_, i64>(5)? as u64;
+            let input = usize::try_from(row.get::<_, i64>(2)?).unwrap_or(0);
+            let saved = usize::try_from(row.get::<_, i64>(4)?).unwrap_or(0);
+            let commands = usize::try_from(row.get::<_, i64>(1)?).unwrap_or(0);
+            let total_time = u64::try_from(row.get::<_, i64>(5)?).unwrap_or(0);
+            #[allow(clippy::cast_precision_loss)]
             let savings_pct = if input > 0 {
                 (saved as f64 / input as f64) * 100.0
             } else {
                 0.0
             };
             let avg_time_ms = if commands > 0 {
-                total_time / commands as u64
+                total_time / u64::try_from(commands).unwrap_or(1)
             } else {
                 0
             };
@@ -255,7 +258,7 @@ impl Tracker {
                 date: row.get(0)?,
                 commands,
                 input_tokens: input,
-                output_tokens: row.get::<_, i64>(3)? as usize,
+                output_tokens: usize::try_from(row.get::<_, i64>(3)?).unwrap_or(0),
                 saved_tokens: saved,
                 savings_pct,
                 total_time_ms: total_time,
@@ -271,7 +274,7 @@ impl Tracker {
     /// Get weekly statistics grouped by week.
     ///
     /// Returns one [`WeekStats`] per week with aggregated metrics.
-    /// Weeks start on Sunday (SQLite default). Results ordered chronologically.
+    /// Weeks start on Sunday (`SQLite` default). Results ordered chronologically.
     ///
     /// # Examples
     ///
@@ -309,17 +312,18 @@ impl Tracker {
         )?;
 
         let rows = stmt.query_map(params![project_exact, project_glob], |row| {
-            let input = row.get::<_, i64>(3)? as usize;
-            let saved = row.get::<_, i64>(5)? as usize;
-            let commands = row.get::<_, i64>(2)? as usize;
-            let total_time = row.get::<_, i64>(6)? as u64;
+            let input = usize::try_from(row.get::<_, i64>(3)?).unwrap_or(0);
+            let saved = usize::try_from(row.get::<_, i64>(5)?).unwrap_or(0);
+            let commands = usize::try_from(row.get::<_, i64>(2)?).unwrap_or(0);
+            let total_time = u64::try_from(row.get::<_, i64>(6)?).unwrap_or(0);
+            #[allow(clippy::cast_precision_loss)]
             let savings_pct = if input > 0 {
                 (saved as f64 / input as f64) * 100.0
             } else {
                 0.0
             };
             let avg_time_ms = if commands > 0 {
-                total_time / commands as u64
+                total_time / u64::try_from(commands).unwrap_or(1)
             } else {
                 0
             };
@@ -329,7 +333,7 @@ impl Tracker {
                 week_end: row.get(1)?,
                 commands,
                 input_tokens: input,
-                output_tokens: row.get::<_, i64>(4)? as usize,
+                output_tokens: usize::try_from(row.get::<_, i64>(4)?).unwrap_or(0),
                 saved_tokens: saved,
                 savings_pct,
                 total_time_ms: total_time,
@@ -382,17 +386,18 @@ impl Tracker {
         )?;
 
         let rows = stmt.query_map(params![project_exact, project_glob], |row| {
-            let input = row.get::<_, i64>(2)? as usize;
-            let saved = row.get::<_, i64>(4)? as usize;
-            let commands = row.get::<_, i64>(1)? as usize;
-            let total_time = row.get::<_, i64>(5)? as u64;
+            let input = usize::try_from(row.get::<_, i64>(2)?).unwrap_or(0);
+            let saved = usize::try_from(row.get::<_, i64>(4)?).unwrap_or(0);
+            let commands = usize::try_from(row.get::<_, i64>(1)?).unwrap_or(0);
+            let total_time = u64::try_from(row.get::<_, i64>(5)?).unwrap_or(0);
+            #[allow(clippy::cast_precision_loss)]
             let savings_pct = if input > 0 {
                 (saved as f64 / input as f64) * 100.0
             } else {
                 0.0
             };
             let avg_time_ms = if commands > 0 {
-                total_time / commands as u64
+                total_time / u64::try_from(commands).unwrap_or(1)
             } else {
                 0
             };
@@ -401,7 +406,7 @@ impl Tracker {
                 date: row.get(0)?,
                 commands,
                 input_tokens: input,
-                output_tokens: row.get::<_, i64>(3)? as usize,
+                output_tokens: usize::try_from(row.get::<_, i64>(3)?).unwrap_or(0),
                 saved_tokens: saved,
                 savings_pct,
                 total_time_ms: total_time,
@@ -458,11 +463,11 @@ impl Tracker {
              LIMIT ?3",
         )?;
 
-        let rows = stmt.query_map(params![project_exact, project_glob, limit as i64], |row| {
+        let rows = stmt.query_map(params![project_exact, project_glob, i64::try_from(limit).unwrap_or(i64::MAX)], |row| {
             Ok(CommandRecord {
                 timestamp: row.get(0)?,
                 mycelium_cmd: row.get(1)?,
-                saved_tokens: row.get::<_, i64>(2)? as usize,
+                saved_tokens: usize::try_from(row.get::<_, i64>(2)?).unwrap_or(0),
                 savings_pct: row.get(3)?,
             })
         })?;
@@ -485,15 +490,15 @@ impl Tracker {
              LIMIT ?3",
         )?;
 
-        let rows = stmt.query_map(params![project_exact, project_glob, limit as i64], |row| {
+        let rows = stmt.query_map(params![project_exact, project_glob, i64::try_from(limit).unwrap_or(i64::MAX)], |row| {
             Ok(DetailedCommandRecord {
                 timestamp: row.get(0)?,
                 command: row.get(1)?,
                 project_path: row.get::<_, Option<String>>(2)?.unwrap_or_default(),
                 session_id: row.get(3)?,
-                input_tokens: row.get::<_, i64>(4)? as usize,
-                output_tokens: row.get::<_, i64>(5)? as usize,
-                saved_tokens: row.get::<_, i64>(6)? as usize,
+                input_tokens: usize::try_from(row.get::<_, i64>(4)?).unwrap_or(0),
+                output_tokens: usize::try_from(row.get::<_, i64>(5)?).unwrap_or(0),
+                saved_tokens: usize::try_from(row.get::<_, i64>(6)?).unwrap_or(0),
                 savings_pct: row.get(7)?,
             })
         })?;
@@ -539,10 +544,10 @@ impl Tracker {
 impl Tracker {
     /// Get parse tier distribution for the parse-health command.
     ///
-    /// Returns rows grouped by command and tier, excluding legacy commands (parse_tier=0).
+    /// Returns rows grouped by command and tier, excluding legacy commands (`parse_tier=0`).
     /// Used by `mycelium parse-health`.
     pub fn get_parse_health(&self, days: u32) -> Result<Vec<ParseHealthRow>> {
-        let modifier = format!("-{} days", days);
+        let modifier = format!("-{days} days");
         let mut stmt = self.conn.prepare(
             "SELECT mycelium_cmd, parse_tier, COUNT(*) as count
              FROM commands
@@ -555,8 +560,8 @@ impl Tracker {
         let rows = stmt.query_map(params![&modifier], |row| {
             Ok(ParseHealthRow {
                 command: row.get(0)?,
-                tier: row.get::<_, i64>(1)? as u8,
-                count: row.get::<_, i64>(2)? as usize,
+                tier: u8::try_from(row.get::<_, i64>(1)?).unwrap_or(0),
+                count: usize::try_from(row.get::<_, i64>(2)?).unwrap_or(0),
             })
         })?;
 

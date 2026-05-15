@@ -6,7 +6,7 @@
 //!
 //! # Architecture
 //!
-//! - Storage: SQLite database (~/.local/share/mycelium/history.db)
+//! - Storage: `SQLite` database (~/.local/share/mycelium/history.db)
 //! - Retention: 90-day automatic cleanup
 //! - Metrics: Input/output tokens, savings %, execution time
 //!
@@ -60,7 +60,7 @@ const HISTORY_DAYS: i64 = 90;
 
 /// Main tracking interface for recording and querying command history.
 ///
-/// Manages SQLite database connection and provides methods for:
+/// Manages `SQLite` database connection and provides methods for:
 /// - Recording command executions with token counts and timing
 /// - Querying aggregated statistics (summary, daily, weekly, monthly)
 /// - Retrieving recent command history
@@ -146,7 +146,7 @@ pub struct GainSummary {
     pub avg_time_ms: u64,
     /// Top 10 commands by tokens saved
     pub by_command: Vec<CommandStats>,
-    /// Last 30 days of activity: (date, saved_tokens)
+    /// Last 30 days of activity: (date, `saved_tokens`)
     pub by_day: Vec<(String, usize)>,
 }
 
@@ -191,7 +191,7 @@ pub struct DayStats {
 /// Weekly statistics for token savings and execution metrics.
 ///
 /// Serializable to JSON for export via `mycelium gain --weekly --format json`.
-/// Weeks start on Sunday (SQLite default).
+/// Weeks start on Sunday (`SQLite` default).
 #[derive(Debug, Serialize)]
 pub struct WeekStats {
     /// ISO week start date (YYYY-MM-DD)
@@ -243,7 +243,7 @@ pub struct MonthStats {
 pub struct ProjectStats {
     /// Canonical project directory path
     pub project_path: String,
-    /// Human-readable project name (from BASIDIOCARP_PROJECT, git remote, or directory name)
+    /// Human-readable project name (from `BASIDIOCARP_PROJECT`, git remote, or directory name)
     pub project_name: String,
     /// Total commands executed in this project
     pub commands: i64,
@@ -321,7 +321,7 @@ pub struct ParseFailureSummary {
 impl Tracker {
     /// Create a new tracker instance.
     ///
-    /// Opens or creates the SQLite database at the platform-specific location.
+    /// Opens or creates the `SQLite` database at the platform-specific location.
     /// Automatically creates the `commands` table if it doesn't exist and runs
     /// any necessary schema migrations.
     ///
@@ -330,7 +330,7 @@ impl Tracker {
     /// Returns error if:
     /// - Cannot determine database path
     /// - Cannot create parent directories
-    /// - Cannot open/create SQLite database
+    /// - Cannot open/create `SQLite` database
     /// - Schema creation/migration fails
     ///
     /// # Examples
@@ -391,6 +391,7 @@ impl Tracker {
         exec_time_ms: u64,
     ) -> Result<()> {
         let saved = input_tokens.saturating_sub(output_tokens);
+        #[allow(clippy::cast_precision_loss)]
         let pct = if input_tokens > 0 {
             (saved as f64 / input_tokens as f64) * 100.0
         } else {
@@ -411,11 +412,11 @@ impl Tracker {
                 project_path,
                 project_name,
                 session_id,
-                input_tokens as i64,
-                output_tokens as i64,
-                saved as i64,
+                i64::try_from(input_tokens).unwrap_or(i64::MAX),
+                i64::try_from(output_tokens).unwrap_or(i64::MAX),
+                i64::try_from(saved).unwrap_or(i64::MAX),
                 pct,
-                exec_time_ms as i64,
+                i64::try_from(exec_time_ms).unwrap_or(i64::MAX),
                 "filtered",
             ],
         )?;
@@ -426,7 +427,7 @@ impl Tracker {
 
     /// Record a command execution with parse tier and format mode tracking.
     ///
-    /// Use this for commands that use the parser framework (OutputParser trait).
+    /// Use this for commands that use the parser framework (`OutputParser` trait).
     /// Legacy commands should continue using `record()`.
     ///
     /// # Arguments
@@ -445,6 +446,7 @@ impl Tracker {
         format_mode: &str,
     ) -> Result<()> {
         let saved = input_tokens.saturating_sub(output_tokens);
+        #[allow(clippy::cast_precision_loss)]
         let pct = if input_tokens > 0 {
             (saved as f64 / input_tokens as f64) * 100.0
         } else {
@@ -465,12 +467,12 @@ impl Tracker {
                 project_path,
                 project_name,
                 session_id,
-                input_tokens as i64,
-                output_tokens as i64,
-                saved as i64,
+                i64::try_from(input_tokens).unwrap_or(i64::MAX),
+                i64::try_from(output_tokens).unwrap_or(i64::MAX),
+                i64::try_from(saved).unwrap_or(i64::MAX),
                 pct,
-                exec_time_ms as i64,
-                parse_tier as i64,
+                i64::try_from(exec_time_ms).unwrap_or(i64::MAX),
+                i64::from(parse_tier),
                 format_mode,
                 "filtered",
             ],
@@ -501,7 +503,7 @@ impl Tracker {
                 project_path,
                 project_name,
                 session_id,
-                exec_time_ms as i64,
+                i64::try_from(exec_time_ms).unwrap_or(i64::MAX),
             ],
         )?;
 
@@ -520,6 +522,7 @@ impl Tracker {
         exit_code: Option<i32>,
     ) -> Result<()> {
         let saved = input_tokens.saturating_sub(output_tokens);
+        #[allow(clippy::cast_precision_loss)]
         let pct = if input_tokens > 0 {
             (saved as f64 / input_tokens as f64) * 100.0
         } else {
@@ -540,11 +543,11 @@ impl Tracker {
                 project_path,
                 session_id,
                 project_root,
-                input_tokens as i64,
-                output_tokens as i64,
-                saved as i64,
+                i64::try_from(input_tokens).unwrap_or(i64::MAX),
+                i64::try_from(output_tokens).unwrap_or(i64::MAX),
+                i64::try_from(saved).unwrap_or(i64::MAX),
                 pct,
-                exec_time_ms as i64,
+                i64::try_from(exec_time_ms).unwrap_or(i64::MAX),
                 exit_code,
             ],
         )?;
@@ -586,7 +589,7 @@ impl Tracker {
                 Utc::now().to_rfc3339(),
                 raw_command,
                 error_message,
-                fallback_succeeded as i32,
+                i32::from(fallback_succeeded),
                 project_path,
             ],
         )?;
@@ -627,6 +630,7 @@ impl Tracker {
             |row| row.get(0),
         )?;
 
+        #[allow(clippy::cast_precision_loss)]
         let recovery_rate = if total > 0 {
             (succeeded as f64 / total as f64) * 100.0
         } else {
@@ -644,7 +648,7 @@ impl Tracker {
         )?;
         let top_commands = stmt
             .query_map(params![project_exact, project_glob], |row| {
-                Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)? as usize))
+                Ok((row.get::<_, String>(0)?, usize::try_from(row.get::<_, i64>(1)?).unwrap_or(0)))
             })?
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -668,7 +672,7 @@ impl Tracker {
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(ParseFailureSummary {
-            total: total as usize,
+            total: usize::try_from(total).unwrap_or(0),
             recovery_rate,
             top_commands,
             recent,

@@ -185,6 +185,7 @@ fn run_compact_ls(show_all: bool, flags: &[String], paths: &[String], verbose: u
 }
 
 /// Format bytes into human-readable size
+#[allow(clippy::cast_precision_loss)]
 fn human_size(bytes: u64) -> String {
     if bytes >= 1_048_576 {
         format!("{:.1}M", bytes as f64 / 1_048_576.0)

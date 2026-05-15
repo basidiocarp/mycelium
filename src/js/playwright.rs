@@ -84,6 +84,7 @@ pub struct PlaywrightParser;
 impl OutputParser for PlaywrightParser {
     type Output = TestResult;
 
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     fn parse(input: &str) -> ParseResult<TestResult> {
         // Tier 1: Try JSON parsing
         match serde_json::from_str::<PlaywrightJsonOutput>(input) {
@@ -184,6 +185,7 @@ fn pw_duration_re() -> &'static Regex {
     RE.get_or_init(|| Regex::new(r"\((\d+(?:\.\d+)?)(ms|s|m)\)").expect("valid regex"))
 }
 
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 fn extract_playwright_regex(output: &str) -> Option<TestResult> {
     let clean_output = strip_ansi(output);
 

@@ -136,6 +136,7 @@ pub fn convert_saturday_to_monday(saturday: &str) -> Option<String> {
     Some(monday.to_string())
 }
 
+#[allow(clippy::cast_precision_loss, clippy::cast_lossless)]
 pub fn compute_totals(periods: &[PeriodEconomics]) -> Totals {
     let mut totals = Totals {
         cc_cost: 0.0,

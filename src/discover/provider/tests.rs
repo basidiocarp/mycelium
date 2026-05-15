@@ -258,8 +258,7 @@ fn test_codex_discover_skips_unreadable_session_meta_and_keeps_valid_match() {
     symlink(temp_dir.path().join("missing.jsonl"), &unreadable_path).unwrap();
 
     let sessions =
-        CodexProvider::discover_sessions_in(temp_dir.path(), Some("/Users/foo/mycelium"), None)
-            .unwrap();
+        CodexProvider::discover_sessions_in(temp_dir.path(), Some("/Users/foo/mycelium"), None);
 
     assert_eq!(sessions, vec![valid_path]);
 }

@@ -77,6 +77,7 @@ pub(crate) fn run_compare(cmd_str: &str) -> Result<()> {
 ///
 /// Returns `(tokens_saved, savings_percentage)`. Savings percentage is clamped
 /// to `[0.0, 100.0]` — if mycelium output is larger than raw, savings are 0.
+#[allow(clippy::cast_precision_loss)]
 pub fn calculate_savings(raw_tokens: usize, mycelium_tokens: usize) -> (usize, f64) {
     if raw_tokens > 0 && raw_tokens >= mycelium_tokens {
         let saved = raw_tokens - mycelium_tokens;
@@ -88,6 +89,7 @@ pub fn calculate_savings(raw_tokens: usize, mycelium_tokens: usize) -> (usize, f
 }
 
 /// Build a colored savings bar for the compare view (TTY-aware).
+#[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 pub(crate) fn compare_bar(pct: f64, width: usize) -> String {
     if width == 0 {
         return String::new();

@@ -66,20 +66,6 @@ fn walk_tree(node: Node<'_>, source: &[u8], cursor: &mut TreeCursor<'_>) -> bool
 
 fn named_node_is_safe(node: Node<'_>, source: &[u8]) -> bool {
     match node.kind() {
-        "program"
-        | "list"
-        | "command"
-        | "word"
-        | "string"
-        | "raw_string"
-        | "concatenation"
-        | "variable_assignment"
-        | "simple_expansion"
-        | "expansion"
-        | "special_variable_name"
-        | "variable_name"
-        | "file_descriptor"
-        | "number" => true,
         "command_name" => command_name_is_safe(node, source),
         "pipeline"
         | "redirected_statement"
@@ -119,13 +105,12 @@ fn named_node_is_safe(node: Node<'_>, source: &[u8]) -> bool {
 
 fn command_name_is_safe(node: Node<'_>, source: &[u8]) -> bool {
     node.utf8_text(source)
-        .map(|text| {
+        .is_ok_and(|text| {
             !matches!(
                 text,
                 "function" | "declare" | "local" | "readonly" | "typeset"
             )
         })
-        .unwrap_or(false)
 }
 
 #[cfg(test)]

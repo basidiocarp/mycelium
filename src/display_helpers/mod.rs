@@ -11,6 +11,7 @@ use crate::tracking::{DayStats, MonthStats, WeekStats};
 use crate::utils::format_tokens;
 
 /// Format duration in milliseconds to human-readable string
+#[allow(clippy::cast_precision_loss)]
 pub fn format_duration(ms: u64) -> String {
     if ms < 1000 {
         format!("{}ms", ms)
@@ -63,6 +64,7 @@ pub trait PeriodStats {
 }
 
 /// Generic table printer for any period statistics
+#[allow(clippy::cast_precision_loss)]
 pub fn print_period_table<T: PeriodStats>(data: &[T]) {
     if data.is_empty() {
         println!("No {} data available.", T::label().to_lowercase());

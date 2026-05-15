@@ -1,12 +1,13 @@
 //! Data types and formatting for the discover command report output.
+use std::fmt::Write as _;
 use serde::Serialize;
 
 /// Mycelium support status for a command.
 #[derive(Debug, Serialize, Clone, Copy, PartialEq, Eq)]
 pub enum MyceliumStatus {
-    /// Dedicated handler with filtering (e.g., git status → git.rs:run_status())
+    /// Dedicated handler with filtering (e.g., git status → `git.rs:run_status()`)
     Existing,
-    /// Works via external_subcommand passthrough, no filtering (e.g., cargo fmt → Other)
+    /// Works via `external_subcommand` passthrough, no filtering (e.g., cargo fmt → Other)
     Passthrough,
     /// Mycelium doesn't handle this command at all
     NotSupported,
@@ -14,7 +15,7 @@ pub enum MyceliumStatus {
 
 impl MyceliumStatus {
     /// Return the status as a lowercase string label.
-    pub fn as_str(&self) -> &'static str {
+    pub fn as_str(self) -> &'static str {
         match self {
             MyceliumStatus::Existing => "existing",
             MyceliumStatus::Passthrough => "passthrough",
@@ -77,19 +78,21 @@ pub fn format_text(report: &DiscoverReport, limit: usize, verbose: bool) -> Stri
     out.push_str("Mycelium Discover -- Savings Opportunities\n");
     out.push_str(&"=".repeat(52));
     out.push('\n');
-    out.push_str(&format!(
-        "Scanned: {} sessions (last {} days), {} command executions\n",
+    writeln!(
+        out,
+        "Scanned: {} sessions (last {} days), {} command executions",
         report.sessions_scanned, report.since_days, report.total_commands
-    ));
-    out.push_str(&format!(
-        "Already using Mycelium: {} commands ({}%)\n",
+    ).ok();
+    writeln!(
+        out,
+        "Already using Mycelium: {} commands ({}%)",
         report.already_mycelium,
         report
             .already_mycelium
             .saturating_mul(100)
             .checked_div(report.total_commands)
             .unwrap_or(0)
-    ));
+    ).ok();
 
     if report.supported.is_empty() && report.unsupported.is_empty() {
         out.push_str("\nNo missed savings found. Mycelium usage looks good!\n");
@@ -101,29 +104,32 @@ pub fn format_text(report: &DiscoverReport, limit: usize, verbose: bool) -> Stri
         out.push_str("\nMISSED SAVINGS -- Commands Mycelium already handles\n");
         out.push_str(&"-".repeat(72));
         out.push('\n');
-        out.push_str(&format!(
-            "{:<24} {:>5}    {:<18} {:<13} {:>12}\n",
+        writeln!(
+            out,
+            "{:<24} {:>5}    {:<18} {:<13} {:>12}",
             "Command", "Count", "Mycelium Equivalent", "Status", "Est. Savings"
-        ));
+        ).ok();
 
         for entry in report.supported.iter().take(limit) {
-            out.push_str(&format!(
-                "{:<24} {:>5}    {:<18} {:<13} ~{}\n",
+            writeln!(
+                out,
+                "{:<24} {:>5}    {:<18} {:<13} ~{}",
                 truncate_str(&entry.command, 23),
                 entry.count,
                 entry.mycelium_equivalent,
                 entry.mycelium_status.as_str(),
                 format_tokens(entry.estimated_savings_tokens),
-            ));
+            ).ok();
         }
 
         out.push_str(&"-".repeat(72));
         out.push('\n');
-        out.push_str(&format!(
-            "Total: {} commands -> ~{} saveable\n",
+        writeln!(
+            out,
+            "Total: {} commands -> ~{} saveable",
             report.total_supported_count(),
             format_tokens(report.total_saveable_tokens()),
-        ));
+        ).ok();
     }
 
     // Unhandled
@@ -131,18 +137,16 @@ pub fn format_text(report: &DiscoverReport, limit: usize, verbose: bool) -> Stri
         out.push_str("\nTOP UNHANDLED COMMANDS -- open an issue?\n");
         out.push_str(&"-".repeat(52));
         out.push('\n');
-        out.push_str(&format!(
-            "{:<24} {:>5}    {}\n",
-            "Command", "Count", "Example"
-        ));
+        writeln!(out, "{:<24} {:>5}    Example", "Command", "Count").ok();
 
         for entry in report.unsupported.iter().take(limit) {
-            out.push_str(&format!(
-                "{:<24} {:>5}    {}\n",
+            writeln!(
+                out,
+                "{:<24} {:>5}    {}",
                 truncate_str(&entry.base_command, 23),
                 entry.count,
                 truncate_str(&entry.example, 40),
-            ));
+            ).ok();
         }
 
         out.push_str(&"-".repeat(52));
@@ -153,7 +157,7 @@ pub fn format_text(report: &DiscoverReport, limit: usize, verbose: bool) -> Stri
     out.push_str("\n~estimated from command output sizes\n");
 
     if verbose && report.parse_errors > 0 {
-        out.push_str(&format!("Parse errors skipped: {}\n", report.parse_errors));
+        writeln!(out, "Parse errors skipped: {}", report.parse_errors).ok();
     }
 
     out
@@ -164,13 +168,14 @@ pub fn format_json(report: &DiscoverReport) -> String {
     serde_json::to_string_pretty(report).unwrap_or_else(|_| "{}".to_string())
 }
 
+#[allow(clippy::cast_precision_loss)]
 fn format_tokens(tokens: usize) -> String {
     if tokens >= 1_000_000 {
         format!("{:.1}M tokens", tokens as f64 / 1_000_000.0)
     } else if tokens >= 1_000 {
         format!("{:.1}K tokens", tokens as f64 / 1_000.0)
     } else {
-        format!("{} tokens", tokens)
+        format!("{tokens} tokens")
     }
 }
 
@@ -184,6 +189,6 @@ fn truncate_str(s: &str, max: usize) -> String {
             .take_while(|(i, _)| *i < max.saturating_sub(2))
             .map(|(_, c)| c)
             .collect();
-        format!("{}..", truncated)
+        format!("{truncated}..")
     }
 }

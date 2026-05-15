@@ -142,6 +142,7 @@ fn duration_re() -> &'static Regex {
     RE.get_or_init(|| Regex::new(r"Duration\s+([\d.]+)(ms|s)").expect("valid regex"))
 }
 
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 fn extract_stats_regex(output: &str) -> Option<TestResult> {
     let clean_output = strip_ansi(output);
 

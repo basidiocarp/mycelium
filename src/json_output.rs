@@ -4,6 +4,7 @@ use serde_json::json;
 use crate::{rewrite_cmd::RuntimeResolution, tracking};
 
 /// Wrap filtered command output in a JSON envelope with token savings metrics.
+#[allow(clippy::cast_precision_loss)]
 pub fn wrap_output(
     command: &str,
     mycelium_command: &str,

@@ -35,6 +35,7 @@ struct UnsupportedBucket {
 }
 
 /// Analyze Claude Code and Codex session history and report missed Mycelium savings opportunities.
+#[allow(clippy::too_many_lines)]
 pub fn run(
     project: Option<&str>,
     all: bool,
@@ -119,6 +120,7 @@ pub fn run(
                             category_avg_tokens(category, subcmd)
                         };
 
+                        #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
                         let savings =
                             (output_tokens as f64 * estimated_savings_pct / 100.0) as usize;
                         bucket.total_output_tokens += savings;
@@ -127,7 +129,7 @@ pub fn run(
                         let display_name = display_command_for_discover(part);
                         let entry = bucket
                             .command_counts
-                            .entry(format!("{}:{:?}", display_name, status))
+                            .entry(format!("{display_name}:{status:?}"))
                             .or_insert(0);
                         *entry += 1;
                     }
@@ -160,8 +162,7 @@ pub fn run(
             let (command_with_status, status) = bucket
                 .command_counts
                 .into_iter()
-                .max_by_key(|(_, c)| *c)
-                .map(|(name, _)| {
+                .max_by_key(|(_, c)| *c).map_or_else(|| (String::new(), report::MyceliumStatus::Existing), |(name, _)| {
                     // Extract status from "command:Status" format
                     if let Some(colon_pos) = name.rfind(':') {
                         let cmd = name[..colon_pos].to_string();
@@ -175,8 +176,7 @@ pub fn run(
                     } else {
                         (name, report::MyceliumStatus::Existing)
                     }
-                })
-                .unwrap_or_else(|| (String::new(), report::MyceliumStatus::Existing));
+                });
 
             SupportedEntry {
                 command: command_with_status,

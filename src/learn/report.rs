@@ -1,4 +1,5 @@
 //! Formats learned correction rules as console reports or TOML rule files.
+use std::fmt::Write as _;
 use crate::learn::detector::CorrectionRule;
 use anyhow::Result;
 use std::collections::HashMap;
@@ -6,6 +7,7 @@ use std::fs;
 use std::path::Path;
 
 /// Format correction rules as a human-readable console report.
+#[must_use] 
 pub fn format_console_report(
     rules: &[CorrectionRule],
     total_corrections: usize,
@@ -14,13 +16,14 @@ pub fn format_console_report(
 ) -> String {
     let mut output = String::new();
 
-    output.push_str(&format!(
-        "Mycelium Learn -- {} rules from {} corrections ({} sessions, {} days)\n",
+    writeln!(
+        output,
+        "Mycelium Learn -- {} rules from {} corrections ({} sessions, {} days)",
         rules.len(),
         total_corrections,
         sessions,
         days
-    ));
+    ).ok();
 
     if rules.is_empty() {
         output.push_str("\nNo CLI corrections detected.\n");
@@ -36,15 +39,16 @@ pub fn format_console_report(
             "     ".to_string()
         };
 
-        output.push_str(&format!(
-            "{}{}  →  {}\n",
+        writeln!(
+            output,
+            "{}{}  →  {}",
             count_marker, rule.wrong_pattern, rule.right_pattern
-        ));
+        ).ok();
 
         // Show error snippet (first line only)
         let error_line = rule.example_error.lines().next().unwrap_or("").trim();
         if !error_line.is_empty() {
-            output.push_str(&format!("     Error: {}\n", error_line));
+            writeln!(output, "     Error: {error_line}").ok();
         }
     }
 
@@ -88,7 +92,7 @@ pub fn write_rules_file(rules: &[CorrectionRule], path: &str) -> Result<()> {
 
         // Capitalize first letter for section header
         let section_header = capitalize_first(&base_cmd);
-        content.push_str(&format!("## {}\n", section_header));
+        writeln!(content, "## {section_header}").ok();
 
         for rule in rules_for_cmd {
             let occurrence_note = if rule.occurrences > 1 {
@@ -97,10 +101,11 @@ pub fn write_rules_file(rules: &[CorrectionRule], path: &str) -> Result<()> {
                 String::new()
             };
 
-            content.push_str(&format!(
-                "- Use `{}` not `{}`{}\n",
+            writeln!(
+                content,
+                "- Use `{}` not `{}`{}",
                 rule.right_pattern, rule.wrong_pattern, occurrence_note
-            ));
+            ).ok();
         }
 
         content.push('\n');

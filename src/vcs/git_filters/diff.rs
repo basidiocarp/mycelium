@@ -14,10 +14,10 @@ fn compact_diff_with_hunk_limit(diff: &str, max_lines: usize, max_hunk_lines: us
         if line.starts_with("diff --git") {
             // New file
             if !current_file.is_empty() && (added > 0 || removed > 0) {
-                result.push(format!("  +{} -{}", added, removed));
+                result.push(format!("  +{added} -{removed}"));
             }
             current_file = line.split(" b/").nth(1).unwrap_or("unknown").to_string();
-            result.push(format!("\n📄 {}", current_file));
+            result.push(format!("\n📄 {current_file}"));
             added = 0;
             removed = 0;
             in_hunk = false;
@@ -26,24 +26,24 @@ fn compact_diff_with_hunk_limit(diff: &str, max_lines: usize, max_hunk_lines: us
             in_hunk = true;
             hunk_lines = 0;
             let hunk_info = line.split("@@").nth(1).unwrap_or("").trim();
-            result.push(format!("  @@ {} @@", hunk_info));
+            result.push(format!("  @@ {hunk_info} @@"));
         } else if in_hunk {
             if line.starts_with('+') && !line.starts_with("+++") {
                 added += 1;
                 if hunk_lines < max_hunk_lines {
-                    result.push(format!("  {}", line));
+                    result.push(format!("  {line}"));
                     hunk_lines += 1;
                 }
             } else if line.starts_with('-') && !line.starts_with("---") {
                 removed += 1;
                 if hunk_lines < max_hunk_lines {
-                    result.push(format!("  {}", line));
+                    result.push(format!("  {line}"));
                     hunk_lines += 1;
                 }
-            } else if hunk_lines < max_hunk_lines && !line.starts_with("\\") {
+            } else if hunk_lines < max_hunk_lines && !line.starts_with('\\') {
                 // Context line
                 if hunk_lines > 0 {
-                    result.push(format!("  {}", line));
+                    result.push(format!("  {line}"));
                     hunk_lines += 1;
                 }
             }
@@ -61,7 +61,7 @@ fn compact_diff_with_hunk_limit(diff: &str, max_lines: usize, max_hunk_lines: us
     }
 
     if !current_file.is_empty() && (added > 0 || removed > 0) {
-        result.push(format!("  +{} -{}", added, removed));
+        result.push(format!("  +{added} -{removed}"));
     }
 
     result.join("\n")
@@ -72,6 +72,7 @@ fn compact_diff_with_hunk_limit(diff: &str, max_lines: usize, max_hunk_lines: us
     dead_code,
     reason = "The profile-aware diff surface is part of the public library API"
 )]
+#[must_use] 
 pub fn compact_diff_with_profile(
     diff: &str,
     max_lines: usize,
@@ -84,6 +85,7 @@ pub fn compact_diff_with_profile(
 ///
 /// Shows file names, hunk headers, and changed lines up to `max_hunk_lines`
 /// per hunk, capping the total output at `max_lines` result lines.
+#[must_use] 
 pub fn compact_diff(diff: &str, max_lines: usize) -> String {
     compact_diff_with_hunk_limit(
         diff,

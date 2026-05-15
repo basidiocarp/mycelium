@@ -37,15 +37,15 @@ pub struct DeclarativeFilter {
     pub strategy: String,
     /// Maximum lines to keep (used by truncate strategy).
     pub max_lines: Option<usize>,
-    /// Original keep_pattern string, retained for inspection and test assertions.
+    /// Original `keep_pattern` string, retained for inspection and test assertions.
     #[allow(dead_code)]
     pub keep_pattern: Option<String>,
-    /// Original drop_pattern string, retained for inspection and test assertions.
+    /// Original `drop_pattern` string, retained for inspection and test assertions.
     #[allow(dead_code)]
     pub drop_pattern: Option<String>,
-    /// Pre-compiled keep_pattern regex. None if no pattern or compilation failed.
+    /// Pre-compiled `keep_pattern` regex. None if no pattern or compilation failed.
     keep_regex: Option<Regex>,
-    /// Pre-compiled drop_pattern regex. None if no pattern or compilation failed.
+    /// Pre-compiled `drop_pattern` regex. None if no pattern or compilation failed.
     drop_regex: Option<Regex>,
 }
 
@@ -105,11 +105,12 @@ impl DeclarativeFilter {
     }
 
     /// Returns true if this filter matches the given command string (substring match).
+    #[must_use] 
     pub fn matches(&self, command_str: &str) -> bool {
         command_str.contains(&self.command)
     }
 
-    /// Check if a line should be kept (keep_pattern wins over drop_pattern).
+    /// Check if a line should be kept (`keep_pattern` wins over `drop_pattern`).
     fn should_keep(&self, line: &str) -> bool {
         // Always keep lines matching keep_pattern
         if let Some(ref keep) = self.keep_regex {
@@ -128,7 +129,7 @@ impl DeclarativeFilter {
         true
     }
 
-    /// Returns true if this line explicitly matches the keep_pattern.
+    /// Returns true if this line explicitly matches the `keep_pattern`.
     /// Used by strategies that need to distinguish "kept by pattern" vs "kept by default".
     fn is_keep_match(&self, line: &str) -> bool {
         match self.keep_regex {
@@ -137,7 +138,8 @@ impl DeclarativeFilter {
         }
     }
 
-    /// Apply this filter to the given input, returning a FilterResult.
+    /// Apply this filter to the given input, returning a `FilterResult`.
+    #[must_use] 
     pub fn apply(&self, input: &str) -> FilterResult {
         let lines: Vec<&str> = input.lines().collect();
 
@@ -152,19 +154,19 @@ impl DeclarativeFilter {
             }
         };
 
-        if output != input {
-            FilterResult::full(input, output)
-        } else {
+        if output == input {
             // Output is identical to input — no transformation occurred.
             FilterResult::passthrough(input)
+        } else {
+            FilterResult::full(input, output)
         }
     }
 
-    /// Truncate strategy: keep at most max_lines lines total.
+    /// Truncate strategy: keep at most `max_lines` lines total.
     ///
-    /// Always keeps keep_pattern lines. For the remaining budget, keeps the tail
-    /// of the output. If keep_pattern lines push the total above max, that is
-    /// acceptable — keep_pattern always wins.
+    /// Always keeps `keep_pattern` lines. For the remaining budget, keeps the tail
+    /// of the output. If `keep_pattern` lines push the total above max, that is
+    /// acceptable — `keep_pattern` always wins.
     fn apply_truncate(&self, lines: &[&str]) -> String {
         let max = self.max_lines.unwrap_or(lines.len());
         let total = lines.len();
@@ -186,7 +188,7 @@ impl DeclarativeFilter {
         kept.join("\n")
     }
 
-    /// Filter strategy: drop lines matching drop_pattern, always keep keep_pattern lines.
+    /// Filter strategy: drop lines matching `drop_pattern`, always keep `keep_pattern` lines.
     fn apply_filter(&self, lines: &[&str]) -> String {
         lines
             .iter()
@@ -198,7 +200,7 @@ impl DeclarativeFilter {
 
     /// Group strategy: deduplicate consecutive identical lines.
     ///
-    /// Lines that match keep_pattern are always emitted, even if consecutive
+    /// Lines that match `keep_pattern` are always emitted, even if consecutive
     /// duplicates — "always keep" overrides the dedup logic.
     fn apply_group(&self, lines: &[&str]) -> String {
         let mut result = Vec::new();
@@ -239,6 +241,7 @@ impl DeclarativeFilter {
 /// Load all *.toml files from a directory as declarative filters.
 /// Files that fail to parse are logged to stderr and skipped (do not crash).
 /// If the directory does not exist, returns an empty vector.
+#[must_use] 
 pub fn load_declarative_filters(dir: &Path) -> Vec<DeclarativeFilter> {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return Vec::new();
@@ -251,15 +254,14 @@ pub fn load_declarative_filters(dir: &Path) -> Vec<DeclarativeFilter> {
             continue;
         }
         let Ok(contents) = std::fs::read_to_string(&path) else {
-            eprintln!("mycelium: failed to read declarative filter {:?}", path);
+            eprintln!("mycelium: failed to read declarative filter {}", path.display());
             continue;
         };
         match toml::from_str::<RawDeclarativeFilter>(&contents) {
             Ok(raw) => filters.push(DeclarativeFilter::new(raw)),
             Err(e) => {
                 eprintln!(
-                    "mycelium: failed to parse declarative filter {:?}: {e}",
-                    path
+                    "mycelium: failed to parse declarative filter {}: {e}", path.display()
                 );
             }
         }
@@ -269,7 +271,8 @@ pub fn load_declarative_filters(dir: &Path) -> Vec<DeclarativeFilter> {
 
 /// Load declarative filters from both project-local and user-global paths.
 /// Project-local takes precedence for overlapping commands.
-/// Returns (project_filters, user_filters) for visibility into which source matched.
+/// Returns (`project_filters`, `user_filters`) for visibility into which source matched.
+#[must_use] 
 pub fn load_all_declarative_filters() -> (Vec<DeclarativeFilter>, Vec<DeclarativeFilter>) {
     let mut project_filters = Vec::new();
     let mut user_filters = Vec::new();
@@ -292,6 +295,7 @@ pub fn load_all_declarative_filters() -> (Vec<DeclarativeFilter>, Vec<Declarativ
 
 /// Find the first filter that matches the command string.
 /// Project-local filters take precedence over user-global filters.
+#[must_use] 
 pub fn find_matching_filter<'a>(
     command: &str,
     project_filters: &'a [DeclarativeFilter],

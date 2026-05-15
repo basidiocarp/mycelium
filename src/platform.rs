@@ -1,30 +1,37 @@
 use std::path::PathBuf;
 use std::process::Command;
 
+#[must_use] 
 pub fn mycelium_config_dir() -> Option<PathBuf> {
     Some(spore::paths::config_dir("mycelium"))
 }
 
+#[must_use] 
 pub fn mycelium_data_dir() -> Option<PathBuf> {
     Some(spore::paths::data_dir("mycelium"))
 }
 
+#[must_use] 
 pub fn claude_dir() -> Option<PathBuf> {
     dirs::home_dir().map(|home| home.join(".claude"))
 }
 
+#[must_use] 
 pub fn claude_settings_path() -> Option<PathBuf> {
     claude_dir().map(|dir| dir.join("settings.json"))
 }
 
+#[must_use] 
 pub fn claude_hooks_dir() -> Option<PathBuf> {
     claude_dir().map(|dir| dir.join("hooks"))
 }
 
+#[must_use] 
 pub fn command_path(command: &str) -> Option<PathBuf> {
     which::which(command).ok()
 }
 
+#[must_use] 
 pub fn command_on_path(command: &str) -> bool {
     command_path(command).is_some()
 }
@@ -37,6 +44,7 @@ fn preferred_shell_program() -> String {
     }
 }
 
+#[must_use] 
 pub fn shell_command(command: &str) -> Command {
     let mut cmd = Command::new(preferred_shell_program());
     if cfg!(target_os = "windows") {
@@ -47,6 +55,7 @@ pub fn shell_command(command: &str) -> Command {
     cmd
 }
 
+#[must_use] 
 pub fn invoke_shell_command(command: &str) -> Command {
     let mut cmd = Command::new(preferred_shell_program());
     if cfg!(target_os = "windows") {
@@ -57,6 +66,7 @@ pub fn invoke_shell_command(command: &str) -> Command {
     cmd
 }
 
+#[must_use] 
 pub fn render_shell_command(args: &[String]) -> String {
     args.iter()
         .map(|arg| shell_escape_arg(arg))
@@ -102,6 +112,7 @@ fn escape_windows_arg(arg: &str) -> String {
     format!("\"{}\"", arg.replace('"', "\\\""))
 }
 
+#[must_use] 
 pub fn split_env_paths(value: &str) -> Vec<PathBuf> {
     std::env::split_paths(value).collect()
 }

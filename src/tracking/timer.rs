@@ -44,6 +44,7 @@ impl TimedExecution {
     /// // ... execute command ...
     /// timer.track("cmd", "mycelium cmd", "input", "output");
     /// ```
+    #[must_use] 
     pub fn start() -> Self {
         Self {
             start: Instant::now(),
@@ -76,7 +77,7 @@ impl TimedExecution {
     /// ```
     pub fn track(&self, original_cmd: &str, mycelium_cmd: &str, input: &str, output: &str) {
         let _tool_span = tool_span("tracking_record", &span_context(original_cmd)).entered();
-        let elapsed_ms = self.start.elapsed().as_millis() as u64;
+        let elapsed_ms = u64::try_from(self.start.elapsed().as_millis()).unwrap_or(u64::MAX);
         let input_tokens = estimate_tokens(input);
         let output_tokens = estimate_tokens(output);
 
@@ -121,7 +122,7 @@ impl TimedExecution {
     pub fn track_passthrough(&self, original_cmd: &str, mycelium_cmd: &str) {
         let _tool_span =
             tool_span("tracking_record_passthrough", &span_context(original_cmd)).entered();
-        let elapsed_ms = self.start.elapsed().as_millis() as u64;
+        let elapsed_ms = u64::try_from(self.start.elapsed().as_millis()).unwrap_or(u64::MAX);
         match Tracker::new() {
             Ok(tracker) => {
                 if let Err(e) = tracker.record_passthrough(original_cmd, mycelium_cmd, elapsed_ms) {
@@ -136,7 +137,7 @@ impl TimedExecution {
 
     /// Track the command with parse tier and format mode.
     ///
-    /// Use for commands that use the OutputParser framework.
+    /// Use for commands that use the `OutputParser` framework.
     /// Records parse degradation data for the `parse-health` diagnostic command.
     ///
     /// # Arguments
@@ -154,7 +155,7 @@ impl TimedExecution {
     ) {
         let _tool_span =
             tool_span("tracking_record_parse_info", &span_context(original_cmd)).entered();
-        let elapsed_ms = self.start.elapsed().as_millis() as u64;
+        let elapsed_ms = u64::try_from(self.start.elapsed().as_millis()).unwrap_or(u64::MAX);
         let input_tokens = estimate_tokens(input);
         let output_tokens = estimate_tokens(output);
 

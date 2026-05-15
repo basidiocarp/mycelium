@@ -1,5 +1,5 @@
 //! Git status, branch, and related output filters.
-
+use std::fmt::Write as _;
 use crate::config::{CompactionProfile, current_compaction_tuning};
 
 fn format_status_output_with_limit(porcelain: &str, max_status_files: usize) -> String {
@@ -16,7 +16,7 @@ fn format_status_output_with_limit(porcelain: &str, max_status_files: usize) -> 
         && branch_line.starts_with("##")
     {
         let branch = branch_line.trim_start_matches("## ");
-        output.push_str(&format!("Branch: {}\n", branch));
+        writeln!(output, "Branch: {branch}").ok();
     }
 
     // Count changes by type
@@ -64,39 +64,36 @@ fn format_status_output_with_limit(porcelain: &str, max_status_files: usize) -> 
     let mut remaining_budget = max_status_files;
 
     if staged > 0 {
-        output.push_str(&format!("Staged: {} files\n", staged));
+        writeln!(output, "Staged: {staged} files").ok();
         for f in staged_files.iter().take(remaining_budget) {
-            output.push_str(&format!("   {}\n", f));
+            writeln!(output, "   {f}").ok();
         }
         remaining_budget =
             remaining_budget.saturating_sub(staged_files.len().min(remaining_budget));
     }
 
     if modified > 0 {
-        output.push_str(&format!("Modified: {} files\n", modified));
+        writeln!(output, "Modified: {modified} files").ok();
         for f in modified_files.iter().take(remaining_budget) {
-            output.push_str(&format!("   {}\n", f));
+            writeln!(output, "   {f}").ok();
         }
         remaining_budget =
             remaining_budget.saturating_sub(modified_files.len().min(remaining_budget));
     }
 
     if untracked > 0 {
-        output.push_str(&format!("Untracked: {} files\n", untracked));
+        writeln!(output, "Untracked: {untracked} files").ok();
         for f in untracked_files.iter().take(remaining_budget) {
-            output.push_str(&format!("   {}\n", f));
+            writeln!(output, "   {f}").ok();
         }
     }
 
     if total > max_status_files {
-        output.push_str(&format!(
-            "   ... +{} more files\n",
-            total - max_status_files
-        ));
+        writeln!(output, "   ... +{} more files", total - max_status_files).ok();
     }
 
     if conflicts > 0 {
-        output.push_str(&format!("Conflicts: {} files\n", conflicts));
+        writeln!(output, "Conflicts: {conflicts} files").ok();
     }
 
     output.trim_end().to_string()
@@ -107,16 +104,19 @@ fn format_status_output_with_limit(porcelain: &str, max_status_files: usize) -> 
     dead_code,
     reason = "The profile-aware status surface is part of the public library API"
 )]
+#[must_use] 
 pub fn format_status_output_with_profile(porcelain: &str, profile: CompactionProfile) -> String {
     format_status_output_with_limit(porcelain, profile.tuning().status_max_files)
 }
 
 /// Format porcelain output into compact Mycelium status display.
+#[must_use] 
 pub fn format_status_output(porcelain: &str) -> String {
     format_status_output_with_limit(porcelain, current_compaction_tuning().status_max_files)
 }
 
 /// Minimal filtering for git status with user-provided args
+#[must_use] 
 pub fn filter_status_with_args(output: &str) -> String {
     let mut result = Vec::new();
 
@@ -161,6 +161,7 @@ pub fn filter_status_with_args(output: &str) -> String {
     dead_code,
     reason = "Kept in library API as fallback for callers that receive pre-formatted branch output"
 )]
+#[must_use] 
 pub fn filter_branch_output(output: &str) -> String {
     let mut current = String::new();
     let mut local: Vec<String> = Vec::new();
@@ -187,11 +188,11 @@ pub fn filter_branch_output(output: &str) -> String {
     }
 
     let mut result = Vec::new();
-    result.push(format!("* {}", current));
+    result.push(format!("* {current}"));
 
     if !local.is_empty() {
         for b in &local {
-            result.push(format!("  {}", b));
+            result.push(format!("  {b}"));
         }
     }
 
@@ -204,7 +205,7 @@ pub fn filter_branch_output(output: &str) -> String {
         if !remote_only.is_empty() {
             result.push(format!("  remote-only ({}):", remote_only.len()));
             for b in remote_only.iter().take(10) {
-                result.push(format!("    {}", b));
+                result.push(format!("    {b}"));
             }
             if remote_only.len() > 10 {
                 result.push(format!("    ... +{} more", remote_only.len() - 10));
@@ -220,12 +221,13 @@ pub fn filter_branch_output(output: &str) -> String {
 /// Takes pre-separated current, local, and remote branch names instead of parsing
 /// human-readable `git branch -a` output. This avoids regex fragility when git's
 /// display format changes.
+#[must_use] 
 pub fn format_branch_structured(current: &str, local: &[String], remote: &[String]) -> String {
     let mut result = Vec::new();
-    result.push(format!("* {}", current));
+    result.push(format!("* {current}"));
 
     for b in local {
-        result.push(format!("  {}", b));
+        result.push(format!("  {b}"));
     }
 
     if !remote.is_empty() {
@@ -237,7 +239,7 @@ pub fn format_branch_structured(current: &str, local: &[String], remote: &[Strin
         if !remote_only.is_empty() {
             result.push(format!("  remote-only ({}):", remote_only.len()));
             for b in remote_only.iter().take(10) {
-                result.push(format!("    {}", b));
+                result.push(format!("    {b}"));
             }
             if remote_only.len() > 10 {
                 result.push(format!("    ... +{} more", remote_only.len() - 10));
@@ -262,6 +264,7 @@ pub fn format_branch_structured(current: &str, local: &[String], remote: &[Strin
 /// ```
 ///
 /// This avoids parsing the space-aligned human-readable format.
+#[must_use] 
 pub fn format_worktree_porcelain(porcelain: &str) -> String {
     let home = dirs::home_dir()
         .map(|h| h.to_string_lossy().to_string())
@@ -294,9 +297,9 @@ pub fn format_worktree_porcelain(porcelain: &str) -> String {
                     let short = current_branch
                         .strip_prefix("refs/heads/")
                         .unwrap_or(&current_branch);
-                    format!("[{}]", short)
+                    format!("[{short}]")
                 };
-                result.push(format!("{} {} {}", path, short_head, branch_display));
+                result.push(format!("{path} {short_head} {branch_display}"));
             }
             current_path.clear();
             current_head.clear();
@@ -335,9 +338,9 @@ pub fn format_worktree_porcelain(porcelain: &str) -> String {
             let short = current_branch
                 .strip_prefix("refs/heads/")
                 .unwrap_or(&current_branch);
-            format!("[{}]", short)
+            format!("[{short}]")
         };
-        result.push(format!("{} {} {}", path, short_head, branch_display));
+        result.push(format!("{path} {short_head} {branch_display}"));
     }
 
     result.join("\n")

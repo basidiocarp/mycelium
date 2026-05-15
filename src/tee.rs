@@ -54,7 +54,7 @@ fn cleanup_old_files(dir: &std::path::Path, max_files: usize) {
         .ok()
         .into_iter()
         .flatten()
-        .filter_map(|e| e.ok())
+        .filter_map(std::result::Result::ok)
         .filter(|e| e.path().extension().is_some_and(|ext| ext == "log"))
         .collect();
 
@@ -63,7 +63,7 @@ fn cleanup_old_files(dir: &std::path::Path, max_files: usize) {
     }
 
     // Sort by filename (which starts with epoch timestamp = chronological)
-    entries.sort_by_key(|e| e.file_name());
+    entries.sort_by_key(std::fs::DirEntry::file_name);
 
     let to_remove = entries.len() - max_files;
     for entry in entries.iter().take(to_remove) {
@@ -72,7 +72,7 @@ fn cleanup_old_files(dir: &std::path::Path, max_files: usize) {
 }
 
 /// Check if tee should be skipped based on config, mode, exit code, and size.
-/// Returns None if you should skip, Some(tee_dir) if you should proceed.
+/// Returns None if you should skip, `Some(tee_dir)` if you should proceed.
 fn should_tee(
     config: &TeeConfig,
     raw_len: usize,
@@ -116,7 +116,7 @@ fn write_tee_file(
         .duration_since(std::time::UNIX_EPOCH)
         .ok()?
         .as_secs();
-    let filename = format!("{}_{}.log", epoch, slug);
+    let filename = format!("{epoch}_{slug}.log");
     let filepath = tee_dir.join(filename);
 
     // Truncate at max_file_size
@@ -138,7 +138,7 @@ fn write_tee_file(
     Some(filepath)
 }
 
-/// Parse a tee mode string into a TeeMode.
+/// Parse a tee mode string into a `TeeMode`.
 /// Returns Some(mode) if the string is a valid mode, None otherwise.
 /// Invalid values are silently ignored (fail-open).
 fn parse_tee_mode_str(s: &str) -> Option<TeeMode> {
@@ -150,7 +150,7 @@ fn parse_tee_mode_str(s: &str) -> Option<TeeMode> {
     }
 }
 
-/// Parse MYCELIUM_TEE_MODE env var into a TeeMode.
+/// Parse `MYCELIUM_TEE_MODE` env var into a `TeeMode`.
 /// Returns Some(mode) if the env var is set and valid, None otherwise.
 /// Invalid values are silently ignored (fail-open).
 fn parse_tee_mode_env() -> Option<TeeMode> {
@@ -161,6 +161,7 @@ fn parse_tee_mode_env() -> Option<TeeMode> {
 
 /// Write raw output to tee file if conditions are met.
 /// Returns file path on success, None if skipped/failed.
+#[must_use] 
 pub fn tee_raw(raw: &str, command_slug: &str, exit_code: i32) -> Option<PathBuf> {
     // Check MYCELIUM_TEE=0 env override (disable)
     if std::env::var("MYCELIUM_TEE").ok().as_deref() == Some("0") {
@@ -199,17 +200,18 @@ fn format_hint(path: &std::path::Path) -> String {
         path.display().to_string()
     };
 
-    format!("[full output: {}]", display)
+    format!("[full output: {display}]")
 }
 
 /// Convenience: tee + format hint in one call.
 /// Returns hint string if file was written, None if skipped.
+#[must_use] 
 pub fn tee_and_hint(raw: &str, command_slug: &str, exit_code: i32) -> Option<String> {
     let path = tee_raw(raw, command_slug, exit_code)?;
     Some(format_hint(&path))
 }
 
-/// TeeMode controls when tee writes files.
+/// `TeeMode` controls when tee writes files.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum TeeMode {

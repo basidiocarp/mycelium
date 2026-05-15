@@ -9,6 +9,7 @@ use rusqlite::Connection;
 ///
 /// Safe to call on an existing database; all operations are idempotent or
 /// use `ALTER TABLE … ADD COLUMN` (which no-ops when the column already exists).
+#[allow(clippy::too_many_lines)]
 pub(super) fn init_schema(conn: &Connection) -> Result<()> {
     conn.execute(
         "CREATE TABLE IF NOT EXISTS commands (

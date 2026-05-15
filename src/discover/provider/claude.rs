@@ -26,15 +26,16 @@ impl ClaudeProvider {
 
     /// Encode a filesystem path to Claude Code's directory name format.
     /// `/Users/foo/bar` → `-Users-foo-bar`
+    #[must_use] 
     pub fn encode_project_path(path: &str) -> String {
         path.replace('/', "-")
     }
 
     /// Whether Claude Code history is available.
+    #[must_use] 
     pub fn history_root_exists() -> bool {
         dirs::home_dir()
-            .map(|home| home.join(".claude").join("projects").exists())
-            .unwrap_or(false)
+            .is_some_and(|home| home.join(".claude").join("projects").exists())
     }
 }
 
@@ -68,7 +69,7 @@ impl SessionProvider for ClaudeProvider {
                 .git_ignore(false)
                 .follow_links(false)
                 .build()
-                .filter_map(|e| e.ok())
+                .filter_map(std::result::Result::ok)
             {
                 let file_path = walk_entry.path();
                 if file_path.extension().and_then(|e| e.to_str()) != Some("jsonl") {
@@ -101,10 +102,7 @@ impl SessionProvider for ClaudeProvider {
         let mut sequence_counter = 0;
 
         for line in reader.lines() {
-            let line = match line {
-                Ok(l) => l,
-                Err(_) => continue,
-            };
+            let Ok(line) = line else { continue };
 
             if !line.contains("\"Bash\"") && !line.contains("\"tool_result\"") {
                 continue;
@@ -153,7 +151,7 @@ impl SessionProvider for ClaudeProvider {
                                 let output_len = content.len();
                                 let is_error = block
                                     .get("is_error")
-                                    .and_then(|e| e.as_bool())
+                                    .and_then(serde_json::Value::as_bool)
                                     .unwrap_or(false);
                                 let content_preview: String = content.chars().take(1000).collect();
 
@@ -172,8 +170,7 @@ impl SessionProvider for ClaudeProvider {
         for (tool_id, command, sequence_index) in pending_tool_uses {
             let (output_len, output_content, is_error) = tool_results
                 .get(&tool_id)
-                .map(|(len, content, err)| (Some(*len), Some(content.clone()), *err))
-                .unwrap_or((None, None, false));
+                .map_or((None, None, false), |(len, content, err)| (Some(*len), Some(content.clone()), *err));
 
             commands.push(ExtractedCommand {
                 command,

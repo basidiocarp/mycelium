@@ -13,11 +13,13 @@ pub use status::{
 
 /// Detect `rev:path` style arguments (blob show) while ignoring flags like
 /// `--pretty=format:...`.
+#[must_use] 
 pub fn is_blob_show_arg(arg: &str) -> bool {
     !arg.starts_with('-') && arg.contains(':')
 }
 
 /// Filter git log output: truncate long messages, cap lines
+#[must_use] 
 pub fn filter_log_output(output: &str, limit: usize) -> String {
     let lines: Vec<&str> = output.lines().collect();
     let capped: Vec<String> = lines
@@ -26,7 +28,7 @@ pub fn filter_log_output(output: &str, limit: usize) -> String {
         .map(|line| {
             if line.len() > 120 {
                 let truncated: String = line.chars().take(117).collect();
-                format!("{}...", truncated)
+                format!("{truncated}...")
             } else {
                 line.to_string()
             }
@@ -44,6 +46,7 @@ pub fn filter_log_output(output: &str, limit: usize) -> String {
     dead_code,
     reason = "Kept in library API as fallback for callers that receive pre-formatted stash output"
 )]
+#[must_use] 
 pub fn filter_stash_list(output: &str) -> String {
     // Format: "stash@{0}: WIP on main: abc1234 commit message"
     let mut result = Vec::new();
@@ -57,7 +60,7 @@ pub fn filter_stash_list(output: &str) -> String {
             } else {
                 rest.trim()
             };
-            result.push(format!("{}: {}", index, message));
+            result.push(format!("{index}: {message}"));
         } else {
             result.push(line.to_string());
         }
@@ -73,6 +76,7 @@ pub fn filter_stash_list(output: &str) -> String {
     dead_code,
     reason = "Kept in library API as fallback for callers that receive pre-formatted worktree output"
 )]
+#[must_use] 
 pub fn filter_worktree_list(output: &str) -> String {
     let home = dirs::home_dir()
         .map(|h| h.to_string_lossy().to_string())
@@ -92,7 +96,7 @@ pub fn filter_worktree_list(output: &str) -> String {
             }
             let hash = parts[1];
             let branch = parts[2..].join(" ");
-            result.push(format!("{} {} {}", path, hash, branch));
+            result.push(format!("{path} {hash} {branch}"));
         } else {
             result.push(line.to_string());
         }

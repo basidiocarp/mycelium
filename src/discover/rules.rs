@@ -4,7 +4,7 @@ use super::report::MyceliumStatus;
 /// A rule mapping a shell command pattern to its Mycelium equivalent.
 pub struct MyceliumRule {
     pub mycelium_cmd: &'static str,
-    /// Original command prefixes to replace with mycelium_cmd (longest first for correct matching).
+    /// Original command prefixes to replace with `mycelium_cmd` (longest first for correct matching).
     pub rewrite_prefixes: &'static [&'static str],
     pub category: &'static str,
     pub savings_pct: f64,

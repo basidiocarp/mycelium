@@ -192,6 +192,7 @@ pub(crate) fn load_summary(since_days: u64) -> Result<Option<AuditSummary>> {
     Ok(summarize_entries(&entries, since_days, path))
 }
 
+#[allow(clippy::cast_precision_loss)]
 fn percentage(numerator: usize, denominator: usize) -> f64 {
     if denominator == 0 {
         0.0
