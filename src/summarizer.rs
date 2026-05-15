@@ -26,7 +26,12 @@ pub struct OutputSummary {
 /// - Line count and token count of original output
 /// - Key stats (error count, warning count if detectable)
 /// - Instruction for retrieving full output via `mycelium proxy`
-pub fn summarize(raw: &str, command: &str, threshold_tokens: usize) -> Option<OutputSummary> {
+pub fn summarize(
+    raw: &str,
+    command: &str,
+    threshold_tokens: usize,
+    exit_code: i32,
+) -> Option<OutputSummary> {
     let input_tokens = estimate_tokens(raw);
 
     // Below threshold — no summarization needed
@@ -34,7 +39,7 @@ pub fn summarize(raw: &str, command: &str, threshold_tokens: usize) -> Option<Ou
         return None;
     }
 
-    let summary_text = build_summary(raw, command, input_tokens);
+    let summary_text = build_summary(raw, command, input_tokens, exit_code);
     let output_tokens = estimate_tokens(&summary_text);
 
     Some(OutputSummary {
@@ -44,7 +49,7 @@ pub fn summarize(raw: &str, command: &str, threshold_tokens: usize) -> Option<Ou
     })
 }
 
-fn build_summary(raw: &str, command: &str, input_tokens: usize) -> String {
+fn build_summary(raw: &str, command: &str, input_tokens: usize, exit_code: i32) -> String {
     let lines: Vec<&str> = raw.lines().collect();
     let line_count = lines.len();
 
@@ -60,14 +65,16 @@ fn build_summary(raw: &str, command: &str, input_tokens: usize) -> String {
         command, line_count, input_tokens
     ));
 
-    // Key stats
+    // Key stats — use exit code as ground truth; error keyword scan is supplemental.
     if error_count > 0 {
         result.push(format!("  FAIL: {} errors", error_count));
+    } else if exit_code != 0 {
+        result.push(format!("  FAIL: exit code {exit_code}"));
     }
     if warning_count > 0 {
         result.push(format!("  [!] {} warnings", warning_count));
     }
-    if error_count == 0 && warning_count == 0 {
+    if exit_code == 0 && error_count == 0 && warning_count == 0 {
         result.push("  ok: Completed without errors".to_string());
     }
 
@@ -88,9 +95,17 @@ fn is_error_line(line: &str) -> bool {
 
 /// Check if a line looks like a warning. Lines that also match error patterns
 /// are classified as errors instead (error takes priority over warning).
+///
+/// Uses whole-word matching for the short form "warn" to avoid false positives
+/// on words like "forward", "awkward", or "downward".
 fn is_warning_line(line: &str) -> bool {
     let lower = line.to_lowercase();
-    (lower.contains("warning") || lower.contains("warn")) && !lower.contains("error")
+    // "warning" as a substring is unambiguous; "warn" requires a word boundary.
+    let has_warn = lower.contains("warning")
+        || lower
+            .split(|c: char| !c.is_alphabetic())
+            .any(|w| w == "warn");
+    has_warn && !lower.contains("error")
 }
 
 #[cfg(test)]
@@ -100,14 +115,14 @@ mod tests {
     #[test]
     fn test_summarize_returns_none_below_threshold() {
         let small_output = "hello world";
-        let result = summarize(small_output, "echo", 4000);
+        let result = summarize(small_output, "echo", 4000, 0);
         assert!(result.is_none());
     }
 
     #[test]
     fn test_summarize_returns_some_above_threshold() {
         let large_output = "line\n".repeat(5000);
-        let result = summarize(&large_output, "test", 4000);
+        let result = summarize(&large_output, "test", 4000, 0);
         assert!(result.is_some());
 
         let summary = result.unwrap();
@@ -119,7 +134,7 @@ mod tests {
     #[test]
     fn test_summary_contains_retrieval_notice() {
         let large_output = "line\n".repeat(5000);
-        let result = summarize(&large_output, "mycelium ls", 4000);
+        let result = summarize(&large_output, "mycelium ls", 4000, 0);
         assert!(result.is_some());
 
         let summary = result.unwrap();
@@ -131,7 +146,7 @@ mod tests {
     fn test_summary_detects_errors() {
         let mut large_output = "line\n".repeat(5000);
         large_output.push_str("error: something failed\n");
-        let result = summarize(&large_output, "build", 4000);
+        let result = summarize(&large_output, "build", 4000, 1);
         assert!(result.is_some());
 
         let summary = result.unwrap();
@@ -139,10 +154,26 @@ mod tests {
     }
 
     #[test]
+    fn test_summary_nonzero_exit_without_error_keywords() {
+        // A failed command with no error lines in output should still show FAIL.
+        let large_output = "line\n".repeat(5000);
+        let result = summarize(&large_output, "build", 4000, 2);
+        assert!(result.is_some());
+
+        let summary = result.unwrap();
+        assert!(
+            summary.summary.contains("FAIL"),
+            "expected FAIL for exit_code=2, got: {}",
+            summary.summary
+        );
+        assert!(!summary.summary.contains("ok:"));
+    }
+
+    #[test]
     fn test_summary_detects_warnings() {
         let mut large_output = "line\n".repeat(5000);
         large_output.push_str("warning: be careful\n");
-        let result = summarize(&large_output, "build", 4000);
+        let result = summarize(&large_output, "build", 4000, 0);
         assert!(result.is_some());
 
         let summary = result.unwrap();
@@ -153,7 +184,7 @@ mod tests {
     #[test]
     fn test_summary_token_counts() {
         let large_output = "line\n".repeat(5000);
-        let result = summarize(&large_output, "test", 4000);
+        let result = summarize(&large_output, "test", 4000, 0);
         assert!(result.is_some());
 
         let summary = result.unwrap();
@@ -179,6 +210,13 @@ mod tests {
         assert!(is_warning_line("warn: short form"));
         assert!(!is_warning_line("error: not a warning"));
         assert!(!is_warning_line("normal output"));
+    }
+
+    #[test]
+    fn test_is_warning_line_no_false_positives() {
+        assert!(!is_warning_line("forward pass complete"));
+        assert!(!is_warning_line("downward trend"));
+        assert!(!is_warning_line("awkward silence"));
     }
 
     #[test]

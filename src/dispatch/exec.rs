@@ -102,33 +102,67 @@ fn bounded_output(
     timeout: std::time::Duration,
     max_bytes: usize,
 ) -> std::io::Result<std::process::Output> {
-    use std::io::Read;
+    use std::io::{Read, Write};
     use std::process::Stdio;
     use std::sync::mpsc;
 
     cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
     let mut child = cmd.spawn()?;
-    let mut stdout = child.stdout.take().unwrap();
-    let mut stderr = child.stderr.take().unwrap();
+    let stdout = child.stdout.take().unwrap();
+    let stderr = child.stderr.take().unwrap();
 
-    let (tx, rx) = mpsc::channel();
+    // Two threads prevent the classic deadlock: a single thread reading stdout then
+    // stderr blocks when the child fills its stderr pipe buffer (~64 KiB) while
+    // mycelium is still draining stdout. Stderr is also streamed live so the user
+    // gets terminal feedback during long-running builds.
+    let (stdout_tx, stdout_rx) = mpsc::channel::<Vec<u8>>();
+    let (stderr_tx, stderr_rx) = mpsc::channel::<Vec<u8>>();
+
     std::thread::spawn(move || {
-        let mut out = Vec::new();
-        let mut err = Vec::new();
-        let _ = stdout.read_to_end(&mut out);
-        let _ = stderr.read_to_end(&mut err);
-        out.truncate(max_bytes);
-        err.truncate(max_bytes);
-        let _ = tx.send((out, err));
+        let mut reader = stdout;
+        let mut captured = Vec::new();
+        let mut buf = [0u8; 8192];
+        loop {
+            match reader.read(&mut buf) {
+                Ok(0) | Err(_) => break,
+                Ok(n) => {
+                    if captured.len() < max_bytes {
+                        captured.extend_from_slice(&buf[..n]);
+                    }
+                }
+            }
+        }
+        let _ = stdout_tx.send(captured);
     });
 
-    match rx.recv_timeout(timeout) {
-        Ok((out, err)) => {
+    std::thread::spawn(move || {
+        let mut reader = stderr;
+        let mut captured = Vec::new();
+        let mut buf = [0u8; 8192];
+        loop {
+            match reader.read(&mut buf) {
+                Ok(0) | Err(_) => break,
+                Ok(n) => {
+                    if captured.len() < max_bytes {
+                        captured.extend_from_slice(&buf[..n]);
+                    }
+                    let _ = std::io::stderr().write_all(&buf[..n]);
+                }
+            }
+        }
+        let _ = stderr_tx.send(captured);
+    });
+
+    // stdout EOF signals that the child is done; use it as the timeout checkpoint.
+    match stdout_rx.recv_timeout(timeout) {
+        Ok(stdout_bytes) => {
+            // stderr drains concurrently and finishes shortly after stdout closes.
+            let stderr_bytes = stderr_rx.recv().unwrap_or_default();
             let status = child.wait()?;
             Ok(std::process::Output {
                 status,
-                stdout: out,
-                stderr: err,
+                stdout: stdout_bytes,
+                stderr: stderr_bytes,
             })
         }
         Err(_) => {

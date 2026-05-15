@@ -204,11 +204,14 @@ impl FilteredCommand {
         let slug = self.tee_slug.unwrap_or_else(|| self.tool_name.clone());
 
         // Check if filtered output exceeds the summary threshold
-        let output_to_print = if let Some(summary) =
-            summarizer::summarize(&filtered, &self.tool_name, DEFAULT_SUMMARY_THRESHOLD_TOKENS)
-        {
-            // Large output: use summary instead
-            format!("{}\nexit code: {}", summary.summary, exit_code)
+        let output_to_print = if let Some(summary) = summarizer::summarize(
+            &filtered,
+            &self.tool_name,
+            DEFAULT_SUMMARY_THRESHOLD_TOKENS,
+            exit_code,
+        ) {
+            // Large output: summary embeds exit code status when non-zero
+            summary.summary
         } else {
             // Small output: pass through unchanged
             filtered.clone()
@@ -255,35 +258,42 @@ impl FilteredCommand {
 
         let stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);
-        let combined = format!("{}{}", stdout, stderr);
 
-        let raw = if self.do_strip_ansi {
-            utils::strip_ansi(&combined)
+        // Mirror the run() split: filter sees stdout only, storage gets combined.
+        let raw_for_filter = if self.do_strip_ansi {
+            utils::strip_ansi(&stdout)
         } else {
-            combined
+            stdout.to_string()
         };
 
-        let filtered = (self.filter_fn)(&raw);
+        let raw_for_storage = if self.do_strip_ansi {
+            utils::strip_ansi(&format!("{}{}", stdout, stderr))
+        } else {
+            format!("{}{}", stdout, stderr)
+        };
+
+        let filtered = (self.filter_fn)(&raw_for_filter);
+        let exit_code = utils::exit_code(&output.status);
 
         let raw_label = format!("{} {}", self.tool_name, self.args.join(" "));
         let mycelium_label = self
             .mycelium_label
             .unwrap_or_else(|| format!("mycelium {} {}", self.tool_name, self.args.join(" ")));
 
-        // Check if filtered output exceeds the summary threshold
-        let final_output = if let Some(summary) =
-            summarizer::summarize(&filtered, &self.tool_name, DEFAULT_SUMMARY_THRESHOLD_TOKENS)
-        {
-            // Large output: use summary instead
+        let final_output = if let Some(summary) = summarizer::summarize(
+            &filtered,
+            &self.tool_name,
+            DEFAULT_SUMMARY_THRESHOLD_TOKENS,
+            exit_code,
+        ) {
             summary.summary
         } else {
-            // Small output: pass through unchanged
             filtered
         };
 
-        timer.track(&raw_label, &mycelium_label, &raw, &final_output);
+        timer.track(&raw_label, &mycelium_label, &raw_for_storage, &final_output);
 
-        Ok((raw, final_output))
+        Ok((raw_for_storage, final_output))
     }
 }
 

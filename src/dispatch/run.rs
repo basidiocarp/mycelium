@@ -66,8 +66,8 @@ pub(super) fn run_spawned_command(
             }
             // Continue draining stderr even after cap is hit, but discard bytes past the cap
             let mut err = std::io::stderr().lock();
-            err.write_all(&buf[..count])?;
-            err.flush()?;
+            let _ = err.write_all(&buf[..count]);
+            let _ = err.flush();
         }
 
         Ok(captured)

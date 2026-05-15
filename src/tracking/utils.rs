@@ -89,15 +89,23 @@ fn get_git_remote_url() -> Option<String> {
     }
 }
 
-/// Derive a human-readable project name for analytics.
+static DERIVED_PROJECT_NAME: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
+/// Derive a human-readable project name for analytics, cached for the process lifetime.
 ///
 /// Priority order:
 /// 1. `BASIDIOCARP_PROJECT` environment variable (explicit project name override)
-/// 2. Git remote URL: parses repo name from `origin` remote (e.g., "mycelium" from "<https://github.com/user/mycelium.git>")
+/// 2. Git remote URL: parses repo name from `origin` remote (e.g., "mycelium" from `https://github.com/user/mycelium.git`)
 /// 3. Current working directory name (fallback)
 ///
 /// Returns "unknown" if all detection fails, never panics.
 pub(super) fn derive_project_name() -> String {
+    DERIVED_PROJECT_NAME
+        .get_or_init(compute_project_name)
+        .clone()
+}
+
+fn compute_project_name() -> String {
     // Priority 1: BASIDIOCARP_PROJECT env var
     if let Ok(name) = std::env::var("BASIDIOCARP_PROJECT")
         && !name.trim().is_empty()

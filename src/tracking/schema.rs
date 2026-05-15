@@ -163,10 +163,7 @@ pub(super) fn init_schema(conn: &Connection) -> Result<()> {
     // Migrations: add columns that were absent in older summaries table schemas.
     // Uses the silent-error pattern (let _ =) so these no-op on fresh databases
     // where the columns already exist from CREATE TABLE above.
-    let _ = conn.execute(
-        "ALTER TABLE summaries ADD COLUMN captured_at TEXT DEFAULT ''",
-        [],
-    );
+    // Note: captured_at migration omitted — the column is defined in CREATE TABLE above.
     let _ = conn.execute(
         "ALTER TABLE summaries ADD COLUMN project_root TEXT DEFAULT ''",
         [],

@@ -201,7 +201,9 @@ pub fn route_or_filter(
     match decide_action(raw, summary_threshold) {
         OutputAction::Passthrough => FilterResult::passthrough(raw),
         OutputAction::Summarize => {
-            if let Some(summary) = crate::summarizer::summarize(raw, command, summary_threshold) {
+            // exit_code not available in this routing context; pass 0 so the
+            // summarizer doesn't emit a spurious FAIL line from the exit-code path.
+            if let Some(summary) = crate::summarizer::summarize(raw, command, summary_threshold, 0) {
                 // Record summary silently (don't fail if tracking has issues)
                 if let Ok(tracker) = crate::tracking::Tracker::new() {
                     if let Err(e) = tracker.record_summary(
