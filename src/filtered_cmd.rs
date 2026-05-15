@@ -175,15 +175,26 @@ impl FilteredCommand {
 
         let stdout = String::from_utf8_lossy(&stdout_bytes);
         let stderr = String::from_utf8_lossy(&stderr_bytes);
-        let combined = format!("{}{}", stdout, stderr);
 
-        let raw = if self.do_strip_ansi {
-            utils::strip_ansi(&combined)
+        // Filter only stdout — stderr is already streamed live to the terminal by the
+        // stderr thread above. Including stderr in the filter input would cause every
+        // error line (including ELIFECYCLE, cargo errors, etc.) to appear twice: once
+        // on the real stderr stream and again in the filtered stdout output.
+        let raw_for_filter = if self.do_strip_ansi {
+            utils::strip_ansi(&stdout)
         } else {
-            combined
+            stdout.to_string()
         };
 
-        let filtered = (self.filter_fn)(&raw);
+        // Use the combined output for storage (tee, hyphae, tracking) so the full
+        // context is preserved for retrieval, even though stderr is not re-printed.
+        let raw_for_storage = if self.do_strip_ansi {
+            utils::strip_ansi(&format!("{}{}", stdout, stderr))
+        } else {
+            format!("{}{}", stdout, stderr)
+        };
+
+        let filtered = (self.filter_fn)(&raw_for_filter);
         let exit_code = utils::exit_code(&status);
 
         let raw_label = format!("{} {}", self.tool_name, self.args.join(" "));
@@ -204,17 +215,17 @@ impl FilteredCommand {
         };
 
         // Route output through hyphae (chunking/summarization) or fall back to filtering
-        let routed = crate::hyphae::route_or_filter(&self.tool_name, &raw, |r| {
+        let routed = crate::hyphae::route_or_filter(&self.tool_name, &raw_for_storage, |r| {
             crate::filter::FilterResult::full(r, output_to_print.clone())
         });
 
-        if let Some(hint) = tee::tee_and_hint(&raw, &slug, exit_code) {
+        if let Some(hint) = tee::tee_and_hint(&raw_for_storage, &slug, exit_code) {
             println!("{}\n{}", routed.output, hint);
         } else {
             println!("{}", routed.output);
         }
 
-        timer.track(&raw_label, &mycelium_label, &raw, &routed.output);
+        timer.track(&raw_label, &mycelium_label, &raw_for_storage, &routed.output);
 
         if exit_code != 0 {
             std::process::exit(exit_code);
