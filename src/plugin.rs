@@ -115,8 +115,8 @@ fn find_plugin_in_dir_with_config(config: &PluginConfig, command: &str) -> Optio
 /// A 10-second timeout kills the plugin process if it hangs.
 pub fn run_plugin(plugin_path: &Path, raw_output: &str) -> Result<String> {
     use std::io::Write;
-    use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::{Arc, Mutex};
 
     let context = span_context(plugin_path);
     let _tool_span = tool_span("plugin_filter", &context).entered();
@@ -129,8 +129,6 @@ pub fn run_plugin(plugin_path: &Path, raw_output: &str) -> Result<String> {
         .spawn()
         .context("Failed to spawn plugin")?;
 
-    let child_pid = child.id();
-
     // Write raw command output to the plugin's stdin, then close the pipe.
     if let Some(mut stdin) = child.stdin.take() {
         stdin
@@ -138,22 +136,54 @@ pub fn run_plugin(plugin_path: &Path, raw_output: &str) -> Result<String> {
             .context("Failed to write to plugin stdin")?;
     }
 
-    // Timeout: kill the plugin if it hasn't finished within 10 seconds.
-    // Use cancellation flag to avoid PID reuse race condition.
+    // Timeout: kill the plugin if it hangs beyond 10 seconds.
+    // Pattern: store child in Arc<Mutex<Option<Child>>>, take it out before the
+    // blocking wait (releasing the lock), so the timeout thread can acquire the
+    // lock and kill via child.kill() if the child is still there, or kill by PID
+    // if the main thread already took it.
+    let pid = child.id();
     let cancel = Arc::new(AtomicBool::new(false));
     let cancel_clone = Arc::clone(&cancel);
-    let _handle = std::thread::spawn(move || {
+    let child_arc = Arc::new(Mutex::new(Some(child)));
+    let child_arc_timeout = Arc::clone(&child_arc);
+
+    let _timeout_handle = std::thread::spawn(move || {
         std::thread::sleep(std::time::Duration::from_secs(10));
         if !cancel_clone.load(Ordering::Relaxed) {
-            kill_process(child_pid);
+            // Try to take the child out of the mutex and kill it directly.
+            // If the main thread already took it (child is None), fall back to
+            // killing by PID — the main thread's wait_with_output is still
+            // blocking because the plugin hasn't exited.
+            let taken = child_arc_timeout.lock().ok().and_then(|mut g| g.take());
+            if let Some(mut c) = taken {
+                let _ = c.kill();
+                let _ = c.wait();
+            } else {
+                // Main thread holds the child; kill by PID so the blocked wait returns.
+                let _ = std::process::Command::new("kill")
+                    .args(["-9", &pid.to_string()])
+                    .status();
+            }
         }
     });
 
-    let output = child
-        .wait_with_output()
-        .context("Failed to wait for plugin")?;
+    // Take child out of the mutex and drop the guard before the blocking wait.
+    // This releases the lock so the timeout thread is not deadlocked if it fires
+    // while wait_with_output is blocking.
+    let child_to_wait = {
+        let mut g = child_arc
+            .lock()
+            .map_err(|_| anyhow::anyhow!("mutex poisoned"))?;
+        g.take()
+    };
 
-    // Signal the timeout thread that the plugin finished normally
+    let output = match child_to_wait {
+        Some(c) => c.wait_with_output().context("Failed to wait for plugin")?,
+        // Timeout thread killed and reaped the child before we could take it.
+        None => anyhow::bail!("plugin subprocess timed out and was killed"),
+    };
+
+    // Signal the timeout thread that the plugin finished normally.
     cancel.store(true, Ordering::Relaxed);
 
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -172,14 +202,13 @@ pub fn run_plugin(plugin_path: &Path, raw_output: &str) -> Result<String> {
             "Plugin subprocess exited non-zero"
         );
         if stderr.is_empty() {
-            anyhow::bail!("Plugin exited with non-zero status: {}", output.status)
-        } else {
-            anyhow::bail!(
-                "Plugin exited with non-zero status {}: {}",
-                output.status,
-                stderr
-            )
+            anyhow::bail!("Plugin exited with non-zero status: {}", output.status);
         }
+        anyhow::bail!(
+            "Plugin exited with non-zero status {}: {}",
+            output.status,
+            stderr
+        )
     }
 }
 
@@ -237,40 +266,6 @@ fn plugin_command(plugin_path: &Path) -> Command {
         Command::new(plugin_path)
     }
 }
-
-/// Kill a process by PID. Silently no-ops if the process has already exited.
-#[cfg(unix)]
-fn kill_process(pid: u32) {
-    use tracing::warn;
-
-    let kill_binary =
-        crate::platform::command_path("kill").unwrap_or_else(|| std::path::PathBuf::from("kill"));
-
-    match std::process::Command::new(&kill_binary)
-        .arg(pid.to_string())
-        .output()
-    {
-        Ok(output) => {
-            if !output.status.success() {
-                warn!(
-                    status = ?output.status.code(),
-                    pid = pid,
-                    "plugin kill failed"
-                );
-            }
-        }
-        Err(e) => {
-            warn!(
-                error = %e,
-                pid = pid,
-                "plugin kill command execution failed"
-            );
-        }
-    }
-}
-
-#[cfg(not(unix))]
-fn kill_process(_pid: u32) {}
 
 /// Check whether `path` has any executable bit set.
 #[cfg(unix)]

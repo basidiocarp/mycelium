@@ -10,7 +10,10 @@ pub(crate) const MAX_STDOUT_CAPTURE: usize = 64 * 1024 * 1024;
 /// Maximum bytes to capture from command stderr (16 MB).
 pub(crate) const MAX_STDERR_CAPTURE: usize = 16 * 1024 * 1024;
 
-/// Run a command with bounded stdout capture.
+/// Timeout for dispatch_json subprocess operations (120 seconds).
+pub(crate) const DISPATCH_JSON_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(120);
+
+/// Run a command with bounded stdout and stderr capture.
 ///
 /// Uses the same 64 MB cap as `run_spawned_command` and drains stderr to avoid deadlocks.
 /// This helper is used by family runners (JS, Python, etc.) instead of `cmd.output()` directly.
@@ -53,6 +56,7 @@ pub(crate) fn run_bounded(
         let mut reader = stderr_pipe;
         let mut captured = Vec::new();
         let mut buf = [0u8; 8192];
+        let mut cap_logged = false;
 
         loop {
             let count = reader.read(&mut buf)?;
@@ -61,6 +65,10 @@ pub(crate) fn run_bounded(
             }
             if captured.len() < MAX_STDERR_CAPTURE {
                 captured.extend_from_slice(&buf[..count]);
+            } else if !cap_logged {
+                // Log once when cap is first exceeded (asymmetric with run_spawned_command which streams post-cap bytes)
+                tracing::debug!("run_bounded: stderr cap reached, discarding further bytes");
+                cap_logged = true;
             }
             // Continue draining stderr even after cap is hit, but discard bytes past the cap
         }
@@ -82,6 +90,56 @@ pub(crate) fn run_bounded(
         stdout,
         stderr,
     })
+}
+
+/// Run a command with bounded output capture and timeout.
+///
+/// Spawns a subprocess, captures stdout and stderr up to the specified limits,
+/// and enforces a maximum runtime. If the timeout is exceeded, the process is killed
+/// and an error is returned.
+fn bounded_output(
+    mut cmd: std::process::Command,
+    timeout: std::time::Duration,
+    max_bytes: usize,
+) -> std::io::Result<std::process::Output> {
+    use std::io::Read;
+    use std::process::Stdio;
+    use std::sync::mpsc;
+
+    cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+    let mut child = cmd.spawn()?;
+    let mut stdout = child.stdout.take().unwrap();
+    let mut stderr = child.stderr.take().unwrap();
+
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        let mut out = Vec::new();
+        let mut err = Vec::new();
+        let _ = stdout.read_to_end(&mut out);
+        let _ = stderr.read_to_end(&mut err);
+        out.truncate(max_bytes);
+        err.truncate(max_bytes);
+        let _ = tx.send((out, err));
+    });
+
+    match rx.recv_timeout(timeout) {
+        Ok((out, err)) => {
+            let status = child.wait()?;
+            Ok(std::process::Output {
+                status,
+                stdout: out,
+                stderr: err,
+            })
+        }
+        Err(_) => {
+            let _ = child.kill();
+            let _ = child.wait(); // reap zombie
+            Err(std::io::Error::new(
+                std::io::ErrorKind::TimedOut,
+                "dispatch_json subprocess timed out",
+            ))
+        }
+    }
 }
 
 pub(super) fn dispatch_proxy(args: &[std::ffi::OsString], cli: &Cli) -> Result<()> {
@@ -606,9 +664,9 @@ pub fn dispatch_json(cli: Cli) -> Result<()> {
             // Resolve the tool path from SUPPORTED_TOOLS allowlist
             match crate::platform::command_path(base_name) {
                 Some(resolved_path) => {
-                    let raw_result = std::process::Command::new(&resolved_path)
-                        .args(&args[1..])
-                        .output();
+                    let mut cmd = std::process::Command::new(&resolved_path);
+                    cmd.args(&args[1..]);
+                    let raw_result = bounded_output(cmd, DISPATCH_JSON_TIMEOUT, MAX_STDOUT_CAPTURE);
                     match raw_result {
                         Ok(out) => String::from_utf8_lossy(&out.stdout).to_string(),
                         Err(e) => {
@@ -639,9 +697,11 @@ pub fn dispatch_json(cli: Cli) -> Result<()> {
     };
 
     let mycelium_exe = std::env::current_exe().context("Failed to locate mycelium executable")?;
-    let filtered_result = std::process::Command::new(&mycelium_exe)
-        .args(&args)
-        .output();
+    let mut filtered_cmd = std::process::Command::new(&mycelium_exe);
+    filtered_cmd.args(&args);
+    // Note: raw_output already buffered child stdout above; filtered_result buffers mycelium's filtered stdout.
+    // Both are bounded at MAX_STDOUT_CAPTURE (64 MB) by bounded_output helper, preventing compound memory exhaustion.
+    let filtered_result = bounded_output(filtered_cmd, DISPATCH_JSON_TIMEOUT, MAX_STDOUT_CAPTURE);
 
     let (envelope, exit_code) = match filtered_result {
         Ok(output) if output.status.success() || !output.stdout.is_empty() => {

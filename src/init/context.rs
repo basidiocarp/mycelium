@@ -16,6 +16,9 @@ use std::sync::mpsc;
 use std::time::Duration;
 use tracing::{debug, warn};
 
+/// Maximum bytes to read from hyphae stdout (4 MiB).
+const MAX_CONTEXT_RESPONSE_BYTES: usize = 4 * 1024 * 1024;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Public API
 // ─────────────────────────────────────────────────────────────────────────────
@@ -94,22 +97,31 @@ pub(crate) fn call_gather_context(
 
     // Read response with 10-second timeout
     let (tx, rx) = mpsc::channel();
-    let mut stdout = child.stdout.take().context("Failed to get hyphae stdout")?;
+    let stdout = child.stdout.take().context("Failed to get hyphae stdout")?;
 
     std::thread::spawn(move || {
         let mut response = String::new();
-        if let Err(e) = stdout.read_to_string(&mut response) {
+        let mut limited = stdout.take(MAX_CONTEXT_RESPONSE_BYTES as u64);
+        if let Err(e) = limited.read_to_string(&mut response) {
             warn!("hyphae gather_context stdout read failed: {e}");
         }
         let _ = tx.send(response);
     });
 
-    let response = rx
-        .recv_timeout(Duration::from_secs(10))
-        .context("Hyphae response timed out after 10 seconds")?;
-    debug!("Received response from hyphae gather_context subprocess");
-
-    let _ = child.wait();
+    let response = match rx.recv_timeout(Duration::from_secs(10)) {
+        Ok(resp) => {
+            debug!("Received response from hyphae gather_context subprocess");
+            let _ = child.wait();
+            resp
+        }
+        Err(_) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(anyhow::anyhow!(
+                "Hyphae response timed out after 10 seconds"
+            ));
+        }
+    };
 
     parse_mcp_response(&response)
 }

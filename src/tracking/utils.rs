@@ -86,6 +86,7 @@ fn get_git_remote_url() -> Option<String> {
         Ok(output_bytes) => Some(String::from_utf8_lossy(&output_bytes).trim().to_owned()),
         Err(_) => {
             let _ = child.kill();
+            let _ = child.wait(); // reap to avoid zombie accumulation
             None
         }
     }
