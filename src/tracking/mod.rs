@@ -121,7 +121,12 @@ impl Tracker {
         )?;
         schema::init_schema(&conn)?;
 
-        Ok(Self { conn })
+        let tracker = Self { conn };
+        // Prune stale rows once per process start rather than per write.
+        if let Err(e) = tracker.cleanup_old() {
+            tracing::warn!("cleanup_old failed at startup: {e}");
+        }
+        Ok(tracker)
     }
 }
 

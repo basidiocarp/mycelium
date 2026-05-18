@@ -88,9 +88,26 @@ fn build_summary(raw: &str, command: &str, input_tokens: usize, exit_code: i32) 
     result.join("\n")
 }
 
+// "error" and "fatal" are rarely substrings of non-error words, so substring
+// matching is safe. "failed" is common in test result counts ("0 failed"), so
+// it uses context-aware whole-word matching to avoid false positives.
 fn is_error_line(line: &str) -> bool {
     let lower = line.to_lowercase();
-    lower.contains("error") || lower.contains("failed") || lower.contains("fatal")
+    if lower.contains("error") || lower.contains("fatal") {
+        return true;
+    }
+    for (i, _) in lower.match_indices("failed") {
+        // Skip if "failed" is a suffix of another word (no word boundary before)
+        if lower[..i].chars().last().map_or(false, |c| c.is_alphabetic()) {
+            continue;
+        }
+        // Skip count context: "0 failed", "12 failed"
+        if lower[..i].trim_end().ends_with(|c: char| c.is_numeric()) {
+            continue;
+        }
+        return true;
+    }
+    false
 }
 
 /// Check if a line looks like a warning. Lines that also match error patterns
@@ -201,6 +218,15 @@ mod tests {
         assert!(is_error_line("fatal error"));
         assert!(!is_error_line("warning only"));
         assert!(!is_error_line("normal output"));
+    }
+
+    #[test]
+    fn test_is_error_line_no_false_positives_on_test_counts() {
+        assert!(!is_error_line("test result: ok. 12 passed; 0 failed; 0 ignored"));
+        assert!(!is_error_line("5 passed, 0 failed"));
+        assert!(!is_error_line("ran 30 tests, 0 failed"));
+        assert!(is_error_line("FAILED: test_foo"));
+        assert!(is_error_line("failed to compile"));
     }
 
     #[test]

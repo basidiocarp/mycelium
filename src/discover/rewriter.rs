@@ -495,6 +495,8 @@ fn rewrite_find_to_fd(cmd: &str) -> Option<String> {
 
     let mut name_pattern: Option<String> = None;
     let mut file_type: Option<String> = None;
+    let mut max_depth: Option<String> = None;
+    let mut min_depth: Option<String> = None;
     while index < words.len() {
         match words[index].as_str() {
             "-name" => {
@@ -509,6 +511,16 @@ fn rewrite_find_to_fd(cmd: &str) -> Option<String> {
                     Some("f" | "d") => {}
                     _ => return None,
                 }
+            }
+            "-maxdepth" => {
+                index += 1;
+                max_depth = words.get(index).cloned();
+                max_depth.as_ref()?;
+            }
+            "-mindepth" => {
+                index += 1;
+                min_depth = words.get(index).cloned();
+                min_depth.as_ref()?;
             }
             token
                 if matches!(
@@ -546,6 +558,12 @@ fn rewrite_find_to_fd(cmd: &str) -> Option<String> {
     }
     if let Some(file_type) = file_type {
         args.extend(["--type".to_string(), file_type]);
+    }
+    if let Some(max_depth_val) = max_depth {
+        args.extend(["--max-depth".to_string(), max_depth_val]);
+    }
+    if let Some(min_depth_val) = min_depth {
+        args.extend(["--min-depth".to_string(), min_depth_val]);
     }
     args.push(path);
     Some(render_shell_command(&args))

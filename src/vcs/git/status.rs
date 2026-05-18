@@ -51,13 +51,6 @@ pub(super) fn run_status(args: &[String], verbose: u8, global_args: &[String]) -
     }
 
     // Default Mycelium compact mode (no args provided)
-    // Get raw git status for tracking
-    let raw_output = super::git_cmd(global_args)
-        .args(["status"])
-        .output()
-        .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
-        .unwrap_or_default();
-
     let output = super::git_cmd(global_args)
         .args(["status", "--porcelain", "-b"])
         .output()
@@ -86,8 +79,8 @@ pub(super) fn run_status(args: &[String], verbose: u8, global_args: &[String]) -
         std::process::exit(output.status.code().unwrap_or(1));
     }
 
-    // Track for statistics
-    timer.track("git status", "mycelium git status", &raw_output, &formatted);
+    // Track for statistics; raw token count derived from the porcelain output.
+    timer.track("git status", "mycelium git status", &stdout, &formatted);
 
     Ok(())
 }

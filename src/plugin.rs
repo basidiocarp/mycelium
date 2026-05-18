@@ -19,7 +19,7 @@ fn default_plugin_dir() -> PathBuf {
 }
 
 /// Plugin system configuration. Mirrors the `[plugins]` section of config.toml.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PluginConfig {
     #[serde(default = "default_true")]
     pub enabled: bool,

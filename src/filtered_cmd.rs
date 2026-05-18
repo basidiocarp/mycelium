@@ -171,7 +171,10 @@ impl FilteredCommand {
             }
         }
         let status = child.wait()?;
-        let stderr_bytes = stderr_thread.join().unwrap_or_default();
+        let stderr_bytes = stderr_thread.join().unwrap_or_else(|_| {
+            eprintln!("[mycelium] stderr drain thread panicked; stderr bytes may be incomplete");
+            Vec::new()
+        });
 
         let stdout = String::from_utf8_lossy(&stdout_bytes);
         let stderr = String::from_utf8_lossy(&stderr_bytes);

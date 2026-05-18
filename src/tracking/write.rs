@@ -73,7 +73,6 @@ impl Tracker {
             ],
         )?;
 
-        self.cleanup_old()?;
         Ok(())
     }
 
@@ -130,7 +129,6 @@ impl Tracker {
             ],
         )?;
 
-        self.cleanup_old()?;
         Ok(())
     }
 
@@ -159,7 +157,6 @@ impl Tracker {
             ],
         )?;
 
-        self.cleanup_old()?;
         Ok(())
     }
 
@@ -204,11 +201,10 @@ impl Tracker {
             ],
         )?;
 
-        self.cleanup_old()?;
         Ok(())
     }
 
-    fn cleanup_old(&self) -> Result<()> {
+    pub(crate) fn cleanup_old(&self) -> Result<()> {
         let cutoff = Utc::now() - Duration::days(HISTORY_DAYS);
         self.conn.execute(
             "DELETE FROM commands WHERE timestamp < ?1",
@@ -245,7 +241,6 @@ impl Tracker {
                 project_path,
             ],
         )?;
-        self.cleanup_old()?;
         Ok(())
     }
 

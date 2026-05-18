@@ -3,7 +3,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Config {
     #[serde(default)]
     pub tracking: TrackingConfig,
@@ -19,7 +19,7 @@ pub struct Config {
     pub plugins: crate::plugin::PluginConfig,
 }
 
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct HooksConfig {
     /// Commands to exclude from auto-rewrite (e.g. `["curl", "playwright"]`).
     /// Survives `mycelium init -g` re-runs since config.toml is user-owned.
@@ -27,7 +27,7 @@ pub struct HooksConfig {
     pub exclude_commands: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrackingConfig {
     pub enabled: bool,
     pub history_days: u32,
@@ -45,7 +45,7 @@ impl Default for TrackingConfig {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DisplayConfig {
     pub colors: bool,
     pub emoji: bool,
@@ -74,7 +74,7 @@ fn default_diff_context_lines() -> usize {
     3
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GitFilterConfig {
     #[serde(default = "default_log_max_commits")]
     pub log_max_commits: usize,
@@ -94,7 +94,7 @@ impl Default for GitFilterConfig {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CargoFilterConfig {
     #[serde(default)]
     pub test_show_passing: bool,
@@ -113,7 +113,7 @@ impl Default for CargoFilterConfig {
 
 /// Controls when adaptive filtering activates based on output size.
 /// Small outputs pass through unfiltered; large outputs get full compression.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AdaptiveConfig {
     /// Outputs below this line count AND `small_bytes` pass through unfiltered (default: 50)
     pub small_lines: usize,
@@ -139,7 +139,7 @@ impl Default for AdaptiveConfig {
 /// - `enabled: None` (default) — auto-detect: use Hyphae when binary is in PATH
 /// - `enabled: Some(true)` — force on: always try Hyphae (still requires binary in PATH)
 /// - `enabled: Some(false)` — force off: never use Hyphae, always use local filtering
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct HyphaeConfig {
     /// Override auto-detection. `true` forces Hyphae on, `false` forces it off.
     #[serde(default)]
@@ -152,7 +152,7 @@ pub struct HyphaeConfig {
 /// - `enabled: None` (default) — auto-detect: use Rhizome when binary is in PATH
 /// - `enabled: Some(true)` — force on: always try Rhizome (still requires binary in PATH)
 /// - `enabled: Some(false)` — force off: never use Rhizome, always use local filtering
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct RhizomeConfig {
     #[serde(default)]
     pub enabled: Option<bool>,
@@ -161,7 +161,7 @@ pub struct RhizomeConfig {
 /// Controls command output summarization for large outputs.
 ///
 /// When enabled, outputs above the token threshold are replaced with a compact summary.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SummaryConfig {
     #[serde(default = "default_summary_threshold_tokens")]
     pub threshold_tokens: usize,
@@ -179,7 +179,7 @@ impl Default for SummaryConfig {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FilterConfig {
     #[serde(default = "default_ignore_dirs")]
     pub ignore_dirs: Vec<String>,
@@ -293,7 +293,16 @@ impl Default for FilterConfig {
     }
 }
 
+static CONFIG_CACHE: std::sync::OnceLock<Config> = std::sync::OnceLock::new();
+
 impl Config {
+    /// Return the cached config for this process. Reads and parses once on first
+    /// call; subsequent calls return a clone. Use `Config::load()` when a fresh
+    /// read is needed (e.g., after `Config::save()`).
+    pub fn load_cached() -> Self {
+        CONFIG_CACHE.get_or_init(|| Config::load().unwrap_or_default()).clone()
+    }
+
     pub fn load() -> Result<Self> {
         let path = config_path()?;
 

@@ -66,7 +66,7 @@ impl ContentRouter {
         }
 
         // Check for code/diffs (hunk markers, code blocks, structural diff markers)
-        if output.contains("@@") || output.contains("```") || looks_like_diff(output) {
+        if output.contains("```") || looks_like_diff(output) {
             return ContentType::Code;
         }
 
@@ -441,5 +441,12 @@ mod tests {
         let output = router.filter_code(input);
 
         assert!(output.contains("SIGSEGV"));
+    }
+
+    #[test]
+    fn email_address_not_detected_as_diff() {
+        // @@ in an email address must not trigger diff detection
+        let content_type = ContentRouter::detect_content_type("Contact: user@example.com or admin@@corp.org");
+        assert_ne!(content_type, ContentType::Code);
     }
 }

@@ -1324,6 +1324,34 @@ fn test_rewrite_find_uses_mycelium_find_when_fd_rewrite_disabled() {
     );
 }
 
+#[test]
+fn test_rewrite_find_maxdepth() {
+    let _guard = set_find_fd_rewrite_active_for_tests(true);
+    let result = rewrite_command("find . -maxdepth 1 -name '*.rs'", &[]);
+    assert!(result.is_some());
+    let cmd = result.unwrap();
+    assert!(cmd.contains("--max-depth") && cmd.contains("1"));
+}
+
+#[test]
+fn test_rewrite_find_mindepth() {
+    let _guard = set_find_fd_rewrite_active_for_tests(true);
+    let result = rewrite_command("find . -mindepth 2 -name '*.rs'", &[]);
+    assert!(result.is_some());
+    let cmd = result.unwrap();
+    assert!(cmd.contains("--min-depth") && cmd.contains("2"));
+}
+
+#[test]
+fn test_rewrite_find_mindepth_and_maxdepth() {
+    let _guard = set_find_fd_rewrite_active_for_tests(true);
+    let result = rewrite_command("find . -mindepth 2 -maxdepth 3 -name '*.rs'", &[]);
+    assert!(result.is_some());
+    let cmd = result.unwrap();
+    assert!(cmd.contains("--min-depth") && cmd.contains("2"));
+    assert!(cmd.contains("--max-depth") && cmd.contains("3"));
+}
+
 // --- Ensure PATTERNS and RULES stay aligned after modifications ---
 
 #[test]

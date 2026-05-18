@@ -24,11 +24,11 @@ pub fn hyphae_binary() -> Option<&'static str> {
 
 /// Check config override, then auto-detection.
 pub fn should_use_hyphae() -> bool {
-    if let Ok(config) = crate::config::Config::load()
-        && let Some(hyphae_config) = &config.filters.hyphae
-        && let Some(enabled) = hyphae_config.enabled
-    {
-        return enabled && is_available();
+    let config = crate::config::Config::load_cached();
+    if let Some(hyphae_config) = &config.filters.hyphae {
+        if let Some(enabled) = hyphae_config.enabled {
+            return enabled && is_available();
+        }
     }
     is_available()
 }
@@ -113,9 +113,9 @@ pub fn decide_action(output: &str, summary_threshold: usize) -> OutputAction {
 }
 
 fn get_summary_threshold() -> usize {
-    crate::config::Config::load()
-        .ok()
-        .and_then(|config| config.filters.summary)
+    crate::config::Config::load_cached()
+        .filters
+        .summary
         .map(|summary_config| summary_config.threshold_tokens)
         .unwrap_or(crate::summarizer::DEFAULT_SUMMARY_THRESHOLD_TOKENS)
 }
@@ -178,9 +178,7 @@ pub(crate) fn validate_filter_output(
 
 /// Check if the filter header should be shown.
 fn should_show_filter_header() -> bool {
-    crate::config::Config::load()
-        .map(|c| c.filters.show_filter_header)
-        .unwrap_or(true)
+    crate::config::Config::load_cached().filters.show_filter_header
 }
 
 /// Route command output through Hyphae, summarize, or fall back to local filtering.

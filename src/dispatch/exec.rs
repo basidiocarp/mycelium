@@ -108,8 +108,12 @@ fn bounded_output(
 
     cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
     let mut child = cmd.spawn()?;
-    let stdout = child.stdout.take().unwrap();
-    let stderr = child.stderr.take().unwrap();
+    let stdout = child.stdout.take().ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::Other, "Failed to capture stdout pipe")
+    })?;
+    let stderr = child.stderr.take().ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::Other, "Failed to capture stderr pipe")
+    })?;
 
     // Two threads prevent the classic deadlock: a single thread reading stdout then
     // stderr blocks when the child fills its stderr pipe buffer (~64 KiB) while
@@ -157,7 +161,10 @@ fn bounded_output(
     match stdout_rx.recv_timeout(timeout) {
         Ok(stdout_bytes) => {
             // stderr drains concurrently and finishes shortly after stdout closes.
-            let stderr_bytes = stderr_rx.recv().unwrap_or_default();
+            let stderr_bytes = stderr_rx.recv().unwrap_or_else(|_| {
+                eprintln!("[mycelium] stderr drain thread disconnected; stderr bytes may be incomplete");
+                Vec::new()
+            });
             let status = child.wait()?;
             Ok(std::process::Output {
                 status,
@@ -542,7 +549,7 @@ pub fn dispatch_json(cli: Cli) -> Result<()> {
                                 error_kind = ?e.kind(),
                                 "Tool spawn error in dispatch_json: {e}"
                             );
-                            String::new()
+                            format!("[raw output unavailable: {e}]")
                         }
                     }
                 }
@@ -570,7 +577,7 @@ pub fn dispatch_json(cli: Cli) -> Result<()> {
     let filtered_result = bounded_output(filtered_cmd, DISPATCH_JSON_TIMEOUT, MAX_STDOUT_CAPTURE);
 
     let (envelope, exit_code) = match filtered_result {
-        Ok(output) if output.status.success() || !output.stdout.is_empty() => {
+        Ok(output) if output.status.success() => {
             let filtered = String::from_utf8_lossy(&output.stdout).to_string();
             let exit_code = output.status.code().unwrap_or(0);
             let envelope = json_output::wrap_output(
@@ -581,6 +588,12 @@ pub fn dispatch_json(cli: Cli) -> Result<()> {
                 project_path.as_deref(),
                 Some(&rewrite_resolution),
             );
+            (envelope, exit_code)
+        }
+        Ok(output) if !output.stdout.is_empty() => {
+            let filtered = String::from_utf8_lossy(&output.stdout).to_string();
+            let exit_code = output.status.code().unwrap_or(1);
+            let envelope = json_output::wrap_error(&filtered, exit_code);
             (envelope, exit_code)
         }
         Ok(output) => {
