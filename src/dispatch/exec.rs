@@ -13,6 +13,12 @@ pub(crate) const MAX_STDERR_CAPTURE: usize = 16 * 1024 * 1024;
 /// Timeout for dispatch_json subprocess operations (120 seconds).
 pub(crate) const DISPATCH_JSON_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(120);
 
+/// Timeout for draining stderr after stdout closes in bounded_output (5 seconds).
+/// Stderr should drain within milliseconds of stdout closing in the normal case;
+/// this guard prevents an indefinite hang when a forked subprocess inherits the
+/// stderr write end and outlives the parent.
+const STDERR_DRAIN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+
 /// Run a command with bounded stdout and stderr capture.
 ///
 /// Uses the same 64 MB cap as `run_spawned_command` and drains stderr to avoid deadlocks.
@@ -161,10 +167,12 @@ fn bounded_output(
     match stdout_rx.recv_timeout(timeout) {
         Ok(stdout_bytes) => {
             // stderr drains concurrently and finishes shortly after stdout closes.
-            let stderr_bytes = stderr_rx.recv().unwrap_or_else(|_| {
-                eprintln!("[mycelium] stderr drain thread disconnected; stderr bytes may be incomplete");
-                Vec::new()
-            });
+            let stderr_bytes = stderr_rx
+                .recv_timeout(STDERR_DRAIN_TIMEOUT)
+                .unwrap_or_else(|_| {
+                    eprintln!("[mycelium] stderr drain timed out or disconnected; stderr bytes may be incomplete");
+                    Vec::new()
+                });
             let status = child.wait()?;
             Ok(std::process::Output {
                 status,
