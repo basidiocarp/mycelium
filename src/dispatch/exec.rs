@@ -533,7 +533,8 @@ pub fn dispatch_json(cli: Cli) -> Result<()> {
 
     // Get raw output only from known tool binaries to prevent arbitrary code execution.
     // Only allow execution of tools that mycelium is designed to proxy.
-    let raw_output = if !args.is_empty() {
+    // Also capture the exit code from the raw command execution for re-entry path.
+    let (raw_output, raw_exit_code) = if !args.is_empty() {
         let tool_name = &args[0];
 
         let base_name = std::path::Path::new(tool_name)
@@ -549,7 +550,10 @@ pub fn dispatch_json(cli: Cli) -> Result<()> {
                     cmd.args(&args[1..]);
                     let raw_result = bounded_output(cmd, DISPATCH_JSON_TIMEOUT, MAX_STDOUT_CAPTURE);
                     match raw_result {
-                        Ok(out) => String::from_utf8_lossy(&out.stdout).to_string(),
+                        Ok(out) => {
+                            let exit_code = out.status.code().unwrap_or(1);
+                            (String::from_utf8_lossy(&out.stdout).to_string(), exit_code)
+                        }
                         Err(e) => {
                             use tracing::warn;
                             warn!(
@@ -557,7 +561,7 @@ pub fn dispatch_json(cli: Cli) -> Result<()> {
                                 error_kind = ?e.kind(),
                                 "Tool spawn error in dispatch_json: {e}"
                             );
-                            format!("[raw output unavailable: {e}]")
+                            (format!("[raw output unavailable: {e}]"), 1)
                         }
                     }
                 }
@@ -567,52 +571,77 @@ pub fn dispatch_json(cli: Cli) -> Result<()> {
                         base_name = base_name,
                         "Failed to resolve allowed tool path in dispatch_json"
                     );
-                    String::new()
+                    (String::new(), 1)
                 }
             }
         } else {
-            String::new()
+            (String::new(), 1)
         }
     } else {
-        String::new()
+        (String::new(), 1)
     };
 
-    let mycelium_exe = std::env::current_exe().context("Failed to locate mycelium executable")?;
-    let mut filtered_cmd = std::process::Command::new(&mycelium_exe);
-    filtered_cmd.args(&args);
-    // Note: raw_output already buffered child stdout above; filtered_result buffers mycelium's filtered stdout.
-    // Both are bounded at MAX_STDOUT_CAPTURE (64 MB) by bounded_output helper, preventing compound memory exhaustion.
-    let filtered_result = bounded_output(filtered_cmd, DISPATCH_JSON_TIMEOUT, MAX_STDOUT_CAPTURE);
+    // Check for re-entry: prevent infinite recursion from dispatch_json spawning another mycelium process
+    let json_depth = std::env::var("MYCELIUM_JSON_DEPTH")
+        .ok()
+        .and_then(|s| s.parse::<u32>().ok())
+        .unwrap_or(0);
 
-    let (envelope, exit_code) = match filtered_result {
-        Ok(output) if output.status.success() => {
-            let filtered = String::from_utf8_lossy(&output.stdout).to_string();
-            let exit_code = output.status.code().unwrap_or(0);
-            let envelope = json_output::wrap_output(
-                &original_cmd,
-                &format!("mycelium {original_cmd}"),
-                &filtered,
-                &raw_output,
-                project_path.as_deref(),
-                Some(&rewrite_resolution),
-            );
-            (envelope, exit_code)
-        }
-        Ok(output) if !output.stdout.is_empty() => {
-            let filtered = String::from_utf8_lossy(&output.stdout).to_string();
-            let exit_code = output.status.code().unwrap_or(1);
-            let envelope = json_output::wrap_error(&filtered, exit_code);
-            (envelope, exit_code)
-        }
-        Ok(output) => {
-            let exit_code = output.status.code().unwrap_or(1);
-            let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-            let envelope = json_output::wrap_error(&stderr, exit_code);
-            (envelope, exit_code)
-        }
-        Err(e) => {
-            let envelope = json_output::wrap_error(&e.to_string(), 1);
-            (envelope, 1)
+    let (envelope, exit_code) = if json_depth >= 1 {
+        use tracing::warn;
+        warn!(
+            depth = json_depth,
+            "Re-entry detected in dispatch_json; skipping inner spawn and returning raw output"
+        );
+        // Re-entry detected: skip spawning another mycelium process and return raw output directly
+        let envelope = json_output::wrap_output(
+            &original_cmd,
+            &format!("mycelium {} [re-entry]", original_cmd),
+            &raw_output,
+            &raw_output,
+            project_path.as_deref(),
+            Some(&rewrite_resolution),
+        );
+        (envelope, raw_exit_code)
+    } else {
+        let mycelium_exe = std::env::current_exe().context("Failed to locate mycelium executable")?;
+        let mut filtered_cmd = std::process::Command::new(&mycelium_exe);
+        filtered_cmd.args(&args);
+        filtered_cmd.env("MYCELIUM_JSON_DEPTH", (json_depth + 1).to_string());
+        // Note: raw_output already buffered child stdout above; filtered_result buffers mycelium's filtered stdout.
+        // Both are bounded at MAX_STDOUT_CAPTURE (64 MB) by bounded_output helper, preventing compound memory exhaustion.
+        let filtered_result = bounded_output(filtered_cmd, DISPATCH_JSON_TIMEOUT, MAX_STDOUT_CAPTURE);
+
+        match filtered_result {
+            Ok(output) if output.status.success() => {
+                let filtered = String::from_utf8_lossy(&output.stdout).to_string();
+                let exit_code = output.status.code().unwrap_or(0);
+                let envelope = json_output::wrap_output(
+                    &original_cmd,
+                    &format!("mycelium {original_cmd}"),
+                    &filtered,
+                    &raw_output,
+                    project_path.as_deref(),
+                    Some(&rewrite_resolution),
+                );
+                (envelope, exit_code)
+            }
+            Ok(output) if !output.stdout.is_empty() => {
+                let filtered = String::from_utf8_lossy(&output.stdout).to_string();
+                let exit_code = output.status.code().unwrap_or(1);
+                let envelope = json_output::wrap_error(&filtered, exit_code);
+                (envelope, exit_code)
+            }
+            Ok(output) => {
+                let exit_code = output.status.code().unwrap_or(1);
+                let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+                let envelope = json_output::wrap_error(&stderr, exit_code);
+                (envelope, exit_code)
+            }
+            Err(e) => {
+                let envelope = json_output::wrap_error(&e.to_string(), 1);
+                (envelope, 1)
+            }
         }
     };
 
