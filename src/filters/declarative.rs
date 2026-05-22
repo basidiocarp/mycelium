@@ -52,7 +52,21 @@ pub struct DeclarativeFilter {
 impl DeclarativeFilter {
     /// Construct a new filter, compiling regexes eagerly.
     /// Compilation failures are logged to stderr and stored as None.
-    fn new(raw: RawDeclarativeFilter) -> Self {
+    /// Returns an error if the strategy is not one of the known variants.
+    fn new(raw: RawDeclarativeFilter) -> Result<Self, String> {
+        // Validate strategy at load time
+        match raw.strategy.as_str() {
+            "truncate" | "filter" | "group" | "deduplicate" => {
+                // Strategy is valid, continue with construction
+            }
+            _ => {
+                return Err(format!(
+                    "unknown filter strategy '{}' for command '{}': must be one of 'truncate', 'filter', 'group', or 'deduplicate'",
+                    raw.strategy, raw.command
+                ));
+            }
+        }
+
         let keep_regex = raw
             .keep_pattern
             .as_deref()
@@ -75,7 +89,7 @@ impl DeclarativeFilter {
                 }
             });
 
-        Self {
+        Ok(Self {
             command: raw.command,
             strategy: raw.strategy,
             max_lines: raw.max_lines,
@@ -83,10 +97,11 @@ impl DeclarativeFilter {
             drop_pattern: raw.drop_pattern,
             keep_regex,
             drop_regex,
-        }
+        })
     }
 
     /// Construct a filter directly (used in tests), compiling regexes eagerly.
+    /// Panics if the strategy is invalid, which is appropriate for test helpers.
     #[cfg(test)]
     fn from_parts(
         command: &str,
@@ -102,10 +117,11 @@ impl DeclarativeFilter {
             keep_pattern: keep_pattern.map(str::to_string),
             drop_pattern: drop_pattern.map(str::to_string),
         })
+        .expect("test helper should have valid strategy")
     }
 
     /// Returns true if this filter matches the given command string (substring match).
-    #[must_use] 
+    #[must_use]
     pub fn matches(&self, command_str: &str) -> bool {
         command_str.contains(&self.command)
     }
@@ -139,7 +155,7 @@ impl DeclarativeFilter {
     }
 
     /// Apply this filter to the given input, returning a `FilterResult`.
-    #[must_use] 
+    #[must_use]
     pub fn apply(&self, input: &str) -> FilterResult {
         let lines: Vec<&str> = input.lines().collect();
 
@@ -149,7 +165,7 @@ impl DeclarativeFilter {
             "group" => self.apply_group(&lines),
             "deduplicate" => self.apply_deduplicate(&lines),
             _ => {
-                eprintln!("mycelium: unknown filter strategy: {}", self.strategy);
+                tracing::warn!("mycelium: unknown filter strategy: {}", self.strategy);
                 input.to_string()
             }
         };
@@ -239,9 +255,9 @@ impl DeclarativeFilter {
 }
 
 /// Load all *.toml files from a directory as declarative filters.
-/// Files that fail to parse are logged to stderr and skipped (do not crash).
+/// Files that fail to parse or have invalid strategies are logged and skipped (do not crash).
 /// If the directory does not exist, returns an empty vector.
-#[must_use] 
+#[must_use]
 pub fn load_declarative_filters(dir: &Path) -> Vec<DeclarativeFilter> {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return Vec::new();
@@ -258,7 +274,14 @@ pub fn load_declarative_filters(dir: &Path) -> Vec<DeclarativeFilter> {
             continue;
         };
         match toml::from_str::<RawDeclarativeFilter>(&contents) {
-            Ok(raw) => filters.push(DeclarativeFilter::new(raw)),
+            Ok(raw) => match DeclarativeFilter::new(raw) {
+                Ok(filter) => filters.push(filter),
+                Err(e) => {
+                    eprintln!(
+                        "mycelium: invalid declarative filter {}: {e}", path.display()
+                    );
+                }
+            },
             Err(e) => {
                 eprintln!(
                     "mycelium: failed to parse declarative filter {}: {e}", path.display()
@@ -272,7 +295,7 @@ pub fn load_declarative_filters(dir: &Path) -> Vec<DeclarativeFilter> {
 /// Load declarative filters from both project-local and user-global paths.
 /// Project-local takes precedence for overlapping commands.
 /// Returns (`project_filters`, `user_filters`) for visibility into which source matched.
-#[must_use] 
+#[must_use]
 pub fn load_all_declarative_filters() -> (Vec<DeclarativeFilter>, Vec<DeclarativeFilter>) {
     let mut project_filters = Vec::new();
     let mut user_filters = Vec::new();
@@ -295,7 +318,7 @@ pub fn load_all_declarative_filters() -> (Vec<DeclarativeFilter>, Vec<Declarativ
 
 /// Find the first filter that matches the command string.
 /// Project-local filters take precedence over user-global filters.
-#[must_use] 
+#[must_use]
 pub fn find_matching_filter<'a>(
     command: &str,
     project_filters: &'a [DeclarativeFilter],
@@ -488,6 +511,19 @@ max_lines = "not a number"
         std::fs::write(&path, bad_toml).unwrap();
         let filters = load_declarative_filters(dir.path());
         assert!(filters.is_empty());
+    }
+
+    #[test]
+    fn unknown_strategy_rejected_at_load_time() {
+        let dir = TempDir::new().unwrap();
+        let bad_strategy_toml = r#"
+command = "cargo test"
+strategy = "invalid_strategy"
+"#;
+        let path = dir.path().join("bad_strategy.toml");
+        std::fs::write(&path, bad_strategy_toml).unwrap();
+        let filters = load_declarative_filters(dir.path());
+        assert!(filters.is_empty(), "filters with unknown strategy should be skipped");
     }
 
     #[test]
