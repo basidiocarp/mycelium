@@ -127,7 +127,7 @@ pub(super) fn run_spawned_command(
     let output_to_print = if crate::hyphae::is_available() {
         use tracing::debug;
         debug!(source = "hyphae", "using hyphae summary as display output");
-        hyphae_output
+        hyphae_output.clone()
     } else {
         use tracing::debug;
         debug!(
@@ -137,6 +137,14 @@ pub(super) fn run_spawned_command(
             output_bytes = filtered_for_display.len(),
             "using content-router output"
         );
+        filtered_for_display.to_string()
+    };
+
+    // When hyphae is active, update filtered_for_display to match output_to_print
+    // so token savings tracking uses the actual output sent to the model.
+    let filtered_for_display = if crate::hyphae::is_available() {
+        hyphae_output
+    } else {
         filtered_for_display.to_string()
     };
 
@@ -159,8 +167,8 @@ pub(super) fn run_spawned_command(
         }
     }
 
-    // Track using the ContentRouter-filtered text (not hyphae's summary output) for accurate token tracking.
-    // This ensures token savings are computed against the actual filtered output users see, not hyphae chunk summaries.
+    // Track using the actual output that was displayed (hyphae summary if active, else ContentRouter-filtered).
+    // This ensures token savings are computed against the real output users see.
     let final_full = format!(
         "{}{}",
         filtered_for_display,
