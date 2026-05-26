@@ -58,7 +58,12 @@ where
                 if let Some(out) = filter_fn(line) {
                     filtered_lines.push(out.clone());
                     let mut lock = stdout_handle.lock();
-                    writeln!(lock, "{}", out).ok();
+                    if let Err(e) = writeln!(lock, "{}", out) {
+                        if e.kind() == std::io::ErrorKind::BrokenPipe {
+                            let _ = child.kill();
+                            break;
+                        }
+                    }
                 }
             }
             Err(e) => {
