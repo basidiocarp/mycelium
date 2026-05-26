@@ -239,6 +239,10 @@ pub(super) fn dispatch_invoke_command(command: &[String], explain: bool, cli: &C
         }
 
         let timer = tracking::TimedExecution::start();
+        // Shell-safety: rendered_command is derived from render_shell_command, which applies
+        // POSIX single-quoting (escape_posix_arg) to each CLI argument. Metacharacters inside
+        // single-quoted args are not evaluated by sh -l -c.
+        tracing::debug!(command = %rendered_command, "invoking login shell command");
         let mut child_command = crate::platform::invoke_shell_command(&rendered_command);
         if cli.skip_env {
             child_command.env("SKIP_ENV_VALIDATION", "1");
@@ -278,6 +282,10 @@ pub(super) fn dispatch_invoke_command(command: &[String], explain: bool, cli: &C
     }
 
     let timer = tracking::TimedExecution::start();
+    // Shell-safety: resolution.command is derived from render_shell_command, which applies
+    // POSIX single-quoting (escape_posix_arg) to each CLI argument. Metacharacters inside
+    // single-quoted args are not evaluated by sh -l -c.
+    tracing::debug!(command = %resolution.command, "invoking login shell command");
     let mut child_command = crate::platform::invoke_shell_command(&resolution.command);
     if cli.skip_env {
         child_command.env("SKIP_ENV_VALIDATION", "1");
