@@ -80,13 +80,14 @@ pub(super) fn run_spawned_command(
     let stdout_bytes = stdout_handle
         .join()
         .map_err(|_| anyhow::anyhow!("stdout streaming thread panicked"))??;
-    let stderr_bytes = stderr_handle
+    // Join the stderr thread to avoid leaving it detached; bytes are unused because
+    // stderr is delivered in real-time by the passthrough thread and excluded from filtering.
+    let _stderr_bytes = stderr_handle
         .join()
         .map_err(|_| anyhow::anyhow!("stderr streaming thread panicked"))??;
 
     let stdout = String::from_utf8_lossy(&stdout_bytes);
-    let stderr = String::from_utf8_lossy(&stderr_bytes);
-    let full_output = format!("{}{}", stdout, stderr);
+    let full_output = stdout.to_string();
 
     // Route raw stdout through hyphae for chunked storage before any ContentRouter filtering.
     // This ensures hyphae stores the complete unfiltered command output.
@@ -171,12 +172,8 @@ pub(super) fn run_spawned_command(
 
     // Track using the actual output that was displayed (hyphae summary if active, else ContentRouter-filtered).
     // This ensures token savings are computed against the real output users see.
-    let final_full = format!(
-        "{}{}",
-        filtered_for_display,
-        String::from_utf8_lossy(&stderr_bytes)
-    );
-    timer.track(tracked_input, tracked_output, &full_output, &final_full);
+    // Stderr is excluded from both sides — it is streamed live and not part of the filtered display output.
+    timer.track(tracked_input, tracked_output, &full_output, &filtered_for_display);
 
     if !status.success() {
         let _ = std::io::stdout().flush();
