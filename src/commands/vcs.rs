@@ -3,6 +3,7 @@ use clap::Args;
 pub use super::subcommands::{GitCommands, GhCommands, GtCommands};
 
 /// Git commands with compact output
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Args)]
 pub struct Git {
     /// Change to directory before executing (like git -C <path>, can be repeated)

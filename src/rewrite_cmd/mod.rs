@@ -4,7 +4,7 @@ use crate::learn::corrections_store;
 
 mod rewrite_display;
 pub(crate) use rewrite_display::{
-    explain_no_rewrite, explain_no_rewrite_segment, explain_registry_match, render_explanation,
+    explain_no_rewrite, explain_registry_match, render_explanation,
     registry_estimated_savings, source_label, RewriteResolution, RewriteSource,
 };
 

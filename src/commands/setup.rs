@@ -57,6 +57,7 @@ pub struct Deps {
 }
 
 /// Show token savings summary and history
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Args)]
 pub struct Gain {
     /// Scope to a project. Bare --project or -p uses the current directory.
@@ -207,6 +208,7 @@ pub struct Context {
 }
 
 /// Initialize Mycelium CLAUDE.md instructions and Claude Code hook integration
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Args)]
 pub struct Init {
     /// Use global ~/.claude integration instead of local CLAUDE.md
@@ -326,6 +328,7 @@ pub struct ParseHealth {
 }
 
 /// Economics: global Claude Code spend (ccusage) vs Mycelium savings
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Args)]
 #[command(name = "economics")]
 pub struct CcEconomics {

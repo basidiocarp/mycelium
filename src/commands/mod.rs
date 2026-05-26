@@ -8,20 +8,19 @@ mod setup;
 pub mod subcommands;
 pub use subcommands::*;
 
+#[allow(unused_imports)]
+pub use files::{Diff, Find, Grep, Ls, Peek, Read, Tree, Wc};
+#[allow(unused_imports)]
+pub use vcs::{Gh, Git, Gt};
+#[allow(unused_imports)]
+pub use build::{Cargo, Format, Go, GolangciLint, Lint, Mypy, Next, Playwright, Prettier, Pytest, Ruff, Test, Tsc, Vitest};
+#[allow(unused_imports)]
+pub use infra::{Atmos, Aws, Curl, Docker, Kubectl, Prisma, Psql, Terraform, Wget};
+#[allow(unused_imports)]
+pub use setup::{Benchmark, CcEconomics, Completions, Config, Context, Deps, Discover, Doctor, Env, Err, Explain, Gain, HookAudit, Init, Invoke, Json, Learn, Log, Npm, Npx, ParseHealth, Pip, Plugin, Pnpm, Proxy, Rewrite, SelfUpdate, ServeSocket, Summary, Verify};
+
 use clap::{Parser, Subcommand};
 
-pub use files::{Diff, Find, Grep, Ls, Peek, Read, Tree, Wc};
-pub use vcs::{Gh, Git, Gt};
-pub use build::{
-    Cargo, Format, Go, GolangciLint, Lint, Mypy, Next, Prettier, Pytest, Ruff, Test, Tsc, Vitest,
-    Playwright,
-};
-pub use infra::{Atmos, Aws, Curl, Docker, Kubectl, Prisma, Psql, Terraform, Wget};
-pub use setup::{
-    Benchmark, CcEconomics, Completions, Config, Context, Deps, Discover, Doctor, Env, Err,
-    Explain, Gain, HookAudit, Init, Invoke, Json, Learn, Log, Npm, Npx, ParseHealth, Pip, Plugin,
-    Pnpm, Proxy, Rewrite, SelfUpdate, ServeSocket, Summary, Verify,
-};
 
 #[derive(Parser)]
 #[command(

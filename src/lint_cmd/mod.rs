@@ -5,7 +5,7 @@ mod generic;
 
 use generic::GenericLintParser;
 
-use crate::parser::{FormatMode, OutputParser, ParseResult, TokenFormatter, truncate_output};
+use crate::parser::{FormatMode, OutputParser, ParseResult, TokenFormatter};
 use crate::python::mypy as mypy_cmd;
 use crate::python::ruff as ruff_cmd;
 use crate::tracking;

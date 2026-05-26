@@ -10,7 +10,7 @@ use crate::init::claude_md::{
     resolve_claude_dir, upsert_mycelium_block,
 };
 use crate::init::hook;
-use crate::init::json_patch::{clean_double_blanks, patch_settings_json};
+use crate::init::json_patch::patch_settings_json;
 
 use super::context;
 

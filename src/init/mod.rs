@@ -11,7 +11,6 @@ mod onboard;
 
 use anyhow::Result;
 use std::fs;
-use std::path::PathBuf;
 
 pub use json_patch::PatchMode;
 pub use config_show::show_config;

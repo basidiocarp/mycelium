@@ -98,7 +98,7 @@ fn is_error_line(line: &str) -> bool {
     }
     for (i, _) in lower.match_indices("failed") {
         // Skip if "failed" is a suffix of another word (no word boundary before)
-        if lower[..i].chars().last().map_or(false, |c| c.is_alphabetic()) {
+        if lower[..i].chars().last().is_some_and(|c| c.is_alphabetic()) {
             continue;
         }
         // Skip count context: "0 failed", "12 failed"
