@@ -339,6 +339,12 @@ const SUPPORTED_TOOLS: &[&str] = &[
     "invoke",
 ];
 
+/// Returns true if `name` is a bare tool name with no directory separators.
+/// Only bare names may reach the SUPPORTED_TOOLS whitelist check.
+fn is_bare_tool_name(name: &str) -> bool {
+    !name.contains('/') && !name.contains('\\')
+}
+
 /// Returns true for commands that are invoked via the hook pipeline
 /// (i.e., commands that process rewritten shell commands).
 /// Meta commands (init, gain, verify, etc.) are excluded because
@@ -518,6 +524,22 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn test_absolute_path_tool_name_rejected_by_whitelist() {
+        let bad = ["/usr/bin/git", "/malicious/git", "relative/git", "../git", "subdir\\git"];
+        for name in bad {
+            assert!(!is_bare_tool_name(name), "{name} should be rejected");
+        }
+    }
+
+    #[test]
+    fn test_bare_tool_name_passes_guard() {
+        let good = ["git", "cargo", "npm", "docker"];
+        for name in good {
+            assert!(is_bare_tool_name(name), "{name} should pass");
+        }
+    }
 }
 
 /// Re-invoke `mycelium` without `--json`, capture stdout, and wrap output in a JSON envelope.
@@ -537,45 +559,54 @@ pub fn dispatch_json(cli: Cli) -> Result<()> {
     let (raw_output, raw_exit_code) = if !args.is_empty() {
         let tool_name = &args[0];
 
-        let base_name = std::path::Path::new(tool_name)
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or(tool_name);
+        // Only bare tool names (no path separators) may reach the whitelist check.
+        // An absolute or relative path like `/malicious/git` would yield base_name "git"
+        // and bypass the intent of the allowlist. Reject any tool_name containing a separator
+        // before extracting the basename.
+        if !is_bare_tool_name(tool_name) {
+            // Path supplied — treat as unrecognized and fall through to empty output.
+            (String::new(), 1)
+        } else {
+            let base_name = std::path::Path::new(tool_name)
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or(tool_name);
 
-        if SUPPORTED_TOOLS.contains(&base_name) {
-            // Resolve the tool path from SUPPORTED_TOOLS allowlist
-            match crate::platform::command_path(base_name) {
-                Some(resolved_path) => {
-                    let mut cmd = std::process::Command::new(&resolved_path);
-                    cmd.args(&args[1..]);
-                    let raw_result = bounded_output(cmd, DISPATCH_JSON_TIMEOUT, MAX_STDOUT_CAPTURE);
-                    match raw_result {
-                        Ok(out) => {
-                            let exit_code = out.status.code().unwrap_or(1);
-                            (String::from_utf8_lossy(&out.stdout).to_string(), exit_code)
-                        }
-                        Err(e) => {
-                            use tracing::warn;
-                            warn!(
-                                tool = tool_name,
-                                error_kind = ?e.kind(),
-                                "Tool spawn error in dispatch_json: {e}"
-                            );
-                            (format!("[raw output unavailable: {e}]"), 1)
+            if SUPPORTED_TOOLS.contains(&base_name) {
+                // Resolve the tool path from SUPPORTED_TOOLS allowlist
+                match crate::platform::command_path(base_name) {
+                    Some(resolved_path) => {
+                        let mut cmd = std::process::Command::new(&resolved_path);
+                        cmd.args(&args[1..]);
+                        let raw_result = bounded_output(cmd, DISPATCH_JSON_TIMEOUT, MAX_STDOUT_CAPTURE);
+                        match raw_result {
+                            Ok(out) => {
+                                let exit_code = out.status.code().unwrap_or(1);
+                                (String::from_utf8_lossy(&out.stdout).to_string(), exit_code)
+                            }
+                            Err(e) => {
+                                use tracing::warn;
+                                warn!(
+                                    tool = tool_name,
+                                    error_kind = ?e.kind(),
+                                    "Tool spawn error in dispatch_json: {e}"
+                                );
+                                (format!("[raw output unavailable: {e}]"), 1)
+                            }
                         }
                     }
+                    None => {
+                        use tracing::warn;
+                        warn!(
+                            base_name = base_name,
+                            "Failed to resolve allowed tool path in dispatch_json"
+                        );
+                        (String::new(), 1)
+                    }
                 }
-                None => {
-                    use tracing::warn;
-                    warn!(
-                        base_name = base_name,
-                        "Failed to resolve allowed tool path in dispatch_json"
-                    );
-                    (String::new(), 1)
-                }
+            } else {
+                (String::new(), 1)
             }
-        } else {
-            (String::new(), 1)
         }
     } else {
         (String::new(), 1)
