@@ -60,9 +60,36 @@ impl ContentRouter {
     pub fn detect_content_type(output: &str) -> ContentType {
         let trimmed = output.trim_start();
 
-        // Check for JSON
-        if trimmed.starts_with('{') || trimmed.starts_with('[') {
-            return ContentType::Json;
+        // Check for JSON — require stronger evidence than just a leading { or [
+        // to reduce false positives on prose that starts with those characters.
+        // Walk backward from 512 to find a valid char boundary, so the probe slice
+        // never splits a multi-byte UTF-8 sequence.
+        let probe_end = {
+            let limit = trimmed.len().min(512);
+            let mut end = limit;
+            while end > 0 && !trimmed.is_char_boundary(end) {
+                end -= 1;
+            }
+            end
+        };
+        if trimmed.starts_with('{') {
+            // JSON objects start with `{"key"`, so the second byte being `"` is a fast path
+            // for the common case. The fast path may over-accept (e.g. `{"not json`), but
+            // filter_json performs a full parse and passes through invalid JSON unchanged,
+            // so routing accuracy here does not affect output correctness.
+            let looks_like_json = trimmed.as_bytes().get(1) == Some(&b'"')
+                || serde_json::from_str::<Value>(&trimmed[..probe_end]).is_ok();
+            if looks_like_json {
+                return ContentType::Json;
+            }
+        } else if trimmed.starts_with('[') {
+            // For arrays: if it parses as valid JSON, treat it as JSON.
+            // This catches both single-element and multi-element arrays that are
+            // legitimately JSON structures, while avoiding prose that happens to start
+            // with `[` but doesn't form valid JSON.
+            if serde_json::from_str::<Value>(&trimmed[..probe_end]).is_ok() {
+                return ContentType::Json;
+            }
         }
 
         // Check for code/diffs (hunk markers, code blocks, structural diff markers)
