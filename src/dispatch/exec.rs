@@ -183,6 +183,9 @@ fn bounded_output(
         Err(_) => {
             let _ = child.kill();
             let _ = child.wait(); // reap zombie
+            // Drain reader threads so they can observe pipe close and exit.
+            while stdout_rx.recv_timeout(std::time::Duration::from_millis(100)).is_ok() {}
+            while stderr_rx.recv_timeout(std::time::Duration::from_millis(100)).is_ok() {}
             Err(std::io::Error::new(
                 std::io::ErrorKind::TimedOut,
                 "dispatch_json subprocess timed out",
