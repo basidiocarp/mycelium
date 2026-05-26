@@ -43,7 +43,8 @@ pub(super) fn run_spawned_command(
                 break;
             }
             if captured.len() < MAX_STDOUT_CAPTURE {
-                captured.extend_from_slice(&buf[..count]);
+                let remaining = MAX_STDOUT_CAPTURE - captured.len();
+                captured.extend_from_slice(&buf[..count.min(remaining)]);
             }
             // Continue draining stdout even after cap is hit, but discard bytes past the cap
         }
@@ -62,7 +63,8 @@ pub(super) fn run_spawned_command(
                 break;
             }
             if captured.len() < MAX_STDERR_CAPTURE {
-                captured.extend_from_slice(&buf[..count]);
+                let remaining = MAX_STDERR_CAPTURE - captured.len();
+                captured.extend_from_slice(&buf[..count.min(remaining)]);
             }
             // Continue draining stderr even after cap is hit, but discard bytes past the cap
             let mut err = std::io::stderr().lock();
