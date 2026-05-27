@@ -649,9 +649,13 @@ pub fn dispatch_json(cli: Cli) -> Result<()> {
         let mycelium_exe = std::env::current_exe().context("Failed to locate mycelium executable")?;
         let mut filtered_cmd = std::process::Command::new(&mycelium_exe);
         filtered_cmd.args(&args);
-        filtered_cmd.env("MYCELIUM_JSON_DEPTH", (json_depth + 1).to_string());
-        // Note: raw_output already buffered child stdout above; filtered_result buffers mycelium's filtered stdout.
-        // Both are bounded at MAX_STDOUT_CAPTURE (64 MB) by bounded_output helper, preventing compound memory exhaustion.
+        // Depth is always 0 at this point (the >= 1 branch above handles re-entry).
+        // Child therefore always starts at depth 1.
+        filtered_cmd.env("MYCELIUM_JSON_DEPTH", "1");
+        // Two bounded_output calls: up to 2 × 64 MB heap per invocation.
+        // raw_output (captured above) buffers the tool's stdout; filtered_result buffers
+        // mycelium's filtered stdout. Both are bounded at MAX_STDOUT_CAPTURE (64 MB) by
+        // bounded_output, preventing compound memory exhaustion.
         let filtered_result = bounded_output(filtered_cmd, DISPATCH_JSON_TIMEOUT, MAX_STDOUT_CAPTURE);
 
         match filtered_result {
