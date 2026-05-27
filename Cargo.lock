@@ -1182,12 +1182,14 @@ checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 
 [[package]]
 name = "spore"
-version = "0.6.0"
-source = "git+https://github.com/basidiocarp/spore?rev=967e10c43a1052c9e57e226227621a83e6ac20e4#967e10c43a1052c9e57e226227621a83e6ac20e4"
+version = "0.6.2"
+source = "git+https://github.com/basidiocarp/spore?rev=85414a54afc16597297f6cd42edec5985474d767#85414a54afc16597297f6cd42edec5985474d767"
 dependencies = [
  "anyhow",
  "chrono",
  "dirs",
+ "libc",
+ "regex",
  "serde",
  "serde_json",
  "tempfile",
