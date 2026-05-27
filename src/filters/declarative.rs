@@ -263,8 +263,11 @@ pub fn load_declarative_filters(dir: &Path) -> Vec<DeclarativeFilter> {
         return Vec::new();
     };
 
+    let mut sorted_entries: Vec<_> = entries.flatten().collect();
+    sorted_entries.sort_by_key(std::fs::DirEntry::file_name);
+
     let mut filters = Vec::new();
-    for entry in entries.flatten() {
+    for entry in sorted_entries {
         let path = entry.path();
         if path.extension().and_then(|e| e.to_str()) != Some("toml") {
             continue;
@@ -553,5 +556,24 @@ strategy = "invalid_strategy"
 
         let matched = find_matching_filter("unknown command", &project_filters, &user_filters);
         assert!(matched.is_none());
+    }
+
+    #[test]
+    fn load_declarative_filters_sorts_by_filename() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let b_filter_path = dir.path().join("b_filter.toml");
+        let a_filter_path = dir.path().join("a_filter.toml");
+
+        // b_filter.toml matches "cargo build"; a_filter.toml matches "cargo test"
+        std::fs::write(&b_filter_path, "command = \"cargo build\"\nstrategy = \"group\"\n")
+            .expect("write b_filter.toml");
+        std::fs::write(&a_filter_path, "command = \"cargo test\"\nstrategy = \"group\"\n")
+            .expect("write a_filter.toml");
+
+        let filters = load_declarative_filters(dir.path());
+        assert_eq!(filters.len(), 2);
+        // a_filter.toml < b_filter.toml alphabetically — a_filter (cargo test) comes first
+        assert_eq!(filters[0].command, "cargo test");
+        assert_eq!(filters[1].command, "cargo build");
     }
 }

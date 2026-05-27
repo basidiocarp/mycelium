@@ -61,7 +61,10 @@ pub fn invoke_shell_command(command: &str) -> Command {
     if cfg!(target_os = "windows") {
         cmd.args(["/C", command]);
     } else {
-        cmd.args(["-l", "-c", command]);
+        if std::env::var("MYCELIUM_LOGIN_SHELL").as_deref() == Ok("1") {
+            cmd.arg("-l");
+        }
+        cmd.args(["-c", command]);
     }
     cmd
 }
