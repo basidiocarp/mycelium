@@ -73,7 +73,7 @@ impl DeclarativeFilter {
             .and_then(|p| match Regex::new(p) {
                 Ok(r) => Some(r),
                 Err(e) => {
-                    eprintln!("mycelium: failed to compile keep_pattern regex '{p}': {e}");
+                    eprintln!("[mycelium] failed to compile keep_pattern regex '{p}': {e}");
                     None
                 }
             });
@@ -84,7 +84,7 @@ impl DeclarativeFilter {
             .and_then(|p| match Regex::new(p) {
                 Ok(r) => Some(r),
                 Err(e) => {
-                    eprintln!("mycelium: failed to compile drop_pattern regex '{p}': {e}");
+                    eprintln!("[mycelium] failed to compile drop_pattern regex '{p}': {e}");
                     None
                 }
             });
@@ -273,7 +273,7 @@ pub fn load_declarative_filters(dir: &Path) -> Vec<DeclarativeFilter> {
             continue;
         }
         let Ok(contents) = std::fs::read_to_string(&path) else {
-            eprintln!("mycelium: failed to read declarative filter {}", path.display());
+            eprintln!("[mycelium] failed to read declarative filter {}", path.display());
             continue;
         };
         match toml::from_str::<RawDeclarativeFilter>(&contents) {
@@ -281,13 +281,13 @@ pub fn load_declarative_filters(dir: &Path) -> Vec<DeclarativeFilter> {
                 Ok(filter) => filters.push(filter),
                 Err(e) => {
                     eprintln!(
-                        "mycelium: invalid declarative filter {}: {e}", path.display()
+                        "[mycelium] invalid declarative filter {}: {e}", path.display()
                     );
                 }
             },
             Err(e) => {
                 eprintln!(
-                    "mycelium: failed to parse declarative filter {}: {e}", path.display()
+                    "[mycelium] failed to parse declarative filter {}: {e}", path.display()
                 );
             }
         }

@@ -96,7 +96,7 @@ fn trait_ts() -> &'static Regex {
 /// Heuristic-based code summarizer - no external model needed
 pub fn run(file: &Path, _model: &str, _force_download: bool, verbose: u8) -> Result<()> {
     if verbose > 0 {
-        eprintln!("Analyzing: {}", file.display());
+        eprintln!("[mycelium] Analyzing: {}", file.display());
     }
 
     let content = fs::read_to_string(file)

@@ -221,8 +221,8 @@ pub fn run_verify(verbose: u8) -> Result<()> {
         let hash_file = hash_path(&hook_path);
 
         if verbose > 0 {
-            eprintln!("Hook:  {}", hook_path.display());
-            eprintln!("Hash:  {}", hash_file.display());
+            eprintln!("[mycelium] Hook:  {}", hook_path.display());
+            eprintln!("[mycelium] Hash:  {}", hash_file.display());
         }
 
         match verify_hook_at(&hook_path)? {
@@ -236,16 +236,16 @@ pub fn run_verify(verbose: u8) -> Result<()> {
             IntegrityStatus::Tampered { expected, actual } => {
                 found_hook = true;
                 tampered = true;
-                eprintln!("FAIL  hook integrity check FAILED");
-                eprintln!();
-                eprintln!("  Expected: {}", expected);
-                eprintln!("  Actual:   {}", actual);
-                eprintln!();
-                eprintln!("  The hook file has been modified outside of `mycelium init`.");
-                eprintln!("  This could indicate tampering or a manual edit.");
-                eprintln!();
-                eprintln!("  To restore: mycelium init -g --auto-patch");
-                eprintln!("  To inspect: cat {}", hook_path.display());
+                eprintln!("[mycelium] FAIL  hook integrity check FAILED");
+                eprintln!("[mycelium]");
+                eprintln!("[mycelium]   Expected: {}", expected);
+                eprintln!("[mycelium]   Actual:   {}", actual);
+                eprintln!("[mycelium]");
+                eprintln!("[mycelium]   The hook file has been modified outside of `mycelium init`.");
+                eprintln!("[mycelium]   This could indicate tampering or a manual edit.");
+                eprintln!("[mycelium]");
+                eprintln!("[mycelium]   To restore: mycelium init -g --auto-patch");
+                eprintln!("[mycelium]   To inspect: cat {}", hook_path.display());
             }
             IntegrityStatus::NoBaseline => {
                 found_hook = true;
@@ -257,9 +257,9 @@ pub fn run_verify(verbose: u8) -> Result<()> {
             IntegrityStatus::NotInstalled => {}
             IntegrityStatus::OrphanedHash => {
                 found_hook = true;
-                eprintln!("WARN  hash file exists but hook is missing");
-                eprintln!("      Run `mycelium init -g` to reinstall.");
-                eprintln!("      {}", hook_path.display());
+                eprintln!("[mycelium] WARN  hash file exists but hook is missing");
+                eprintln!("[mycelium]       Run `mycelium init -g` to reinstall.");
+                eprintln!("[mycelium]       {}", hook_path.display());
             }
         }
     }
@@ -296,27 +296,27 @@ pub fn runtime_check() -> Result<()> {
                 // Silently skip to avoid noise for users who haven't re-run init
             }
             IntegrityStatus::Tampered { expected, actual } => {
-                eprintln!("mycelium: hook integrity check FAILED");
+                eprintln!("[mycelium] hook integrity check FAILED");
                 eprintln!(
-                    "  Expected hash: {}...",
+                    "[mycelium]   Expected hash: {}...",
                     expected.get(..16).unwrap_or(&expected)
                 );
                 eprintln!(
-                    "  Actual hash:   {}...",
+                    "[mycelium]   Actual hash:   {}...",
                     actual.get(..16).unwrap_or(&actual)
                 );
-                eprintln!();
-                eprintln!("  The hook at {} has been modified.", hook_path.display());
-                eprintln!("  This may indicate tampering. Mycelium will not execute.");
-                eprintln!();
-                eprintln!("  To restore:  mycelium init -g --auto-patch");
-                eprintln!("  To inspect:  mycelium verify");
+                eprintln!("[mycelium]");
+                eprintln!("[mycelium]   The hook at {} has been modified.", hook_path.display());
+                eprintln!("[mycelium]   This may indicate tampering. Mycelium will not execute.");
+                eprintln!("[mycelium]");
+                eprintln!("[mycelium]   To restore:  mycelium init -g --auto-patch");
+                eprintln!("[mycelium]   To inspect:  mycelium verify");
                 std::process::exit(1);
             }
             IntegrityStatus::OrphanedHash => {
-                eprintln!("mycelium: warning: hash file exists but hook is missing");
-                eprintln!("  Run `mycelium init -g` to reinstall.");
-                eprintln!("  Missing hook: {}", hook_path.display());
+                eprintln!("[mycelium] warning: hash file exists but hook is missing");
+                eprintln!("[mycelium]   Run `mycelium init -g` to reinstall.");
+                eprintln!("[mycelium]   Missing hook: {}", hook_path.display());
                 // Don't block — hook is gone, nothing to exploit
             }
         }
