@@ -6,6 +6,7 @@
 use regex::Regex;
 use serde::Deserialize;
 use std::path::Path;
+use tracing::warn;
 
 use crate::filter::FilterResult;
 
@@ -73,6 +74,7 @@ impl DeclarativeFilter {
             .and_then(|p| match Regex::new(p) {
                 Ok(r) => Some(r),
                 Err(e) => {
+                    warn!(pattern = p, error = %e, command = %raw.command, "declarative filter keep_pattern regex failed to compile; pattern skipped");
                     eprintln!("[mycelium] failed to compile keep_pattern regex '{p}': {e}");
                     None
                 }
@@ -84,6 +86,7 @@ impl DeclarativeFilter {
             .and_then(|p| match Regex::new(p) {
                 Ok(r) => Some(r),
                 Err(e) => {
+                    warn!(pattern = p, error = %e, command = %raw.command, "declarative filter drop_pattern regex failed to compile; pattern skipped");
                     eprintln!("[mycelium] failed to compile drop_pattern regex '{p}': {e}");
                     None
                 }
@@ -165,7 +168,7 @@ impl DeclarativeFilter {
             "group" => self.apply_group(&lines),
             "deduplicate" => self.apply_deduplicate(&lines),
             _ => {
-                tracing::warn!("mycelium: unknown filter strategy: {}", self.strategy);
+                warn!("mycelium: unknown filter strategy: {}", self.strategy);
                 input.to_string()
             }
         };
