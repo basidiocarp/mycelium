@@ -3,12 +3,12 @@ use std::process::Command;
 
 #[must_use]
 pub fn mycelium_config_dir() -> Option<PathBuf> {
-    Some(spore::paths::config_dir("mycelium"))
+    spore::paths::config_dir("mycelium").ok()
 }
 
 #[must_use]
 pub fn mycelium_data_dir() -> Option<PathBuf> {
-    Some(spore::paths::data_dir("mycelium"))
+    spore::paths::data_dir("mycelium").ok()
 }
 
 #[must_use]

@@ -340,7 +340,7 @@ fn check_binary_collision() {
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 fn config_path_best_effort() -> Option<PathBuf> {
-    Some(spore::paths::config_path("mycelium"))
+    spore::paths::config_path("mycelium").ok()
 }
 
 #[cfg(test)]
