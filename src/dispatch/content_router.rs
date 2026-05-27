@@ -5,6 +5,10 @@
 //! essential information.
 
 use serde_json::Value;
+use std::sync::OnceLock;
+
+static KILLED_RE: OnceLock<regex::Regex> = OnceLock::new();
+static DENIED_RE: OnceLock<regex::Regex> = OnceLock::new();
 
 /// Check whether input looks like unified diff output.
 fn looks_like_diff(input: &str) -> bool {
@@ -170,6 +174,11 @@ impl ContentRouter {
     /// Lines beyond that limit are counted and emitted as `[... N context lines ...]`
     /// at the next important line or end of input.
     fn filter_code(&self, output: &str) -> String {
+        // Initialize regexes once before the loop to avoid clippy warning about
+        // regex construction in loops.
+        let killed_re = KILLED_RE.get_or_init(|| regex::Regex::new(r"(?i)\bkilled\b").unwrap());
+        let denied_re = DENIED_RE.get_or_init(|| regex::Regex::new(r"(?i)\bdenied\b").unwrap());
+
         let mut result = Vec::new();
         // Total consecutive non-important lines in the current run.
         let mut context_run: usize = 0;
@@ -194,10 +203,8 @@ impl ContentRouter {
                 || line.contains("Traceback")
                 || line.contains("assertion")
                 || line.contains("Assertion")
-                || line.contains("killed")
-                || line.contains("Killed")
-                || line.contains("denied")
-                || line.contains("Denied")
+                || killed_re.is_match(line)
+                || denied_re.is_match(line)
                 || line.contains("aborted")
                 || line.contains("Aborted")
                 || line.contains("segfault")
@@ -475,5 +482,31 @@ mod tests {
         // @@ in an email address must not trigger diff detection
         let content_type = ContentRouter::detect_content_type("Contact: user@example.com or admin@@corp.org");
         assert_ne!(content_type, ContentType::Code);
+    }
+
+    #[test]
+    fn filter_code_kills_false_positive_not_triggered_by_unkilled() {
+        let router = ContentRouter::default();
+        let input = "process unkilled normally; all good";
+        let output = router.filter_code(input);
+        // "unkilled" must not mark this line as important (no ellipsis expected)
+        assert!(!output.contains("[..."));
+        assert!(output.contains("unkilled"));
+    }
+
+    #[test]
+    fn filter_code_detects_killed_word() {
+        let router = ContentRouter::default();
+        let input = "context\nprocess was killed by signal\nmore context";
+        let output = router.filter_code(input);
+        assert!(output.contains("killed"));
+    }
+
+    #[test]
+    fn filter_code_detects_killed_uppercase() {
+        let router = ContentRouter::default();
+        let input = "context\nKILLED by OOM killer\nmore context";
+        let output = router.filter_code(input);
+        assert!(output.contains("KILLED"));
     }
 }
