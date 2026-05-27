@@ -675,17 +675,23 @@ pub fn dispatch_json(cli: Cli) -> Result<()> {
             Ok(output) if !output.stdout.is_empty() => {
                 let filtered = String::from_utf8_lossy(&output.stdout).to_string();
                 let exit_code = output.status.code().unwrap_or(1);
-                let envelope = json_output::wrap_error(&filtered, exit_code);
+                // Inner mycelium exited non-zero but produced stdout — most likely the proxied
+                // tool failed and mycelium forwarded its output. A mycelium-internal panic after
+                // partial output would also land here, but that scenario is rare enough that
+                // false is the right default.
+                let envelope = json_output::wrap_error(&filtered, raw_exit_code, false);
                 (envelope, exit_code)
             }
             Ok(output) => {
                 let exit_code = output.status.code().unwrap_or(1);
                 let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-                let envelope = json_output::wrap_error(&stderr, exit_code);
+                // Inner mycelium produced no stdout — the failure originated inside mycelium.
+                let envelope = json_output::wrap_error(&stderr, raw_exit_code, true);
                 (envelope, exit_code)
             }
             Err(e) => {
-                let envelope = json_output::wrap_error(&e.to_string(), 1);
+                // Spawn failure — mycelium could not start the inner process at all.
+                let envelope = json_output::wrap_error(&e.to_string(), raw_exit_code, true);
                 (envelope, 1)
             }
         }

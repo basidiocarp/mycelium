@@ -42,10 +42,15 @@ pub fn wrap_output(
 }
 
 /// Wrap an error in a JSON envelope.
-pub fn wrap_error(message: &str, exit_code: i32) -> String {
+///
+/// `exit_code` must be the proxied tool's exit code, not mycelium's own process exit code.
+/// `mycelium_error` is `true` only when the failure originated inside mycelium itself
+/// (spawn failure, empty output after inner process error) rather than from the proxied tool.
+pub fn wrap_error(message: &str, exit_code: i32, mycelium_error: bool) -> String {
     serde_json::to_string(&json!({
         "error": message,
-        "exit_code": exit_code
+        "exit_code": exit_code,
+        "mycelium_error": mycelium_error
     }))
     .unwrap_or_else(|_| "{}".to_string())
 }
@@ -73,10 +78,29 @@ mod tests {
 
     #[test]
     fn test_wrap_error() {
-        let result = wrap_error("something went wrong", 1);
+        let result = wrap_error("something went wrong", 1, true);
         let v: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
         assert_eq!(v["error"], "something went wrong");
         assert_eq!(v["exit_code"], 1);
+        assert_eq!(v["mycelium_error"], true);
+    }
+
+    #[test]
+    fn test_wrap_error_tool_failure_not_mycelium_error() {
+        let result = wrap_error("tool exited with non-zero status", 2, false);
+        let v: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
+        assert_eq!(v["exit_code"], 2);
+        assert_eq!(v["mycelium_error"], false);
+    }
+
+    #[test]
+    fn test_wrap_error_exit_code_is_proxied_tool_code_not_inner_mycelium() {
+        // raw_exit_code (proxied tool) = 2, inner mycelium exit = 1 (different).
+        // The envelope must carry the proxied tool's code, not mycelium's.
+        let result = wrap_error("tool output on failure", 2, false);
+        let v: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
+        assert_eq!(v["exit_code"], 2);
+        assert_eq!(v["mycelium_error"], false);
     }
 
     #[test]
