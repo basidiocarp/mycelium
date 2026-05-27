@@ -231,7 +231,12 @@ impl FilteredCommand {
             println!("{}", routed.output);
         }
 
-        timer.track(&raw_label, &mycelium_label, &raw_for_storage, &routed.output);
+        timer.track(
+            &raw_label,
+            &mycelium_label,
+            &raw_for_storage,
+            &routed.output,
+        );
 
         if exit_code != 0 {
             std::process::exit(exit_code);

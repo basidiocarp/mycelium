@@ -480,7 +480,8 @@ mod tests {
     #[test]
     fn email_address_not_detected_as_diff() {
         // @@ in an email address must not trigger diff detection
-        let content_type = ContentRouter::detect_content_type("Contact: user@example.com or admin@@corp.org");
+        let content_type =
+            ContentRouter::detect_content_type("Contact: user@example.com or admin@@corp.org");
         assert_ne!(content_type, ContentType::Code);
     }
 

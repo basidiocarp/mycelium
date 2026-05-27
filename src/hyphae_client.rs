@@ -65,14 +65,12 @@ fn get_or_connect() -> Result<MutexGuard<'static, Option<McpClient>>> {
     // Recover from poison rather than propagating: the `is_alive()` check and
     // re-spawn path below handle any partially-written state left by the
     // panicking thread, so the recovered guard is safe to reuse here.
-    let mut guard = HYPHAE_PROCESS
-        .lock()
-        .unwrap_or_else(|e| {
-            HYPHAE_POISON_WARNED.get_or_init(|| {
-                warn!("hyphae mutex was poisoned; recovering inner value");
-            });
-            e.into_inner()
+    let mut guard = HYPHAE_PROCESS.lock().unwrap_or_else(|e| {
+        HYPHAE_POISON_WARNED.get_or_init(|| {
+            warn!("hyphae mutex was poisoned; recovering inner value");
         });
+        e.into_inner()
+    });
 
     if let Some(client) = guard.as_mut()
         && client.is_alive()

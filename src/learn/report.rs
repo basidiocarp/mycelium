@@ -1,13 +1,13 @@
 //! Formats learned correction rules as console reports or TOML rule files.
-use std::fmt::Write as _;
 use crate::learn::detector::CorrectionRule;
 use anyhow::Result;
 use std::collections::HashMap;
+use std::fmt::Write as _;
 use std::fs;
 use std::path::Path;
 
 /// Format correction rules as a human-readable console report.
-#[must_use] 
+#[must_use]
 pub fn format_console_report(
     rules: &[CorrectionRule],
     total_corrections: usize,
@@ -23,7 +23,8 @@ pub fn format_console_report(
         total_corrections,
         sessions,
         days
-    ).ok();
+    )
+    .ok();
 
     if rules.is_empty() {
         output.push_str("\nNo CLI corrections detected.\n");
@@ -43,7 +44,8 @@ pub fn format_console_report(
             output,
             "{}{}  →  {}",
             count_marker, rule.wrong_pattern, rule.right_pattern
-        ).ok();
+        )
+        .ok();
 
         // Show error snippet (first line only)
         let error_line = rule.example_error.lines().next().unwrap_or("").trim();
@@ -105,7 +107,8 @@ pub fn write_rules_file(rules: &[CorrectionRule], path: &str) -> Result<()> {
                 content,
                 "- Use `{}` not `{}`{}",
                 rule.right_pattern, rule.wrong_pattern, occurrence_note
-            ).ok();
+            )
+            .ok();
         }
 
         content.push('\n');

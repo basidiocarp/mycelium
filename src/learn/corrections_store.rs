@@ -31,7 +31,7 @@ pub fn write_corrections_json(corrections: &[UserCorrection], path: &str) -> Res
 }
 
 /// Load user corrections from JSON. Returns empty Vec on missing or malformed file.
-#[must_use] 
+#[must_use]
 pub fn load_corrections(path: &str) -> Vec<UserCorrection> {
     std::fs::read_to_string(path)
         .ok()
@@ -40,7 +40,7 @@ pub fn load_corrections(path: &str) -> Vec<UserCorrection> {
 }
 
 /// Return the corrected command if `cmd` matches a user correction, otherwise `None`.
-#[must_use] 
+#[must_use]
 pub fn apply_correction(cmd: &str, corrections: &[UserCorrection]) -> Option<String> {
     let trimmed = cmd.trim();
     corrections

@@ -1,6 +1,8 @@
 use clap::Args;
 
-pub use super::subcommands::{DockerCommands, KubectlCommands, TerraformCommands, AwsCommands, AtmosCommands};
+pub use super::subcommands::{
+    AtmosCommands, AwsCommands, DockerCommands, KubectlCommands, TerraformCommands,
+};
 
 /// Docker commands with compact output
 #[derive(Args)]

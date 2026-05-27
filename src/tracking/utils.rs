@@ -82,7 +82,9 @@ fn get_git_remote_url() -> Option<String> {
         let _ = tx.send(output);
     });
 
-    if let Ok(output_bytes) = rx.recv_timeout(Duration::from_secs(2)) { Some(String::from_utf8_lossy(&output_bytes).trim().to_owned()) } else {
+    if let Ok(output_bytes) = rx.recv_timeout(Duration::from_secs(2)) {
+        Some(String::from_utf8_lossy(&output_bytes).trim().to_owned())
+    } else {
         let _ = child.kill();
         let _ = child.wait(); // reap to avoid zombie accumulation
         None
@@ -317,7 +319,7 @@ fn span_context(command: &str) -> SpanContext {
 /// assert_eq!(estimate_tokens("abcde"), 2); // 5 chars = ceil(1.25) = 2
 /// assert_eq!(estimate_tokens("hello world"), 3); // 11 chars = ceil(2.75) = 3
 /// ```
-#[must_use] 
+#[must_use]
 pub fn estimate_tokens(text: &str) -> usize {
     spore::tokens::estimate(text)
 }
@@ -335,7 +337,7 @@ pub fn estimate_tokens(text: &str) -> usize {
 /// let args = vec![OsString::from("status"), OsString::from("--short")];
 /// assert_eq!(args_display(&args), "status --short");
 /// ```
-#[must_use] 
+#[must_use]
 pub fn args_display(args: &[OsString]) -> String {
     args.iter()
         .map(|a| a.to_string_lossy())

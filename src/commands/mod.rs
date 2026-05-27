@@ -1,26 +1,32 @@
 //! Clap CLI definition with all subcommands and global flags.
 
-mod files;
-mod vcs;
 mod build;
+mod files;
 mod infra;
 mod setup;
 pub mod subcommands;
+mod vcs;
 pub use subcommands::*;
 
 #[allow(unused_imports)]
+pub use build::{
+    Cargo, Format, Go, GolangciLint, Lint, Mypy, Next, Playwright, Prettier, Pytest, Ruff, Test,
+    Tsc, Vitest,
+};
+#[allow(unused_imports)]
 pub use files::{Diff, Find, Grep, Ls, Peek, Read, Tree, Wc};
-#[allow(unused_imports)]
-pub use vcs::{Gh, Git, Gt};
-#[allow(unused_imports)]
-pub use build::{Cargo, Format, Go, GolangciLint, Lint, Mypy, Next, Playwright, Prettier, Pytest, Ruff, Test, Tsc, Vitest};
 #[allow(unused_imports)]
 pub use infra::{Atmos, Aws, Curl, Docker, Kubectl, Prisma, Psql, Terraform, Wget};
 #[allow(unused_imports)]
-pub use setup::{Benchmark, CcEconomics, Completions, Config, Context, Deps, Discover, Doctor, Env, Err, Explain, Gain, HookAudit, Init, Invoke, Json, Learn, Log, Npm, Npx, ParseHealth, Pip, Plugin, Pnpm, Proxy, Rewrite, SelfUpdate, ServeSocket, Summary, Verify};
+pub use setup::{
+    Benchmark, CcEconomics, Completions, Config, Context, Deps, Discover, Doctor, Env, Err,
+    Explain, Gain, HookAudit, Init, Invoke, Json, Learn, Log, Npm, Npx, ParseHealth, Pip, Plugin,
+    Pnpm, Proxy, Rewrite, SelfUpdate, ServeSocket, Summary, Verify,
+};
+#[allow(unused_imports)]
+pub use vcs::{Gh, Git, Gt};
 
 use clap::{Parser, Subcommand};
-
 
 #[derive(Parser)]
 #[command(

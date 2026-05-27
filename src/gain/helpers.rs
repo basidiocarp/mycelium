@@ -61,7 +61,11 @@ pub(crate) fn style_command_cell(cmd: &str) -> String {
 }
 
 /// Render a proportional bar chart segment (TTY-aware).
-#[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+#[allow(
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
 pub(crate) fn mini_bar(value: usize, max: usize, width: usize) -> String {
     if max == 0 || width == 0 {
         return String::new();
@@ -78,7 +82,11 @@ pub(crate) fn mini_bar(value: usize, max: usize, width: usize) -> String {
 }
 
 /// Print an efficiency meter with colored progress bar (TTY-aware).
-#[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+#[allow(
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
 pub(crate) fn print_efficiency_meter(pct: f64) {
     let width = 24usize;
     let filled = (((pct / 100.0) * width as f64).round() as usize).min(width);

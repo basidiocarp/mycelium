@@ -35,9 +35,7 @@ pub fn run(
     }
 
     if sessions.is_empty() {
-        println!(
-            "No Claude Code or Codex sessions found in the last {since} days."
-        );
+        println!("No Claude Code or Codex sessions found in the last {since} days.");
         return Ok(());
     }
 
@@ -45,7 +43,9 @@ pub fn run(
     let mut all_commands: Vec<CommandExecution> = Vec::new();
 
     for (source, session_path) in &sessions {
-        let Ok(extracted) = extract_commands(*source, session_path) else { continue }; // Skip malformed sessions
+        let Ok(extracted) = extract_commands(*source, session_path) else {
+            continue;
+        }; // Skip malformed sessions
 
         for ext_cmd in extracted {
             // Only process commands with output content

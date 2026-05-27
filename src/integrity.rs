@@ -241,7 +241,9 @@ pub fn run_verify(verbose: u8) -> Result<()> {
                 eprintln!("[mycelium]   Expected: {}", expected);
                 eprintln!("[mycelium]   Actual:   {}", actual);
                 eprintln!("[mycelium]");
-                eprintln!("[mycelium]   The hook file has been modified outside of `mycelium init`.");
+                eprintln!(
+                    "[mycelium]   The hook file has been modified outside of `mycelium init`."
+                );
                 eprintln!("[mycelium]   This could indicate tampering or a manual edit.");
                 eprintln!("[mycelium]");
                 eprintln!("[mycelium]   To restore: mycelium init -g --auto-patch");
@@ -306,7 +308,10 @@ pub fn runtime_check() -> Result<()> {
                     actual.get(..16).unwrap_or(&actual)
                 );
                 eprintln!("[mycelium]");
-                eprintln!("[mycelium]   The hook at {} has been modified.", hook_path.display());
+                eprintln!(
+                    "[mycelium]   The hook at {} has been modified.",
+                    hook_path.display()
+                );
                 eprintln!("[mycelium]   This may indicate tampering. Mycelium will not execute.");
                 eprintln!("[mycelium]");
                 eprintln!("[mycelium]   To restore:  mycelium init -g --auto-patch");

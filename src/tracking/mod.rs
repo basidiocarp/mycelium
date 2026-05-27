@@ -33,8 +33,8 @@ mod schema;
 mod telemetry;
 mod timer;
 mod types;
-mod write;
 pub(crate) mod utils;
+mod write;
 
 use anyhow::Result;
 use rusqlite::Connection;

@@ -4,8 +4,8 @@ use crate::learn::corrections_store;
 
 mod rewrite_display;
 pub(crate) use rewrite_display::{
-    explain_no_rewrite, explain_registry_match, render_explanation,
-    registry_estimated_savings, source_label, RewriteResolution, RewriteSource,
+    RewriteResolution, RewriteSource, explain_no_rewrite, explain_registry_match,
+    registry_estimated_savings, render_explanation, source_label,
 };
 
 /// Run the `mycelium rewrite` command.
@@ -70,7 +70,6 @@ pub(crate) fn resolve_runtime_command(cmd: &str) -> RuntimeResolution {
 pub fn explain(cmd: &str) -> String {
     render_explanation(&resolve(cmd))
 }
-
 
 pub(crate) fn resolve_with_inputs_internal(
     cmd: &str,
@@ -143,12 +142,6 @@ fn resolve(cmd: &str) -> RewriteResolution {
     let user_corrections = corrections_store::load_corrections(corrections_store::CORRECTIONS_JSON);
     resolve_with_inputs_internal(cmd, &excluded, &user_corrections)
 }
-
-
-
-
-
-
 
 #[cfg(test)]
 mod explain_tests {
@@ -256,8 +249,11 @@ mod tests {
             right: "mycelium git status && mycelium gh pr list --json number".to_string(),
         }];
 
-        let resolution =
-            resolve_with_inputs_internal("git status && gh pr list --json number", &[], &corrections);
+        let resolution = resolve_with_inputs_internal(
+            "git status && gh pr list --json number",
+            &[],
+            &corrections,
+        );
         assert!(resolution.rewritten.is_none());
         assert_eq!(resolution.source, RewriteSource::NoRewrite);
     }

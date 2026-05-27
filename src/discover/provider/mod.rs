@@ -49,7 +49,7 @@ pub enum SessionSource {
 
 impl SessionSource {
     /// Human-readable label for user-facing output.
-    #[must_use] 
+    #[must_use]
     pub fn label(self) -> &'static str {
         match self {
             SessionSource::ClaudeCode => "Claude Code",
@@ -58,7 +58,7 @@ impl SessionSource {
     }
 
     /// Whether this source has a history root on the current machine.
-    #[must_use] 
+    #[must_use]
     pub fn is_available(self) -> bool {
         match self {
             SessionSource::ClaudeCode => ClaudeProvider::history_root_exists(),
@@ -68,7 +68,7 @@ impl SessionSource {
 }
 
 /// Return the session sources that are available on this machine.
-#[must_use] 
+#[must_use]
 pub fn available_sources() -> Vec<SessionSource> {
     [SessionSource::ClaudeCode, SessionSource::CodexCli]
         .into_iter()
@@ -77,7 +77,7 @@ pub fn available_sources() -> Vec<SessionSource> {
 }
 
 /// Build the default project filter for a given source.
-#[must_use] 
+#[must_use]
 pub fn project_filter_for_source(
     source: SessionSource,
     project: Option<&str>,

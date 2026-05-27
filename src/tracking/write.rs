@@ -4,12 +4,12 @@ use anyhow::Result;
 use chrono::{Duration, Utc};
 use rusqlite::params;
 
-use super::types::{ParseFailureRecord, ParseFailureSummary, HISTORY_DAYS};
+use super::Tracker;
+use super::types::{HISTORY_DAYS, ParseFailureRecord, ParseFailureSummary};
 use super::utils::{
     current_project_path_string, current_project_root, current_runtime_session_id,
     derive_project_name, project_filter_params,
 };
-use super::Tracker;
 
 impl Tracker {
     /// Record a command execution with token counts and timing.
@@ -295,7 +295,10 @@ impl Tracker {
         )?;
         let top_commands = stmt
             .query_map(params![project_exact, project_glob], |row| {
-                Ok((row.get::<_, String>(0)?, usize::try_from(row.get::<_, i64>(1)?).unwrap_or(0)))
+                Ok((
+                    row.get::<_, String>(0)?,
+                    usize::try_from(row.get::<_, i64>(1)?).unwrap_or(0),
+                ))
             })?
             .collect::<Result<Vec<_>, _>>()?;
 

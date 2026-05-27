@@ -57,11 +57,7 @@ pub(crate) fn compound_segment_lines(input: &str) -> Vec<String> {
     let mut lines = vec!["Segments:".to_string()];
     for segment in segments {
         let trimmed = segment.trim();
-        let resolution = super::resolve_with_inputs_internal(
-            trimmed,
-            &excluded,
-            &user_corrections,
-        );
+        let resolution = super::resolve_with_inputs_internal(trimmed, &excluded, &user_corrections);
         let output = resolution.rewritten.as_deref().unwrap_or(trimmed);
         lines.push(format!(
             "  - {} => {} ({}, reason: {})",

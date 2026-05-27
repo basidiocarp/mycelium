@@ -44,7 +44,7 @@ impl TimedExecution {
     /// // ... execute command ...
     /// timer.track("cmd", "mycelium cmd", "input", "output");
     /// ```
-    #[must_use] 
+    #[must_use]
     pub fn start() -> Self {
         Self {
             start: Instant::now(),

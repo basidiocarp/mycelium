@@ -1,6 +1,6 @@
 //! Git status, branch, and related output filters.
-use std::fmt::Write as _;
 use crate::config::{CompactionProfile, current_compaction_tuning};
+use std::fmt::Write as _;
 
 fn format_status_output_with_limit(porcelain: &str, max_status_files: usize) -> String {
     let lines: Vec<&str> = porcelain.lines().collect();
@@ -104,19 +104,19 @@ fn format_status_output_with_limit(porcelain: &str, max_status_files: usize) -> 
     dead_code,
     reason = "The profile-aware status surface is part of the public library API"
 )]
-#[must_use] 
+#[must_use]
 pub fn format_status_output_with_profile(porcelain: &str, profile: CompactionProfile) -> String {
     format_status_output_with_limit(porcelain, profile.tuning().status_max_files)
 }
 
 /// Format porcelain output into compact Mycelium status display.
-#[must_use] 
+#[must_use]
 pub fn format_status_output(porcelain: &str) -> String {
     format_status_output_with_limit(porcelain, current_compaction_tuning().status_max_files)
 }
 
 /// Minimal filtering for git status with user-provided args
-#[must_use] 
+#[must_use]
 pub fn filter_status_with_args(output: &str) -> String {
     let mut result = Vec::new();
 
@@ -161,7 +161,7 @@ pub fn filter_status_with_args(output: &str) -> String {
     dead_code,
     reason = "Kept in library API as fallback for callers that receive pre-formatted branch output"
 )]
-#[must_use] 
+#[must_use]
 pub fn filter_branch_output(output: &str) -> String {
     let mut current = String::new();
     let mut local: Vec<String> = Vec::new();
@@ -221,7 +221,7 @@ pub fn filter_branch_output(output: &str) -> String {
 /// Takes pre-separated current, local, and remote branch names instead of parsing
 /// human-readable `git branch -a` output. This avoids regex fragility when git's
 /// display format changes.
-#[must_use] 
+#[must_use]
 pub fn format_branch_structured(current: &str, local: &[String], remote: &[String]) -> String {
     let mut result = Vec::new();
     result.push(format!("* {current}"));
@@ -264,7 +264,7 @@ pub fn format_branch_structured(current: &str, local: &[String], remote: &[Strin
 /// ```
 ///
 /// This avoids parsing the space-aligned human-readable format.
-#[must_use] 
+#[must_use]
 pub fn format_worktree_porcelain(porcelain: &str) -> String {
     let home = dirs::home_dir()
         .map(|h| h.to_string_lossy().to_string())

@@ -10,7 +10,7 @@ use std::{cell::RefCell, rc::Rc};
 use super::rules::RULES;
 
 // Import the shared shell parsing modules
-use super::registry::{shell, parser};
+use super::registry::{parser, shell};
 
 fn find_fd_rewrite_active() -> bool {
     #[cfg(test)]

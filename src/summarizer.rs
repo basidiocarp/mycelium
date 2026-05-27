@@ -222,7 +222,9 @@ mod tests {
 
     #[test]
     fn test_is_error_line_no_false_positives_on_test_counts() {
-        assert!(!is_error_line("test result: ok. 12 passed; 0 failed; 0 ignored"));
+        assert!(!is_error_line(
+            "test result: ok. 12 passed; 0 failed; 0 ignored"
+        ));
         assert!(!is_error_line("5 passed, 0 failed"));
         assert!(!is_error_line("ran 30 tests, 0 failed"));
         assert!(is_error_line("FAILED: test_foo"));

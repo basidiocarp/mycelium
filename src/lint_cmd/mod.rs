@@ -1,7 +1,7 @@
 //! Token-optimized filter for linters (ESLint, Biome, Ruff, Mypy) with grouped rule violations.
 pub mod eslint;
-pub mod pylint;
 mod generic;
+pub mod pylint;
 
 use generic::GenericLintParser;
 

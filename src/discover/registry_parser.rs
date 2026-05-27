@@ -104,13 +104,12 @@ fn named_node_is_safe(node: Node<'_>, source: &[u8]) -> bool {
 }
 
 fn command_name_is_safe(node: Node<'_>, source: &[u8]) -> bool {
-    node.utf8_text(source)
-        .is_ok_and(|text| {
-            !matches!(
-                text,
-                "function" | "declare" | "local" | "readonly" | "typeset"
-            )
-        })
+    node.utf8_text(source).is_ok_and(|text| {
+        !matches!(
+            text,
+            "function" | "declare" | "local" | "readonly" | "typeset"
+        )
+    })
 }
 
 #[cfg(test)]

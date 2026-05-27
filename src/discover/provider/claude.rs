@@ -26,16 +26,15 @@ impl ClaudeProvider {
 
     /// Encode a filesystem path to Claude Code's directory name format.
     /// `/Users/foo/bar` → `-Users-foo-bar`
-    #[must_use] 
+    #[must_use]
     pub fn encode_project_path(path: &str) -> String {
         path.replace('/', "-")
     }
 
     /// Whether Claude Code history is available.
-    #[must_use] 
+    #[must_use]
     pub fn history_root_exists() -> bool {
-        dirs::home_dir()
-            .is_some_and(|home| home.join(".claude").join("projects").exists())
+        dirs::home_dir().is_some_and(|home| home.join(".claude").join("projects").exists())
     }
 }
 
@@ -170,7 +169,9 @@ impl SessionProvider for ClaudeProvider {
         for (tool_id, command, sequence_index) in pending_tool_uses {
             let (output_len, output_content, is_error) = tool_results
                 .get(&tool_id)
-                .map_or((None, None, false), |(len, content, err)| (Some(*len), Some(content.clone()), *err));
+                .map_or((None, None, false), |(len, content, err)| {
+                    (Some(*len), Some(content.clone()), *err)
+                });
 
             commands.push(ExtractedCommand {
                 command,

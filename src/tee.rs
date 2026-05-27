@@ -161,7 +161,7 @@ fn parse_tee_mode_env() -> Option<TeeMode> {
 
 /// Write raw output to tee file if conditions are met.
 /// Returns file path on success, None if skipped/failed.
-#[must_use] 
+#[must_use]
 pub fn tee_raw(raw: &str, command_slug: &str, exit_code: i32) -> Option<PathBuf> {
     // Check MYCELIUM_TEE=0 env override (disable)
     if std::env::var("MYCELIUM_TEE").ok().as_deref() == Some("0") {
@@ -205,7 +205,7 @@ fn format_hint(path: &std::path::Path) -> String {
 
 /// Convenience: tee + format hint in one call.
 /// Returns hint string if file was written, None if skipped.
-#[must_use] 
+#[must_use]
 pub fn tee_and_hint(raw: &str, command_slug: &str, exit_code: i32) -> Option<String> {
     let path = tee_raw(raw, command_slug, exit_code)?;
     Some(format_hint(&path))

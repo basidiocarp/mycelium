@@ -4,22 +4,20 @@ mod claude_md;
 mod config_show;
 mod hook;
 pub(crate) mod host_status;
+mod install;
 #[cfg_attr(not(unix), allow(dead_code))]
 mod json_patch;
-mod install;
 mod onboard;
 
 use anyhow::Result;
 use std::fs;
 
-pub use json_patch::PatchMode;
 pub use config_show::show_config;
+pub use json_patch::PatchMode;
 
-use claude_md::{
-    remove_mycelium_block, resolve_claude_dir,
-};
+use claude_md::{remove_mycelium_block, resolve_claude_dir};
+use install::{run_claude_md_mode, run_default_mode, run_hook_only_mode};
 use json_patch::{clean_double_blanks, remove_hook_from_settings};
-use install::{run_default_mode, run_hook_only_mode, run_claude_md_mode};
 
 const LEGACY_SESSION_SUMMARY_HOOK_NAME: &str = "session-summary.sh";
 
@@ -175,7 +173,6 @@ pub fn uninstall(global: bool, verbose: u8) -> Result<()> {
 
     Ok(())
 }
-
 
 // Need with_context for uninstall
 use anyhow::Context;

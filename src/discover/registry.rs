@@ -7,13 +7,12 @@ use super::rules::{IGNORED_EXACT, IGNORED_PREFIXES, PATTERNS, RULES};
 // Re-export the rewrite API from the rewriter module
 // Note: rewrite_command is pub; others are pub(crate) for internal use
 pub use super::rewriter::rewrite_command;
-#[allow(unused_imports)]
-pub(crate) use super::rewriter::{
-    rewrite_primary_command, rewrite_block_reason,
-    learned_correction_block_reason,
-};
 #[cfg(test)]
 pub(crate) use super::rewriter::set_find_fd_rewrite_active_for_tests;
+#[allow(unused_imports)]
+pub(crate) use super::rewriter::{
+    learned_correction_block_reason, rewrite_block_reason, rewrite_primary_command,
+};
 
 #[path = "registry_compound.rs"]
 pub(super) mod compound;
@@ -38,7 +37,7 @@ pub enum Classification {
 }
 
 /// Average token counts per category for estimation when no `output_len` available.
-#[must_use] 
+#[must_use]
 pub fn category_avg_tokens(category: &str, subcmd: &str) -> usize {
     match category {
         "Git" => match subcmd {
@@ -108,7 +107,7 @@ fn compiled() -> &'static Vec<Regex> {
     })
 }
 
-#[must_use] 
+#[must_use]
 pub fn split_command_chain(cmd: &str) -> Vec<&str> {
     compound::split_command_chain(cmd)
 }
@@ -134,7 +133,7 @@ pub(crate) fn display_command_for_discover(cmd: &str) -> String {
 }
 
 /// Classify a single (already-split) command.
-#[must_use] 
+#[must_use]
 pub fn classify_command(cmd: &str) -> Classification {
     let trimmed = cmd.trim();
     if trimmed.is_empty() {

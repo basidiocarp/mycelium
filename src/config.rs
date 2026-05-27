@@ -227,7 +227,7 @@ pub struct CompactionTuning {
 }
 
 impl CompactionProfile {
-    #[must_use] 
+    #[must_use]
     pub fn tuning(self) -> CompactionTuning {
         match self {
             Self::Debug => CompactionTuning {
@@ -300,7 +300,9 @@ impl Config {
     /// call; subsequent calls return a clone. Use `Config::load()` when a fresh
     /// read is needed (e.g., after `Config::save()`).
     pub fn load_cached() -> Self {
-        CONFIG_CACHE.get_or_init(|| Config::load().unwrap_or_default()).clone()
+        CONFIG_CACHE
+            .get_or_init(|| Config::load().unwrap_or_default())
+            .clone()
     }
 
     pub fn load() -> Result<Self> {
@@ -333,7 +335,7 @@ impl Config {
         config_path()
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn compaction_tuning(&self) -> CompactionTuning {
         let mut tuning = self.filters.compaction_profile.tuning();
         if let Some(adaptive) = &self.filters.adaptive {
@@ -355,16 +357,19 @@ pub fn config_path() -> Result<PathBuf> {
     dead_code,
     reason = "Library consumers use this through the curated lib.rs re-export"
 )]
-#[must_use] 
+#[must_use]
 pub fn current_compaction_profile() -> CompactionProfile {
     Config::load()
         .map(|config| config.filters.compaction_profile)
         .unwrap_or_default()
 }
 
-#[must_use] 
+#[must_use]
 pub fn current_compaction_tuning() -> CompactionTuning {
-    Config::load().map_or_else(|_| CompactionProfile::default().tuning(), |config| config.compaction_tuning())
+    Config::load().map_or_else(
+        |_| CompactionProfile::default().tuning(),
+        |config| config.compaction_tuning(),
+    )
 }
 
 pub fn show_config() -> Result<()> {

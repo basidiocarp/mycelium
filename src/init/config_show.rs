@@ -5,8 +5,8 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::init::claude_md::resolve_claude_dir;
-use crate::init::json_patch::hook_already_present;
 use crate::init::hook::extract_hook_version;
+use crate::init::json_patch::hook_already_present;
 
 /// Show current mycelium configuration
 pub fn show_config() -> Result<()> {
@@ -84,7 +84,9 @@ pub fn show_config() -> Result<()> {
                     Some(version) if version == current_version => {
                         println!("ok Hook version: {} (current)", version);
                     }
-                    Some(version) if crate::init::hook::version_is_stale(version, current_version) => {
+                    Some(version)
+                        if crate::init::hook::version_is_stale(version, current_version) =>
+                    {
                         println!(
                             "[!] Hook version: {} (stale vs current {}; run `mycelium init -g`)",
                             version, current_version
@@ -103,9 +105,11 @@ pub fn show_config() -> Result<()> {
                     }
                 }
                 let mycelium_embedded =
-                    crate::init::hook::extract_quoted_assignment(&hook_content, "MYCELIUM_BIN").unwrap_or_default();
+                    crate::init::hook::extract_quoted_assignment(&hook_content, "MYCELIUM_BIN")
+                        .unwrap_or_default();
                 let jq_embedded =
-                    crate::init::hook::extract_quoted_assignment(&hook_content, "JQ_BIN").unwrap_or_default();
+                    crate::init::hook::extract_quoted_assignment(&hook_content, "JQ_BIN")
+                        .unwrap_or_default();
                 let mycelium_on_path = crate::platform::command_on_path("mycelium");
                 let jq_on_path = crate::platform::command_on_path("jq");
 

@@ -1,6 +1,6 @@
 //! Language-aware code filtering with configurable levels (none, minimal, aggressive).
-use std::fmt::Write as _;
 use regex::Regex;
+use std::fmt::Write as _;
 use std::str::FromStr;
 use std::sync::OnceLock;
 
@@ -55,7 +55,7 @@ pub struct FilterResult {
 
 impl FilterResult {
     /// Build a result for successfully filtered output.
-    #[must_use] 
+    #[must_use]
     pub fn full(input: &str, output: String) -> Self {
         let input_tokens = crate::tracking::utils::estimate_tokens(input);
         let output_tokens = crate::tracking::utils::estimate_tokens(&output);
@@ -68,7 +68,7 @@ impl FilterResult {
     }
 
     /// Build a result when the filter partially matched the input format.
-    #[must_use] 
+    #[must_use]
     pub fn degraded(input: &str, output: String) -> Self {
         let input_tokens = crate::tracking::utils::estimate_tokens(input);
         let output_tokens = crate::tracking::utils::estimate_tokens(&output);
@@ -81,7 +81,7 @@ impl FilterResult {
     }
 
     /// Build a result when the filter fell back to raw passthrough.
-    #[must_use] 
+    #[must_use]
     pub fn passthrough(content: &str) -> Self {
         let tokens = crate::tracking::utils::estimate_tokens(content);
         Self {
@@ -128,7 +128,7 @@ pub enum Language {
 }
 
 impl Language {
-    #[must_use] 
+    #[must_use]
     pub fn from_extension(ext: &str) -> Self {
         match ext.to_lowercase().as_str() {
             "rs" => Language::Rust,
@@ -145,7 +145,7 @@ impl Language {
         }
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn comment_patterns(&self) -> CommentPatterns {
         match self {
             Language::Rust => CommentPatterns {
@@ -459,9 +459,13 @@ impl FilterStrategy for AggressiveFilter {
 
             if in_impl_body {
                 #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
-                { brace_depth += open_braces as i32; }
+                {
+                    brace_depth += open_braces as i32;
+                }
                 #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
-                { brace_depth -= close_braces as i32; }
+                {
+                    brace_depth -= close_braces as i32;
+                }
 
                 impl_body_buf.push(line.to_string());
 
@@ -501,7 +505,7 @@ impl FilterStrategy for AggressiveFilter {
     }
 }
 
-#[must_use] 
+#[must_use]
 pub fn get_filter(level: FilterLevel) -> Box<dyn FilterStrategy> {
     match level {
         FilterLevel::None => Box::new(NoFilter),
@@ -510,7 +514,7 @@ pub fn get_filter(level: FilterLevel) -> Box<dyn FilterStrategy> {
     }
 }
 
-#[must_use] 
+#[must_use]
 pub fn smart_truncate(content: &str, max_lines: usize, _lang: &Language) -> String {
     let lines: Vec<&str> = content.lines().collect();
     if lines.len() <= max_lines {

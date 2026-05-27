@@ -2,10 +2,10 @@ use anyhow::{Context, Result};
 
 use crate::{rewrite_cmd, tracking};
 
+use super::exec::MAX_STDERR_CAPTURE;
 /// Maximum bytes to capture from command stdout (64 MB).
 /// This constant is imported from exec.rs via super:: reference.
 use super::exec::MAX_STDOUT_CAPTURE;
-use super::exec::MAX_STDERR_CAPTURE;
 
 pub(super) fn run_spawned_command(
     mut command: std::process::Command,
@@ -173,7 +173,12 @@ pub(super) fn run_spawned_command(
     // Track using the actual output that was displayed (hyphae summary if active, else ContentRouter-filtered).
     // This ensures token savings are computed against the real output users see.
     // Stderr is excluded from both sides — it is streamed live and not part of the filtered display output.
-    timer.track(tracked_input, tracked_output, &full_output, &filtered_for_display);
+    timer.track(
+        tracked_input,
+        tracked_output,
+        &full_output,
+        &filtered_for_display,
+    );
 
     if !status.success() {
         let _ = std::io::stdout().flush();

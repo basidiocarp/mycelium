@@ -67,7 +67,7 @@ fn load_plugin_config() -> PluginConfig {
 /// Looks for `<command>.sh` (preferred) then `<command>` in the plugin directory.
 /// Returns `None` if plugins are disabled, the directory doesn't exist, or no
 /// matching executable passes security validation.
-#[must_use] 
+#[must_use]
 pub fn find_plugin(command: &str) -> Option<PathBuf> {
     let config = load_plugin_config();
     find_plugin_in_dir_with_config(&config, command)
@@ -271,8 +271,7 @@ fn plugin_command(plugin_path: &Path) -> Command {
 #[cfg(unix)]
 fn is_executable(path: &Path) -> bool {
     use std::os::unix::fs::PermissionsExt;
-    std::fs::metadata(path)
-        .is_ok_and(|m| m.permissions().mode() & 0o111 != 0)
+    std::fs::metadata(path).is_ok_and(|m| m.permissions().mode() & 0o111 != 0)
 }
 
 #[cfg(not(unix))]

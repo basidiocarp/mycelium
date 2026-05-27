@@ -184,8 +184,14 @@ fn bounded_output(
             let _ = child.kill();
             let _ = child.wait(); // reap zombie
             // Drain reader threads so they can observe pipe close and exit.
-            while stdout_rx.recv_timeout(std::time::Duration::from_millis(100)).is_ok() {}
-            while stderr_rx.recv_timeout(std::time::Duration::from_millis(100)).is_ok() {}
+            while stdout_rx
+                .recv_timeout(std::time::Duration::from_millis(100))
+                .is_ok()
+            {}
+            while stderr_rx
+                .recv_timeout(std::time::Duration::from_millis(100))
+                .is_ok()
+            {}
             Err(std::io::Error::new(
                 std::io::ErrorKind::TimedOut,
                 "dispatch_json subprocess timed out",
@@ -302,7 +308,6 @@ pub(super) fn dispatch_invoke_command(command: &[String], explain: bool, cli: &C
     )
 }
 
-
 /// Tools supported by mycelium for proxying and filtering.
 /// This list must remain synchronized with `is_operational_command`.
 ///
@@ -414,8 +419,8 @@ pub fn is_operational_command(cmd: &Commands) -> bool {
         Commands::Context(_) => return false, // not operational
         Commands::Init(_) => return false, // not operational
         Commands::Config(_) => return false, // not operational
-        Commands::Doctor => return false,      // not operational
-        Commands::Verify => return false,      // not operational
+        Commands::Doctor => return false,  // not operational
+        Commands::Verify => return false,  // not operational
         Commands::SelfUpdate(_) => return false, // not operational
         Commands::Completions(_) => return false, // not operational
         Commands::Proxy(_) => return false, // not operational (handled separately)
@@ -538,7 +543,13 @@ mod tests {
 
     #[test]
     fn test_absolute_path_tool_name_rejected_by_whitelist() {
-        let bad = ["/usr/bin/git", "/malicious/git", "relative/git", "../git", "subdir\\git"];
+        let bad = [
+            "/usr/bin/git",
+            "/malicious/git",
+            "relative/git",
+            "../git",
+            "subdir\\git",
+        ];
         for name in bad {
             assert!(!is_bare_tool_name(name), "{name} should be rejected");
         }
@@ -589,7 +600,8 @@ pub fn dispatch_json(cli: Cli) -> Result<()> {
                     Some(resolved_path) => {
                         let mut cmd = std::process::Command::new(&resolved_path);
                         cmd.args(&args[1..]);
-                        let raw_result = bounded_output(cmd, DISPATCH_JSON_TIMEOUT, MAX_STDOUT_CAPTURE);
+                        let raw_result =
+                            bounded_output(cmd, DISPATCH_JSON_TIMEOUT, MAX_STDOUT_CAPTURE);
                         match raw_result {
                             Ok(out) => {
                                 let exit_code = out.status.code().unwrap_or(1);
@@ -646,7 +658,8 @@ pub fn dispatch_json(cli: Cli) -> Result<()> {
         );
         (envelope, raw_exit_code)
     } else {
-        let mycelium_exe = std::env::current_exe().context("Failed to locate mycelium executable")?;
+        let mycelium_exe =
+            std::env::current_exe().context("Failed to locate mycelium executable")?;
         let mut filtered_cmd = std::process::Command::new(&mycelium_exe);
         filtered_cmd.args(&args);
         // Depth is always 0 at this point (the >= 1 branch above handles re-entry).
@@ -656,7 +669,8 @@ pub fn dispatch_json(cli: Cli) -> Result<()> {
         // raw_output (captured above) buffers the tool's stdout; filtered_result buffers
         // mycelium's filtered stdout. Both are bounded at MAX_STDOUT_CAPTURE (64 MB) by
         // bounded_output, preventing compound memory exhaustion.
-        let filtered_result = bounded_output(filtered_cmd, DISPATCH_JSON_TIMEOUT, MAX_STDOUT_CAPTURE);
+        let filtered_result =
+            bounded_output(filtered_cmd, DISPATCH_JSON_TIMEOUT, MAX_STDOUT_CAPTURE);
 
         match filtered_result {
             Ok(output) if output.status.success() => {

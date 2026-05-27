@@ -25,10 +25,9 @@ impl CodexProvider {
     }
 
     /// Whether Codex history is available.
-    #[must_use] 
+    #[must_use]
     pub fn history_root_exists() -> bool {
-        dirs::home_dir()
-            .is_some_and(|home| home.join(".codex").join("sessions").exists())
+        dirs::home_dir().is_some_and(|home| home.join(".codex").join("sessions").exists())
     }
 
     pub(super) fn discover_sessions_in(
@@ -184,7 +183,9 @@ impl CodexProvider {
         for (tool_id, command, sequence_index) in pending_tool_uses {
             let (output_len, output_content, is_error) = tool_results
                 .get(&tool_id)
-                .map_or((None, None, false), |(len, content, err)| (Some(*len), Some(content.clone()), *err));
+                .map_or((None, None, false), |(len, content, err)| {
+                    (Some(*len), Some(content.clone()), *err)
+                });
 
             commands.push(ExtractedCommand {
                 command,
@@ -206,7 +207,11 @@ impl SessionProvider for CodexProvider {
         since_days: Option<u64>,
     ) -> Result<Vec<PathBuf>> {
         let sessions_dir = Self::sessions_dir()?;
-        Ok(Self::discover_sessions_in(&sessions_dir, project_filter, since_days))
+        Ok(Self::discover_sessions_in(
+            &sessions_dir,
+            project_filter,
+            since_days,
+        ))
     }
 
     fn extract_commands(&self, path: &Path) -> Result<Vec<ExtractedCommand>> {

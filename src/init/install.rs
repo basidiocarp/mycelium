@@ -4,12 +4,12 @@ use anyhow::{Context, Result};
 use std::fs;
 use std::path::PathBuf;
 
-use crate::init::json_patch::PatchMode;
 use crate::init::claude_md::{
-    MYCELIUM_INSTRUCTIONS, MYCELIUM_SLIM, MyceliumBlockUpsert, patch_claude_md,
-    resolve_claude_dir, upsert_mycelium_block,
+    MYCELIUM_INSTRUCTIONS, MYCELIUM_SLIM, MyceliumBlockUpsert, patch_claude_md, resolve_claude_dir,
+    upsert_mycelium_block,
 };
 use crate::init::hook;
+use crate::init::json_patch::PatchMode;
 use crate::init::json_patch::patch_settings_json;
 
 use super::context;

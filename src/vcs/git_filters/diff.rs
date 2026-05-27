@@ -72,7 +72,7 @@ fn compact_diff_with_hunk_limit(diff: &str, max_lines: usize, max_hunk_lines: us
     dead_code,
     reason = "The profile-aware diff surface is part of the public library API"
 )]
-#[must_use] 
+#[must_use]
 pub fn compact_diff_with_profile(
     diff: &str,
     max_lines: usize,
@@ -85,7 +85,7 @@ pub fn compact_diff_with_profile(
 ///
 /// Shows file names, hunk headers, and changed lines up to `max_hunk_lines`
 /// per hunk, capping the total output at `max_lines` result lines.
-#[must_use] 
+#[must_use]
 pub fn compact_diff(diff: &str, max_lines: usize) -> String {
     compact_diff_with_hunk_limit(
         diff,

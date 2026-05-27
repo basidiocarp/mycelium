@@ -178,7 +178,9 @@ pub(crate) fn validate_filter_output(
 
 /// Check if the filter header should be shown.
 fn should_show_filter_header() -> bool {
-    crate::config::Config::load_cached().filters.show_filter_header
+    crate::config::Config::load_cached()
+        .filters
+        .show_filter_header
 }
 
 /// Route command output through Hyphae, summarize, or fall back to local filtering.
@@ -201,7 +203,8 @@ pub fn route_or_filter(
         OutputAction::Summarize => {
             // exit_code not available in this routing context; pass 0 so the
             // summarizer doesn't emit a spurious FAIL line from the exit-code path.
-            if let Some(summary) = crate::summarizer::summarize(raw, command, summary_threshold, 0) {
+            if let Some(summary) = crate::summarizer::summarize(raw, command, summary_threshold, 0)
+            {
                 // Record summary silently (don't fail if tracking has issues)
                 if let Ok(tracker) = crate::tracking::Tracker::new() {
                     if let Err(e) = tracker.record_summary(
@@ -274,7 +277,11 @@ fn format_chunk_summary(command: &str, summary: &crate::hyphae_client::ChunkSumm
 /// - Token count reduction (raw → filtered)
 /// - Compression percentage
 /// - How to get raw output via `mycelium proxy`
-#[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+#[allow(
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
 fn add_filter_header(command: &str, raw: &str, filtered: &str) -> String {
     let raw_lines = raw.lines().count();
     let filtered_lines = filtered.lines().count();

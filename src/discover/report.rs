@@ -1,6 +1,6 @@
 //! Data types and formatting for the discover command report output.
-use std::fmt::Write as _;
 use serde::Serialize;
+use std::fmt::Write as _;
 
 /// Mycelium support status for a command.
 #[derive(Debug, Serialize, Clone, Copy, PartialEq, Eq)]
@@ -82,7 +82,8 @@ pub fn format_text(report: &DiscoverReport, limit: usize, verbose: bool) -> Stri
         out,
         "Scanned: {} sessions (last {} days), {} command executions",
         report.sessions_scanned, report.since_days, report.total_commands
-    ).ok();
+    )
+    .ok();
     writeln!(
         out,
         "Already using Mycelium: {} commands ({}%)",
@@ -92,7 +93,8 @@ pub fn format_text(report: &DiscoverReport, limit: usize, verbose: bool) -> Stri
             .saturating_mul(100)
             .checked_div(report.total_commands)
             .unwrap_or(0)
-    ).ok();
+    )
+    .ok();
 
     if report.supported.is_empty() && report.unsupported.is_empty() {
         out.push_str("\nNo missed savings found. Mycelium usage looks good!\n");
@@ -108,7 +110,8 @@ pub fn format_text(report: &DiscoverReport, limit: usize, verbose: bool) -> Stri
             out,
             "{:<24} {:>5}    {:<18} {:<13} {:>12}",
             "Command", "Count", "Mycelium Equivalent", "Status", "Est. Savings"
-        ).ok();
+        )
+        .ok();
 
         for entry in report.supported.iter().take(limit) {
             writeln!(
@@ -119,7 +122,8 @@ pub fn format_text(report: &DiscoverReport, limit: usize, verbose: bool) -> Stri
                 entry.mycelium_equivalent,
                 entry.mycelium_status.as_str(),
                 format_tokens(entry.estimated_savings_tokens),
-            ).ok();
+            )
+            .ok();
         }
 
         out.push_str(&"-".repeat(72));
@@ -129,7 +133,8 @@ pub fn format_text(report: &DiscoverReport, limit: usize, verbose: bool) -> Stri
             "Total: {} commands -> ~{} saveable",
             report.total_supported_count(),
             format_tokens(report.total_saveable_tokens()),
-        ).ok();
+        )
+        .ok();
     }
 
     // Unhandled
@@ -146,7 +151,8 @@ pub fn format_text(report: &DiscoverReport, limit: usize, verbose: bool) -> Stri
                 truncate_str(&entry.base_command, 23),
                 entry.count,
                 truncate_str(&entry.example, 40),
-            ).ok();
+            )
+            .ok();
         }
 
         out.push_str(&"-".repeat(52));

@@ -1,8 +1,8 @@
 //! Analyzes Claude Code and Codex session history to find commands that could benefit from Mycelium.
 pub mod provider;
 pub mod registry;
-pub mod rewriter;
 mod report;
+pub mod rewriter;
 pub mod rules;
 
 use anyhow::Result;
@@ -121,7 +121,11 @@ pub fn run(
                             category_avg_tokens(category, subcmd)
                         };
 
-                        #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                        #[allow(
+                            clippy::cast_precision_loss,
+                            clippy::cast_possible_truncation,
+                            clippy::cast_sign_loss
+                        )]
                         let savings =
                             (output_tokens as f64 * estimated_savings_pct / 100.0) as usize;
                         bucket.total_output_tokens += savings;
@@ -163,21 +167,25 @@ pub fn run(
             let (command_with_status, status) = bucket
                 .command_counts
                 .into_iter()
-                .max_by_key(|(_, c)| *c).map_or_else(|| (String::new(), report::MyceliumStatus::Existing), |(name, _)| {
-                    // Extract status from "command:Status" format
-                    if let Some(colon_pos) = name.rfind(':') {
-                        let cmd = name[..colon_pos].to_string();
-                        let status_str = &name[colon_pos + 1..];
-                        let status = match status_str {
-                            "Passthrough" => report::MyceliumStatus::Passthrough,
-                            "NotSupported" => report::MyceliumStatus::NotSupported,
-                            _ => report::MyceliumStatus::Existing,
-                        };
-                        (cmd, status)
-                    } else {
-                        (name, report::MyceliumStatus::Existing)
-                    }
-                });
+                .max_by_key(|(_, c)| *c)
+                .map_or_else(
+                    || (String::new(), report::MyceliumStatus::Existing),
+                    |(name, _)| {
+                        // Extract status from "command:Status" format
+                        if let Some(colon_pos) = name.rfind(':') {
+                            let cmd = name[..colon_pos].to_string();
+                            let status_str = &name[colon_pos + 1..];
+                            let status = match status_str {
+                                "Passthrough" => report::MyceliumStatus::Passthrough,
+                                "NotSupported" => report::MyceliumStatus::NotSupported,
+                                _ => report::MyceliumStatus::Existing,
+                            };
+                            (cmd, status)
+                        } else {
+                            (name, report::MyceliumStatus::Existing)
+                        }
+                    },
+                );
 
             SupportedEntry {
                 command: command_with_status,

@@ -249,7 +249,14 @@ pub(super) fn dispatch_command(cli: Cli) -> Result<()> {
             )?;
         }
         Commands::Discover(discover_args) => {
-            discover::run(discover_args.project.as_deref(), discover_args.all, discover_args.since, discover_args.limit, &discover_args.format, cli.verbose)?;
+            discover::run(
+                discover_args.project.as_deref(),
+                discover_args.all,
+                discover_args.since,
+                discover_args.limit,
+                &discover_args.format,
+                cli.verbose,
+            )?;
         }
         Commands::Learn(learn_args) => {
             learn::run(

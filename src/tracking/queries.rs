@@ -111,17 +111,24 @@ impl Tracker {
              LIMIT ?3",
         )?;
 
-        let rows = stmt.query_map(params![project_exact, project_glob, i64::try_from(limit).unwrap_or(i64::MAX)], |row| {
-            Ok(CommandStats {
-                command: row.get(0)?,
-                count: usize::try_from(row.get::<_, i64>(1)?).unwrap_or(0),
-                input_tokens: usize::try_from(row.get::<_, i64>(2)?).unwrap_or(0),
-                tokens_saved: usize::try_from(row.get::<_, i64>(3)?).unwrap_or(0),
-                savings_pct: row.get(4)?,
-                #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-                exec_time_ms: row.get::<_, f64>(5)? as u64,
-            })
-        })?;
+        let rows = stmt.query_map(
+            params![
+                project_exact,
+                project_glob,
+                i64::try_from(limit).unwrap_or(i64::MAX)
+            ],
+            |row| {
+                Ok(CommandStats {
+                    command: row.get(0)?,
+                    count: usize::try_from(row.get::<_, i64>(1)?).unwrap_or(0),
+                    input_tokens: usize::try_from(row.get::<_, i64>(2)?).unwrap_or(0),
+                    tokens_saved: usize::try_from(row.get::<_, i64>(3)?).unwrap_or(0),
+                    savings_pct: row.get(4)?,
+                    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                    exec_time_ms: row.get::<_, f64>(5)? as u64,
+                })
+            },
+        )?;
 
         Ok(rows.collect::<Result<Vec<_>, _>>()?)
     }
@@ -138,7 +145,10 @@ impl Tracker {
         )?;
 
         let rows = stmt.query_map(params![project_exact, project_glob], |row| {
-            Ok((row.get::<_, String>(0)?, usize::try_from(row.get::<_, i64>(1)?).unwrap_or(0)))
+            Ok((
+                row.get::<_, String>(0)?,
+                usize::try_from(row.get::<_, i64>(1)?).unwrap_or(0),
+            ))
         })?;
 
         let mut result: Vec<_> = rows.collect::<Result<Vec<_>, _>>()?;
@@ -463,14 +473,21 @@ impl Tracker {
              LIMIT ?3",
         )?;
 
-        let rows = stmt.query_map(params![project_exact, project_glob, i64::try_from(limit).unwrap_or(i64::MAX)], |row| {
-            Ok(CommandRecord {
-                timestamp: row.get(0)?,
-                mycelium_cmd: row.get(1)?,
-                saved_tokens: usize::try_from(row.get::<_, i64>(2)?).unwrap_or(0),
-                savings_pct: row.get(3)?,
-            })
-        })?;
+        let rows = stmt.query_map(
+            params![
+                project_exact,
+                project_glob,
+                i64::try_from(limit).unwrap_or(i64::MAX)
+            ],
+            |row| {
+                Ok(CommandRecord {
+                    timestamp: row.get(0)?,
+                    mycelium_cmd: row.get(1)?,
+                    saved_tokens: usize::try_from(row.get::<_, i64>(2)?).unwrap_or(0),
+                    savings_pct: row.get(3)?,
+                })
+            },
+        )?;
 
         Ok(rows.collect::<Result<Vec<_>, _>>()?)
     }
@@ -490,18 +507,25 @@ impl Tracker {
              LIMIT ?3",
         )?;
 
-        let rows = stmt.query_map(params![project_exact, project_glob, i64::try_from(limit).unwrap_or(i64::MAX)], |row| {
-            Ok(DetailedCommandRecord {
-                timestamp: row.get(0)?,
-                command: row.get(1)?,
-                project_path: row.get::<_, Option<String>>(2)?.unwrap_or_default(),
-                session_id: row.get(3)?,
-                input_tokens: usize::try_from(row.get::<_, i64>(4)?).unwrap_or(0),
-                output_tokens: usize::try_from(row.get::<_, i64>(5)?).unwrap_or(0),
-                saved_tokens: usize::try_from(row.get::<_, i64>(6)?).unwrap_or(0),
-                savings_pct: row.get(7)?,
-            })
-        })?;
+        let rows = stmt.query_map(
+            params![
+                project_exact,
+                project_glob,
+                i64::try_from(limit).unwrap_or(i64::MAX)
+            ],
+            |row| {
+                Ok(DetailedCommandRecord {
+                    timestamp: row.get(0)?,
+                    command: row.get(1)?,
+                    project_path: row.get::<_, Option<String>>(2)?.unwrap_or_default(),
+                    session_id: row.get(3)?,
+                    input_tokens: usize::try_from(row.get::<_, i64>(4)?).unwrap_or(0),
+                    output_tokens: usize::try_from(row.get::<_, i64>(5)?).unwrap_or(0),
+                    saved_tokens: usize::try_from(row.get::<_, i64>(6)?).unwrap_or(0),
+                    savings_pct: row.get(7)?,
+                })
+            },
+        )?;
 
         Ok(rows.collect::<Result<Vec<_>, _>>()?)
     }

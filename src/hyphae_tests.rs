@@ -130,8 +130,7 @@ fn test_route_or_filter_whitespace_filter_falls_back_to_raw() {
 #[test]
 fn test_validate_rule1_empty_filtered_returns_raw() {
     let raw = "some output\nwith content\n";
-    let result =
-        validate_filter_output(raw, crate::filter::FilterResult::full(raw, String::new()));
+    let result = validate_filter_output(raw, crate::filter::FilterResult::full(raw, String::new()));
     assert_eq!(
         result.output, raw,
         "Rule 1: empty filtered should return raw"
@@ -154,8 +153,7 @@ fn test_validate_rule1_whitespace_filtered_returns_raw() {
 #[test]
 fn test_validate_rule1_empty_raw_returns_empty_filtered() {
     // When raw is empty, filtering empty to empty is fine
-    let result =
-        validate_filter_output("", crate::filter::FilterResult::full("", String::new()));
+    let result = validate_filter_output("", crate::filter::FilterResult::full("", String::new()));
     assert_eq!(
         result.output, "",
         "Rule 1: empty filtered from empty raw is ok"
@@ -167,8 +165,7 @@ fn test_validate_rule2_low_savings_returns_raw() {
     // Raw: 100 tokens, filtered: 90 tokens → 10% savings — below 20% threshold
     let raw = "a".repeat(400); // ~100 tokens
     let filtered = "a".repeat(360); // ~90 tokens (10% savings)
-    let result =
-        validate_filter_output(&raw, crate::filter::FilterResult::full(&raw, filtered));
+    let result = validate_filter_output(&raw, crate::filter::FilterResult::full(&raw, filtered));
     assert_eq!(result.output, raw, "Rule 2: <20% savings should return raw");
 }
 
@@ -239,8 +236,7 @@ fn test_validate_rule4_aggressive_small_output_returns_raw() {
     // Raw: 50 lines, filtered: 1 line → >95% reduction on <200 lines
     let raw = "line of content here\n".repeat(50); // 50 lines, substantial tokens
     let filtered = "x".to_string(); // essentially empty — >95% reduction
-    let result =
-        validate_filter_output(&raw, crate::filter::FilterResult::full(&raw, filtered));
+    let result = validate_filter_output(&raw, crate::filter::FilterResult::full(&raw, filtered));
     assert_eq!(
         result.output, raw,
         "Rule 4: >95% reduction on <200 lines should return raw"

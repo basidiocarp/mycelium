@@ -276,7 +276,10 @@ pub fn load_declarative_filters(dir: &Path) -> Vec<DeclarativeFilter> {
             continue;
         }
         let Ok(contents) = std::fs::read_to_string(&path) else {
-            eprintln!("[mycelium] failed to read declarative filter {}", path.display());
+            eprintln!(
+                "[mycelium] failed to read declarative filter {}",
+                path.display()
+            );
             continue;
         };
         match toml::from_str::<RawDeclarativeFilter>(&contents) {
@@ -284,13 +287,15 @@ pub fn load_declarative_filters(dir: &Path) -> Vec<DeclarativeFilter> {
                 Ok(filter) => filters.push(filter),
                 Err(e) => {
                     eprintln!(
-                        "[mycelium] invalid declarative filter {}: {e}", path.display()
+                        "[mycelium] invalid declarative filter {}: {e}",
+                        path.display()
                     );
                 }
             },
             Err(e) => {
                 eprintln!(
-                    "[mycelium] failed to parse declarative filter {}: {e}", path.display()
+                    "[mycelium] failed to parse declarative filter {}: {e}",
+                    path.display()
                 );
             }
         }
@@ -529,7 +534,10 @@ strategy = "invalid_strategy"
         let path = dir.path().join("bad_strategy.toml");
         std::fs::write(&path, bad_strategy_toml).unwrap();
         let filters = load_declarative_filters(dir.path());
-        assert!(filters.is_empty(), "filters with unknown strategy should be skipped");
+        assert!(
+            filters.is_empty(),
+            "filters with unknown strategy should be skipped"
+        );
     }
 
     #[test]
@@ -568,10 +576,16 @@ strategy = "invalid_strategy"
         let a_filter_path = dir.path().join("a_filter.toml");
 
         // b_filter.toml matches "cargo build"; a_filter.toml matches "cargo test"
-        std::fs::write(&b_filter_path, "command = \"cargo build\"\nstrategy = \"group\"\n")
-            .expect("write b_filter.toml");
-        std::fs::write(&a_filter_path, "command = \"cargo test\"\nstrategy = \"group\"\n")
-            .expect("write a_filter.toml");
+        std::fs::write(
+            &b_filter_path,
+            "command = \"cargo build\"\nstrategy = \"group\"\n",
+        )
+        .expect("write b_filter.toml");
+        std::fs::write(
+            &a_filter_path,
+            "command = \"cargo test\"\nstrategy = \"group\"\n",
+        )
+        .expect("write a_filter.toml");
 
         let filters = load_declarative_filters(dir.path());
         assert_eq!(filters.len(), 2);

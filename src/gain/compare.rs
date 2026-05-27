@@ -89,7 +89,11 @@ pub fn calculate_savings(raw_tokens: usize, mycelium_tokens: usize) -> (usize, f
 }
 
 /// Build a colored savings bar for the compare view (TTY-aware).
-#[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+#[allow(
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
 pub(crate) fn compare_bar(pct: f64, width: usize) -> String {
     if width == 0 {
         return String::new();

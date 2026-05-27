@@ -1,6 +1,6 @@
 use clap::Args;
 
-pub use super::subcommands::{GitCommands, GhCommands, GtCommands};
+pub use super::subcommands::{GhCommands, GitCommands, GtCommands};
 
 /// Git commands with compact output
 #[allow(clippy::struct_excessive_bools)]

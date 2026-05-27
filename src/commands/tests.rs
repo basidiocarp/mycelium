@@ -18,7 +18,10 @@ fn test_invoke_command_parses() {
     let cli = Cli::try_parse_from(["mycelium", "invoke", "git", "status"]).unwrap();
     match cli.command {
         Commands::Invoke(invoke) => {
-            assert_eq!(invoke.command, vec!["git".to_string(), "status".to_string()]);
+            assert_eq!(
+                invoke.command,
+                vec!["git".to_string(), "status".to_string()]
+            );
             assert!(!invoke.explain);
         }
         _ => panic!("Expected Invoke command"),
