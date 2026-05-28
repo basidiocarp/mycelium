@@ -232,7 +232,7 @@ fn plugin_command(plugin_path: &Path) -> Command {
         match plugin_path
             .extension()
             .and_then(|ext| ext.to_str())
-            .map(|ext| ext.to_ascii_lowercase())
+            .map(str::to_ascii_lowercase)
             .as_deref()
         {
             Some("ps1") => {
@@ -252,7 +252,7 @@ fn plugin_command(plugin_path: &Path) -> Command {
                 command.arg(plugin_path);
                 command
             }
-            Some("cmd") | Some("bat") => {
+            Some("cmd" | "bat") => {
                 let mut command = Command::new("cmd");
                 command.arg("/C").arg(plugin_path);
                 command
