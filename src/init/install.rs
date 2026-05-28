@@ -1,13 +1,17 @@
 //! Installation sub-flows for Claude Code adapter and related setup.
 
-use anyhow::{Context, Result};
+use anyhow::Result;
+#[cfg(unix)]
+use anyhow::Context;
 use std::fs;
 use std::path::PathBuf;
 
 use crate::init::claude_md::{
-    MYCELIUM_INSTRUCTIONS, MYCELIUM_SLIM, MyceliumBlockUpsert, patch_claude_md, resolve_claude_dir,
-    upsert_mycelium_block,
+    MYCELIUM_INSTRUCTIONS, MyceliumBlockUpsert, resolve_claude_dir, upsert_mycelium_block,
 };
+#[cfg(unix)]
+use crate::init::claude_md::{MYCELIUM_SLIM, patch_claude_md};
+#[cfg(unix)]
 use crate::init::hook;
 use crate::init::json_patch::PatchMode;
 #[cfg(unix)]
@@ -15,6 +19,7 @@ use crate::init::json_patch::patch_settings_json;
 
 use super::context;
 
+#[cfg(unix)]
 const LEGACY_SESSION_SUMMARY_HOOK_NAME: &str = "session-summary.sh";
 
 #[cfg(unix)]
