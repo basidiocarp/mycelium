@@ -98,9 +98,11 @@ mod tests {
         let cmd = git_cmd(&[]);
         let program = cmd.get_program();
         let program_str = program.to_string_lossy();
-        // Program can be either "git" or a resolved path ending in "git"
+        // Program can be "git", a Unix path ending in "/git", or a Windows path ending in "\git.exe"
         assert!(
-            program_str == "git" || program_str.ends_with("/git"),
+            program_str == "git"
+                || program_str.ends_with("/git")
+                || program_str.ends_with("\\git.exe"),
             "Expected git command, got: {}",
             program_str
         );
