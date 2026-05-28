@@ -1,8 +1,8 @@
 //! Installation sub-flows for Claude Code adapter and related setup.
 
-use anyhow::Result;
 #[cfg(unix)]
 use anyhow::Context;
+use anyhow::Result;
 use std::fs;
 use std::path::PathBuf;
 

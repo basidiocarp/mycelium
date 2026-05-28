@@ -1,7 +1,7 @@
 //! Installs and updates the Mycelium shell rewrite hook script.
-use anyhow::Result;
 #[cfg(unix)]
 use anyhow::Context;
+use anyhow::Result;
 #[cfg_attr(not(unix), allow(unused_imports))]
 use std::fs;
 use std::path::Path;
