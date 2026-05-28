@@ -110,7 +110,7 @@ mod tests {
 "#;
         let result = compact_diff(diff, 100);
         assert!(result.contains("foo.rs"));
-        assert!(result.contains("+"));
+        assert!(result.contains('+'));
     }
 
     #[test]
@@ -121,7 +121,7 @@ mod tests {
             "diff --git a/big.rs b/big.rs\n--- a/big.rs\n+++ b/big.rs\n@@ -1,140 +1,140 @@\n"
                 .to_string();
         for i in 1..=140 {
-            diff.push_str(&format!("+line{}\n", i));
+            diff.push_str(&format!("+line{i}\n"));
         }
         let result = compact_diff(&diff, 500);
         assert!(
@@ -137,7 +137,7 @@ mod tests {
             "diff --git a/huge.rs b/huge.rs\n--- a/huge.rs\n+++ b/huge.rs\n@@ -1,220 +1,220 @@\n"
                 .to_string();
         for i in 1..=220 {
-            diff.push_str(&format!("+line{}\n", i));
+            diff.push_str(&format!("+line{i}\n"));
         }
         let result = compact_diff(&diff, 500);
         assert!(
@@ -196,8 +196,7 @@ mod tests {
             / count_tokens(&diff).max(1);
         assert!(
             savings >= 60,
-            "Git diff filter: expected >= 60% token savings, got {}%",
-            savings
+            "Git diff filter: expected >= 60% token savings, got {savings}%"
         );
     }
 
@@ -207,7 +206,7 @@ mod tests {
             "diff --git a/debug.rs b/debug.rs\n--- a/debug.rs\n+++ b/debug.rs\n@@ -1,160 +1,160 @@\n"
                 .to_string();
         for i in 1..=160 {
-            diff.push_str(&format!("+line{}\n", i));
+            diff.push_str(&format!("+line{i}\n"));
         }
         let result = compact_diff_with_profile(&diff, 500, CompactionProfile::Debug);
         assert!(result.contains("+line160"));
@@ -218,7 +217,7 @@ mod tests {
     fn test_compact_diff_aggressive_profile_truncates_sooner() {
         let mut diff = "diff --git a/aggressive.rs b/aggressive.rs\n--- a/aggressive.rs\n+++ b/aggressive.rs\n@@ -1,90 +1,90 @@\n".to_string();
         for i in 1..=90 {
-            diff.push_str(&format!("+line{}\n", i));
+            diff.push_str(&format!("+line{i}\n"));
         }
         let result = compact_diff_with_profile(&diff, 500, CompactionProfile::Aggressive);
         assert!(result.contains("... (truncated)"));

@@ -1,3 +1,4 @@
+#![allow(unsafe_code)]
 use super::*;
 use std::ffi::OsString;
 use std::path::PathBuf;
@@ -227,8 +228,8 @@ fn test_track_passthrough_no_dilution() {
 
         // Use unique test identifiers
         let pid = std::process::id();
-        let cmd1 = format!("mycelium cmd1_test_{}", pid);
-        let cmd2 = format!("mycelium cmd2_passthrough_test_{}", pid);
+        let cmd1 = format!("mycelium cmd1_test_{pid}");
+        let cmd2 = format!("mycelium cmd2_passthrough_test_{pid}");
 
         // Record one real command with 80% savings
         tracker
@@ -491,13 +492,13 @@ fn test_parse_failure_recovery_rate() {
         let pid = std::process::id();
 
         tracker
-            .record_parse_failure(&format!("cmd_ok1_{}", pid), "err", true)
+            .record_parse_failure(&format!("cmd_ok1_{pid}"), "err", true)
             .unwrap();
         tracker
-            .record_parse_failure(&format!("cmd_ok2_{}", pid), "err", true)
+            .record_parse_failure(&format!("cmd_ok2_{pid}"), "err", true)
             .unwrap();
         tracker
-            .record_parse_failure(&format!("cmd_fail_{}", pid), "err", false)
+            .record_parse_failure(&format!("cmd_fail_{pid}"), "err", false)
             .unwrap();
 
         let summary = tracker.get_parse_failure_summary().unwrap();
@@ -627,9 +628,9 @@ fn test_get_by_project() {
 
         let ts = chrono::Utc::now().to_rfc3339();
         for (project, saved) in &[
-            (format!("/tmp/proj_a_{}", pid), 500),
-            (format!("/tmp/proj_a_{}", pid), 300),
-            (format!("/tmp/proj_b_{}", pid), 1000),
+            (format!("/tmp/proj_a_{pid}"), 500),
+            (format!("/tmp/proj_a_{pid}"), 300),
+            (format!("/tmp/proj_b_{pid}"), 1000),
         ] {
             tracker
                 .conn
@@ -656,11 +657,11 @@ fn test_get_by_project() {
 
         let proj_a = results
             .iter()
-            .find(|r| r.project_path == format!("/tmp/proj_a_{}", pid))
+            .find(|r| r.project_path == format!("/tmp/proj_a_{pid}"))
             .expect("proj_a not found in results");
         let proj_b = results
             .iter()
-            .find(|r| r.project_path == format!("/tmp/proj_b_{}", pid))
+            .find(|r| r.project_path == format!("/tmp/proj_b_{pid}"))
             .expect("proj_b not found in results");
 
         assert_eq!(proj_a.commands, 2);
@@ -670,11 +671,11 @@ fn test_get_by_project() {
 
         let idx_a = results
             .iter()
-            .position(|r| r.project_path == format!("/tmp/proj_a_{}", pid))
+            .position(|r| r.project_path == format!("/tmp/proj_a_{pid}"))
             .unwrap();
         let idx_b = results
             .iter()
-            .position(|r| r.project_path == format!("/tmp/proj_b_{}", pid))
+            .position(|r| r.project_path == format!("/tmp/proj_b_{pid}"))
             .unwrap();
         assert!(
             idx_b < idx_a,
@@ -775,11 +776,10 @@ fn test_week_stats_serialization() {
         "total_time_ms",
         "savings_pct",
     ];
-    for (key, _) in json.as_object().unwrap().iter() {
+    for (key, _) in json.as_object().unwrap() {
         assert!(
             allowed_fields.contains(&key.as_str()),
-            "Unexpected field '{}' in serialized WeekStats",
-            key
+            "Unexpected field '{key}' in serialized WeekStats"
         );
     }
 }
@@ -828,11 +828,10 @@ fn test_month_stats_serialization() {
         "total_time_ms",
         "savings_pct",
     ];
-    for (key, _) in json.as_object().unwrap().iter() {
+    for (key, _) in json.as_object().unwrap() {
         assert!(
             allowed_fields.contains(&key.as_str()),
-            "Unexpected field '{}' in serialized MonthStats",
-            key
+            "Unexpected field '{key}' in serialized MonthStats"
         );
     }
 }

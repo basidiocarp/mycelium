@@ -6,7 +6,7 @@ use std::io::Write;
 fn make_jsonl(lines: &[&str]) -> tempfile::NamedTempFile {
     let mut f = tempfile::NamedTempFile::new().unwrap();
     for line in lines {
-        writeln!(f, "{}", line).unwrap();
+        writeln!(f, "{line}").unwrap();
     }
     f.flush().unwrap();
     f

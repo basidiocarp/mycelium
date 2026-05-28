@@ -81,7 +81,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
+    #[ignore = "integration test: requires rhizome binary on PATH"]
     fn test_get_structure_with_rhizome_returns_text() {
         if spore::discover(spore::Tool::Rhizome).is_none() {
             eprintln!("rhizome not in PATH — skipping integration test");

@@ -404,12 +404,12 @@ mod tests {
 
     #[test]
     fn test_format_status_output_mixed_changes() {
-        let porcelain = r#"## main
+        let porcelain = r"## main
 M  staged.rs
  M modified.rs
 A  added.rs
 ?? untracked.txt
-"#;
+";
         let result = format_status_output(porcelain);
         assert!(result.contains("Branch: main"));
         assert!(result.contains("Staged: 2 files"));
@@ -424,7 +424,7 @@ A  added.rs
     #[test]
     fn test_format_status_output_truncation() {
         // Test with 7 staged files - all shown since < 75 budget
-        let porcelain = r#"## main
+        let porcelain = r"## main
 M  file1.rs
 M  file2.rs
 M  file3.rs
@@ -432,7 +432,7 @@ M  file4.rs
 M  file5.rs
 M  file6.rs
 M  file7.rs
-"#;
+";
         let result = format_status_output(porcelain);
         assert!(result.contains("Staged: 7 files"));
         assert!(result.contains("file1.rs"));
@@ -447,15 +447,15 @@ M  file7.rs
 
         // Add 30 staged files
         for i in 1..=30 {
-            porcelain.push_str(&format!("M  staged{}.rs\n", i));
+            porcelain.push_str(&format!("M  staged{i}.rs\n"));
         }
         // Add 30 modified files
         for i in 1..=30 {
-            porcelain.push_str(&format!(" M modified{}.rs\n", i));
+            porcelain.push_str(&format!(" M modified{i}.rs\n"));
         }
         // Add 30 untracked files
         for i in 1..=30 {
-            porcelain.push_str(&format!("?? untracked{}.txt\n", i));
+            porcelain.push_str(&format!("?? untracked{i}.txt\n"));
         }
 
         let result = format_status_output(&porcelain);
@@ -496,7 +496,7 @@ Changes not staged for commit:
 no changes added to commit (use "git add" and/or "git commit -a")
 "#;
         let result = filter_status_with_args(output);
-        eprintln!("Result:\n{}", result);
+        eprintln!("Result:\n{result}");
         assert!(result.contains("On branch main"));
         assert!(result.contains("modified:   src/main.rs"));
         assert!(
@@ -585,7 +585,7 @@ no changes added to commit (use "git add" and/or "git commit -a")
     fn test_format_branch_structured_many_remotes() {
         let current = "main";
         let local: Vec<String> = Vec::new();
-        let remote: Vec<String> = (1..=15).map(|i| format!("feature-{}", i)).collect();
+        let remote: Vec<String> = (1..=15).map(|i| format!("feature-{i}")).collect();
         let result = format_branch_structured(current, &local, &remote);
         assert!(result.contains("remote-only (15):"));
         // First 10 shown
@@ -668,9 +668,10 @@ branch refs/heads/main";
 
     #[test]
     fn test_format_worktree_porcelain_home_shortening() {
-        let home = dirs::home_dir()
-            .map(|h| h.to_string_lossy().to_string())
-            .unwrap_or_else(|| "/home/user".to_string());
+        let home = dirs::home_dir().map_or_else(
+            || "/home/user".to_string(),
+            |h| h.to_string_lossy().to_string(),
+        );
 
         let porcelain = format!(
             "worktree {home}/projects/myapp\nHEAD abc1234def5678\nbranch refs/heads/main\n\n"
@@ -678,8 +679,7 @@ branch refs/heads/main";
         let result = format_worktree_porcelain(&porcelain);
         assert!(
             result.contains("~/projects/myapp"),
-            "Should shorten home directory to ~, got: {}",
-            result
+            "Should shorten home directory to ~, got: {result}"
         );
     }
 }

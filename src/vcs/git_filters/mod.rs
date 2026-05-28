@@ -157,7 +157,7 @@ mod tests {
     #[test]
     fn test_filter_log_output_cap_lines() {
         let output = (0..20)
-            .map(|i| format!("hash{} message {} (1 day ago) <author>", i, i))
+            .map(|i| format!("hash{i} message {i} (1 day ago) <author>"))
             .collect::<Vec<_>>()
             .join("\n");
         let result = filter_log_output(&output, 5);
@@ -207,8 +207,7 @@ mod tests {
 
         assert!(
             savings >= 24.0,
-            "Git stash list filter: expected ≥24% savings, got {:.1}%",
-            savings
+            "Git stash list filter: expected ≥24% savings, got {savings:.1}%"
         );
     }
 
@@ -236,8 +235,7 @@ mod tests {
             / count_tokens(&input).max(1);
         assert!(
             savings >= 40,
-            "Git log filter: expected >= 40% token savings, got {}%",
-            savings
+            "Git log filter: expected >= 40% token savings, got {savings}%"
         );
     }
 
@@ -247,9 +245,10 @@ mod tests {
         // count but not token count (paths have no spaces so each path is a single token).
         // This test validates that the filter produces shorter output in terms of characters,
         // which is the meaningful measure for this filter's compression goal.
-        let home = dirs::home_dir()
-            .map(|h| h.to_string_lossy().to_string())
-            .unwrap_or_else(|| "/home/user".to_string());
+        let home = dirs::home_dir().map_or_else(
+            || "/home/user".to_string(),
+            |h| h.to_string_lossy().to_string(),
+        );
 
         let input = [
             ("projects/myapp/main", "abc1234567890abcdef", "[main]"),

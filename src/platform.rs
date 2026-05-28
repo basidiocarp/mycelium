@@ -161,6 +161,7 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
+    #[allow(unsafe_code)]
     fn test_command_path_finds_executable_on_path() {
         use std::os::unix::fs::PermissionsExt;
 

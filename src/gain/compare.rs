@@ -171,7 +171,7 @@ mod tests {
         // 1/3 savings: 999 raw, 666 mycelium → 33.33..%
         let (saved, pct) = calculate_savings(999, 666);
         assert_eq!(saved, 333);
-        assert!((pct - 33.333333333333336).abs() < 1e-10);
+        assert!((pct - 33.333_333_333_333_336).abs() < 1e-10);
 
         // Very large values — no overflow
         let (saved, pct) = calculate_savings(usize::MAX / 2, usize::MAX / 4);

@@ -138,7 +138,7 @@ fn test_classify_terraform_supported() {
             assert_eq!(mycelium_equivalent, "mycelium terraform");
             assert_eq!(category, "Infra");
         }
-        other => panic!("expected Supported, got {:?}", other),
+        other => panic!("expected Supported, got {other:?}"),
     }
 }
 
@@ -1330,7 +1330,7 @@ fn test_rewrite_find_maxdepth() {
     let result = rewrite_command("find . -maxdepth 1 -name '*.rs'", &[]);
     assert!(result.is_some());
     let cmd = result.unwrap();
-    assert!(cmd.contains("--max-depth") && cmd.contains("1"));
+    assert!(cmd.contains("--max-depth") && cmd.contains('1'));
 }
 
 #[test]
@@ -1339,7 +1339,7 @@ fn test_rewrite_find_mindepth() {
     let result = rewrite_command("find . -mindepth 2 -name '*.rs'", &[]);
     assert!(result.is_some());
     let cmd = result.unwrap();
-    assert!(cmd.contains("--min-depth") && cmd.contains("2"));
+    assert!(cmd.contains("--min-depth") && cmd.contains('2'));
 }
 
 #[test]
@@ -1348,8 +1348,8 @@ fn test_rewrite_find_mindepth_and_maxdepth() {
     let result = rewrite_command("find . -mindepth 2 -maxdepth 3 -name '*.rs'", &[]);
     assert!(result.is_some());
     let cmd = result.unwrap();
-    assert!(cmd.contains("--min-depth") && cmd.contains("2"));
-    assert!(cmd.contains("--max-depth") && cmd.contains("3"));
+    assert!(cmd.contains("--min-depth") && cmd.contains('2'));
+    assert!(cmd.contains("--max-depth") && cmd.contains('3'));
 }
 
 // --- Ensure PATTERNS and RULES stay aligned after modifications ---

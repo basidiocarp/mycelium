@@ -440,130 +440,6 @@ pub fn is_operational_command(cmd: &Commands) -> bool {
     SUPPORTED_TOOLS.contains(&cmd_name)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::commands::Commands;
-
-    #[test]
-    fn test_is_operational_command_consistency_with_supported_tools() {
-        // Verify that is_operational_command returns true for commands in SUPPORTED_TOOLS.
-        // This enforces that both paths use the same canonical set.
-        use crate::commands::{Ls, Npm, Tree};
-        let test_cases: Vec<(&str, Commands)> = vec![
-            ("ls", Commands::Ls(Ls { args: vec![] })),
-            ("tree", Commands::Tree(Tree { args: vec![] })),
-            ("npm", Commands::Npm(Npm { args: vec![] })),
-            ("npm", Commands::Npm(Npm { args: vec![] })),
-        ];
-
-        for (tool_name, cmd) in test_cases {
-            assert!(
-                is_operational_command(&cmd),
-                "is_operational_command should return true for {} command",
-                tool_name
-            );
-            assert!(
-                SUPPORTED_TOOLS.contains(&tool_name),
-                "{} should be in SUPPORTED_TOOLS",
-                tool_name
-            );
-        }
-    }
-
-    #[test]
-    fn test_supported_tools_vs_is_operational_command_drift() {
-        // Verify every SUPPORTED_TOOLS entry has a corresponding entry in is_operational_command.
-        // We do this by checking that SUPPORTED_TOOLS doesn't contain tools that would fail
-        // if processed by is_operational_command.
-        //
-        // This test acts as a drift detector — if a tool is added to SUPPORTED_TOOLS but not
-        // to is_operational_command (or vice versa), the mismatch will be caught by integration
-        // tests that attempt to execute commands through the dispatch system.
-
-        // Known operational command tool names (from is_operational_command)
-        let operational_commands = [
-            "ls",
-            "tree",
-            "read",
-            "peek",
-            "git",
-            "gh",
-            "gt",
-            "cargo",
-            "tsc",
-            "next",
-            "go",
-            "lint",
-            "prettier",
-            "ruff",
-            "golangci-lint",
-            "test",
-            "vitest",
-            "playwright",
-            "pytest",
-            "pnpm",
-            "pip",
-            "npm",
-            "npx",
-            "prisma",
-            "curl",
-            "wget",
-            "docker",
-            "kubectl",
-            "json",
-            "log",
-            "err",
-            "summary",
-            "env",
-            "deps",
-            "invoke",
-            "find",
-            "grep",
-            "diff",
-        ];
-
-        // Check that all SUPPORTED_TOOLS have a counterpart in operational commands
-        for tool in SUPPORTED_TOOLS {
-            assert!(
-                operational_commands.contains(tool),
-                "Tool '{}' in SUPPORTED_TOOLS is not in operational_commands list",
-                tool
-            );
-        }
-
-        // Check that all operational commands are in SUPPORTED_TOOLS (if they should be)
-        // This is a one-way check to catch missing additions
-        for tool in &operational_commands {
-            if !SUPPORTED_TOOLS.contains(tool) {
-                panic!("Tool '{}' is operational but not in SUPPORTED_TOOLS", tool);
-            }
-        }
-    }
-
-    #[test]
-    fn test_absolute_path_tool_name_rejected_by_whitelist() {
-        let bad = [
-            "/usr/bin/git",
-            "/malicious/git",
-            "relative/git",
-            "../git",
-            "subdir\\git",
-        ];
-        for name in bad {
-            assert!(!is_bare_tool_name(name), "{name} should be rejected");
-        }
-    }
-
-    #[test]
-    fn test_bare_tool_name_passes_guard() {
-        let good = ["git", "cargo", "npm", "docker"];
-        for name in good {
-            assert!(is_bare_tool_name(name), "{name} should pass");
-        }
-    }
-}
-
 /// Re-invoke `mycelium` without `--json`, capture stdout, and wrap output in a JSON envelope.
 pub fn dispatch_json(cli: Cli) -> Result<()> {
     let args: Vec<String> = std::env::args().skip(1).filter(|a| a != "--json").collect();
@@ -718,4 +594,130 @@ pub fn dispatch_json(cli: Cli) -> Result<()> {
         std::process::exit(exit_code);
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::commands::Commands;
+
+    #[test]
+    fn test_is_operational_command_consistency_with_supported_tools() {
+        // Verify that is_operational_command returns true for commands in SUPPORTED_TOOLS.
+        // This enforces that both paths use the same canonical set.
+        use crate::commands::{Ls, Npm, Tree};
+        let test_cases: Vec<(&str, Commands)> = vec![
+            ("ls", Commands::Ls(Ls { args: vec![] })),
+            ("tree", Commands::Tree(Tree { args: vec![] })),
+            ("npm", Commands::Npm(Npm { args: vec![] })),
+            ("npm", Commands::Npm(Npm { args: vec![] })),
+        ];
+
+        for (tool_name, cmd) in test_cases {
+            assert!(
+                is_operational_command(&cmd),
+                "is_operational_command should return true for {} command",
+                tool_name
+            );
+            assert!(
+                SUPPORTED_TOOLS.contains(&tool_name),
+                "{} should be in SUPPORTED_TOOLS",
+                tool_name
+            );
+        }
+    }
+
+    #[test]
+    fn test_supported_tools_vs_is_operational_command_drift() {
+        // Verify every SUPPORTED_TOOLS entry has a corresponding entry in is_operational_command.
+        // We do this by checking that SUPPORTED_TOOLS doesn't contain tools that would fail
+        // if processed by is_operational_command.
+        //
+        // This test acts as a drift detector — if a tool is added to SUPPORTED_TOOLS but not
+        // to is_operational_command (or vice versa), the mismatch will be caught by integration
+        // tests that attempt to execute commands through the dispatch system.
+
+        // Known operational command tool names (from is_operational_command)
+        let operational_commands = [
+            "ls",
+            "tree",
+            "read",
+            "peek",
+            "git",
+            "gh",
+            "gt",
+            "cargo",
+            "tsc",
+            "next",
+            "go",
+            "lint",
+            "prettier",
+            "ruff",
+            "golangci-lint",
+            "test",
+            "vitest",
+            "playwright",
+            "pytest",
+            "pnpm",
+            "pip",
+            "npm",
+            "npx",
+            "prisma",
+            "curl",
+            "wget",
+            "docker",
+            "kubectl",
+            "json",
+            "log",
+            "err",
+            "summary",
+            "env",
+            "deps",
+            "invoke",
+            "find",
+            "grep",
+            "diff",
+        ];
+
+        // Check that all SUPPORTED_TOOLS have a counterpart in operational commands
+        for tool in SUPPORTED_TOOLS {
+            assert!(
+                operational_commands.contains(tool),
+                "Tool '{}' in SUPPORTED_TOOLS is not in operational_commands list",
+                tool
+            );
+        }
+
+        // Check that all operational commands are in SUPPORTED_TOOLS (if they should be)
+        // This is a one-way check to catch missing additions
+        for tool in &operational_commands {
+            assert!(
+                SUPPORTED_TOOLS.contains(tool),
+                "Tool '{}' is operational but not in SUPPORTED_TOOLS",
+                tool
+            );
+        }
+    }
+
+    #[test]
+    fn test_absolute_path_tool_name_rejected_by_whitelist() {
+        let bad = [
+            "/usr/bin/git",
+            "/malicious/git",
+            "relative/git",
+            "../git",
+            "subdir\\git",
+        ];
+        for name in bad {
+            assert!(!is_bare_tool_name(name), "{name} should be rejected");
+        }
+    }
+
+    #[test]
+    fn test_bare_tool_name_passes_guard() {
+        let good = ["git", "cargo", "npm", "docker"];
+        for name in good {
+            assert!(is_bare_tool_name(name), "{name} should pass");
+        }
+    }
 }

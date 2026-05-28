@@ -480,7 +480,7 @@ mod tests {
     /// Before fix, positional args fell into list mode which added `-a`,
     /// turning creation into a pattern-filtered listing (silent no-op).
     #[test]
-    #[ignore] // Integration test: requires git repo
+    #[ignore = "integration test: requires git repo"]
     fn test_branch_creation_not_swallowed() {
         let branch = "test-mycelium-create-branch-regression";
         // Create branch via run_branch
@@ -502,7 +502,7 @@ mod tests {
 
     /// Regression test: `git branch <name> <commit>` must create from commit.
     #[test]
-    #[ignore] // Integration test: requires git repo
+    #[ignore = "integration test: requires git repo"]
     fn test_branch_creation_from_commit() {
         let branch = "test-mycelium-create-from-commit";
         run_branch(&[branch.to_string(), "HEAD".to_string()], 0, &[])

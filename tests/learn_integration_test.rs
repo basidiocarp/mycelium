@@ -2,7 +2,7 @@
 //!
 //! Uses a fixture JSONL file that simulates a Claude Code session with
 //! error-then-correction patterns, and verifies the full pipeline:
-//! provider extraction → find_corrections → deduplicate_corrections.
+//! provider extraction → `find_corrections` → `deduplicate_corrections`.
 
 use mycelium::discover::provider::{ClaudeProvider, SessionProvider};
 use mycelium::learn::corrections_store::{

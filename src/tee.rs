@@ -352,23 +352,26 @@ mod tests {
 
         // Create 25 .log files
         for i in 0..25 {
-            let filename = format!("{:010}_{}.log", 1000000 + i, "test");
+            let filename = format!("{:010}_{}.log", 1_000_000 + i, "test");
             fs::write(dir.join(&filename), "content").unwrap();
         }
 
         cleanup_old_files(dir, 20);
 
-        let remaining: Vec<_> = fs::read_dir(dir).unwrap().filter_map(|e| e.ok()).collect();
+        let remaining: Vec<_> = fs::read_dir(dir)
+            .unwrap()
+            .filter_map(std::result::Result::ok)
+            .collect();
         assert_eq!(remaining.len(), 20);
 
         // Oldest 5 should be removed
         for i in 0..5 {
-            let filename = format!("{:010}_{}.log", 1000000 + i, "test");
+            let filename = format!("{:010}_{}.log", 1_000_000 + i, "test");
             assert!(!dir.join(&filename).exists());
         }
         // Newest 20 should remain
         for i in 5..25 {
-            let filename = format!("{:010}_{}.log", 1000000 + i, "test");
+            let filename = format!("{:010}_{}.log", 1_000_000 + i, "test");
             assert!(dir.join(&filename).exists());
         }
     }
@@ -405,7 +408,7 @@ directory = "/tmp/mycelium-tee"
         assert!(config.enabled);
         assert_eq!(config.mode, TeeMode::Always);
         assert_eq!(config.max_files, 10);
-        assert_eq!(config.max_file_size, 524288);
+        assert_eq!(config.max_file_size, 524_288);
         assert_eq!(config.directory, Some(PathBuf::from("/tmp/mycelium-tee")));
 
         // Round-trip

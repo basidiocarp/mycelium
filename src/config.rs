@@ -425,23 +425,23 @@ exclude_commands = ["curl", "gh"]
 
     #[test]
     fn test_config_without_hooks_section_is_valid() {
-        let toml = r#"
+        let toml = r"
 [tracking]
 enabled = true
 history_days = 90
-"#;
+";
         let config: Config = toml::from_str(toml).expect("valid toml");
         assert!(config.hooks.exclude_commands.is_empty());
     }
 
     #[test]
     fn test_git_filter_config_deserialize_custom() {
-        let toml = r#"
+        let toml = r"
 [filters.git]
 log_max_commits = 20
 diff_context_lines = 5
 status_show_untracked = false
-"#;
+";
         let config: Config = toml::from_str(toml).expect("valid toml");
         let git_config = config.filters.git.expect("git config should be present");
         assert_eq!(git_config.log_max_commits, 20);
@@ -451,10 +451,10 @@ status_show_untracked = false
 
     #[test]
     fn test_git_filter_config_defaults() {
-        let toml = r#"
+        let toml = r"
 [filters.git]
 log_max_commits = 25
-"#;
+";
         let config: Config = toml::from_str(toml).expect("valid toml");
         let git_config = config.filters.git.expect("git config should be present");
         assert_eq!(git_config.log_max_commits, 25);
@@ -464,11 +464,11 @@ log_max_commits = 25
 
     #[test]
     fn test_cargo_filter_config_deserialize_custom() {
-        let toml = r#"
+        let toml = r"
 [filters.cargo]
 test_show_passing = true
 build_show_warnings = false
-"#;
+";
         let config: Config = toml::from_str(toml).expect("valid toml");
         let cargo_config = config
             .filters
@@ -480,10 +480,10 @@ build_show_warnings = false
 
     #[test]
     fn test_cargo_filter_config_defaults() {
-        let toml = r#"
+        let toml = r"
 [filters.cargo]
 test_show_passing = true
-"#;
+";
         let config: Config = toml::from_str(toml).expect("valid toml");
         let cargo_config = config
             .filters
@@ -559,10 +559,10 @@ large_lines = 120
 
     #[test]
     fn test_hyphae_config_enabled_true() {
-        let toml = r#"
+        let toml = r"
 [filters.hyphae]
 enabled = true
-"#;
+";
         let config: Config = toml::from_str(toml).expect("valid toml");
         let hyphae = config.filters.hyphae.expect("hyphae config present");
         assert_eq!(hyphae.enabled, Some(true));
@@ -570,10 +570,10 @@ enabled = true
 
     #[test]
     fn test_hyphae_config_enabled_false() {
-        let toml = r#"
+        let toml = r"
 [filters.hyphae]
 enabled = false
-"#;
+";
         let config: Config = toml::from_str(toml).expect("valid toml");
         let hyphae = config.filters.hyphae.expect("hyphae config present");
         assert_eq!(hyphae.enabled, Some(false));
@@ -587,10 +587,10 @@ enabled = false
 
     #[test]
     fn test_rhizome_config_enabled_true() {
-        let toml = r#"
+        let toml = r"
 [filters.rhizome]
 enabled = true
-"#;
+";
         let config: Config = toml::from_str(toml).expect("valid toml");
         let rhizome = config.filters.rhizome.expect("rhizome config present");
         assert_eq!(rhizome.enabled, Some(true));
@@ -598,10 +598,10 @@ enabled = true
 
     #[test]
     fn test_rhizome_config_enabled_false() {
-        let toml = r#"
+        let toml = r"
 [filters.rhizome]
 enabled = false
-"#;
+";
         let config: Config = toml::from_str(toml).expect("valid toml");
         let rhizome = config.filters.rhizome.expect("rhizome config present");
         assert_eq!(rhizome.enabled, Some(false));
@@ -615,13 +615,13 @@ enabled = false
 
     #[test]
     fn test_hyphae_and_rhizome_together() {
-        let toml = r#"
+        let toml = r"
 [filters.hyphae]
 enabled = true
 
 [filters.rhizome]
 enabled = false
-"#;
+";
         let config: Config = toml::from_str(toml).expect("valid toml");
         assert_eq!(config.filters.hyphae.unwrap().enabled, Some(true));
         assert_eq!(config.filters.rhizome.unwrap().enabled, Some(false));
@@ -629,10 +629,10 @@ enabled = false
 
     #[test]
     fn test_summary_config_custom_threshold() {
-        let toml = r#"
+        let toml = r"
 [filters.summary]
 threshold_tokens = 6000
-"#;
+";
         let config: Config = toml::from_str(toml).expect("valid toml");
         let summary = config
             .filters

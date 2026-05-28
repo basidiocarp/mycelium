@@ -2,7 +2,7 @@
 //!
 //! Compares three formats: raw text, compact JSON, and a TOON-like key-value
 //! notation. Uses existing fixtures from tests/fixtures/ and mycelium's own
-//! estimate_tokens to measure savings.
+//! `estimate_tokens` to measure savings.
 
 use mycelium::tracking::estimate_tokens;
 
@@ -32,6 +32,7 @@ impl std::fmt::Display for Format {
 // ── Encoders ─────────────────────────────────────────────────────────────────
 
 /// Encode text into the target format. Returns input unchanged on encode error.
+#[must_use]
 pub fn encode(format: Format, input: &str) -> String {
     match format {
         Format::Raw => input.to_string(),
@@ -40,7 +41,7 @@ pub fn encode(format: Format, input: &str) -> String {
     }
 }
 
-/// Strip whitespace from JSON by re-serializing through serde_json.
+/// Strip whitespace from JSON by re-serializing through `serde_json`.
 /// Falls back to whitespace-collapsing for non-JSON input.
 fn compact_json(input: &str) -> String {
     if let Ok(value) = serde_json::from_str::<serde_json::Value>(input) {
@@ -77,7 +78,7 @@ fn flatten_value(prefix: &str, value: &serde_json::Value, out: &mut Vec<String>)
                 let key = if prefix.is_empty() {
                     k.clone()
                 } else {
-                    format!("{}.{}", prefix, k)
+                    format!("{prefix}.{k}")
                 };
                 flatten_value(&key, v, out);
             }
@@ -87,22 +88,22 @@ fn flatten_value(prefix: &str, value: &serde_json::Value, out: &mut Vec<String>)
                 let key = if prefix.is_empty() {
                     i.to_string()
                 } else {
-                    format!("{}[{}]", prefix, i)
+                    format!("{prefix}[{i}]")
                 };
                 flatten_value(&key, v, out);
             }
         }
         serde_json::Value::Null => {
             if !prefix.is_empty() {
-                out.push(format!("{}:null", prefix));
+                out.push(format!("{prefix}:null"));
             }
         }
-        serde_json::Value::Bool(b) => out.push(format!("{}:{}", prefix, b)),
-        serde_json::Value::Number(n) => out.push(format!("{}:{}", prefix, n)),
+        serde_json::Value::Bool(b) => out.push(format!("{prefix}:{b}")),
+        serde_json::Value::Number(n) => out.push(format!("{prefix}:{n}")),
         serde_json::Value::String(s) => {
             let clean = s.split_whitespace().collect::<Vec<_>>().join(" ");
             if !clean.is_empty() {
-                out.push(format!("{}:{}", prefix, clean));
+                out.push(format!("{prefix}:{clean}"));
             }
         }
     }
@@ -119,6 +120,7 @@ pub struct FormatResult {
 }
 
 /// Compare all formats against `input`. Raw is the baseline for savings %.
+#[must_use]
 pub fn compare_formats(input: &str) -> Vec<FormatResult> {
     let baseline_tokens = estimate_tokens(input);
 
@@ -146,6 +148,7 @@ pub fn compare_formats(input: &str) -> Vec<FormatResult> {
 
 /// Check whether scalar string values from a JSON input survive encoding
 /// into the target format. Returns ratio of preserved values (0.0–1.0).
+#[must_use]
 pub fn structural_preservation_score(input: &str, encoded: &str) -> f64 {
     let Ok(root) = serde_json::from_str::<serde_json::Value>(input) else {
         return 1.0; // non-JSON: no structural check possible
@@ -216,17 +219,15 @@ mod tests {
         let toon_tokens = estimate_tokens(&toon);
         assert!(
             toon_tokens < raw_tokens,
-            "TOON ({} tokens) should be shorter than raw ({} tokens)",
-            toon_tokens,
-            raw_tokens
+            "TOON ({toon_tokens} tokens) should be shorter than raw ({raw_tokens} tokens)"
         );
     }
 
     #[test]
     fn toon_like_preserves_key_values() {
         let toon = encode(Format::ToonLike, PRETTY_JSON);
-        assert!(toon.contains("status:ok"), "missing status:ok in {}", toon);
-        assert!(toon.contains("count:42"), "missing count:42 in {}", toon);
+        assert!(toon.contains("status:ok"), "missing status:ok in {toon}");
+        assert!(toon.contains("count:42"), "missing count:42 in {toon}");
     }
 
     #[test]
@@ -261,8 +262,7 @@ mod tests {
         let score = structural_preservation_score(PRETTY_JSON, &compact);
         assert!(
             score >= 0.9,
-            "compact JSON should preserve ≥90% of string leaves, got {:.2}",
-            score
+            "compact JSON should preserve ≥90% of string leaves, got {score:.2}"
         );
     }
 
@@ -345,7 +345,7 @@ mod tests {
 
     fn print_experiment_results(fixture: &str, results: &[FormatResult], input: &str) {
         let baseline = estimate_tokens(input);
-        println!("\n=== {} ({} tokens baseline) ===", fixture, baseline);
+        println!("\n=== {fixture} ({baseline} tokens baseline) ===");
         for r in results {
             println!(
                 "  {:14} {:5} tokens  {:5.1}% savings",

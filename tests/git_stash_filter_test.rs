@@ -1,6 +1,6 @@
 //! Tests for git stash filter
 //!
-//! Snapshot and token savings tests for the filter_stash_list function.
+//! Snapshot and token savings tests for the `filter_stash_list` function.
 
 use std::path::Path;
 
@@ -18,7 +18,7 @@ fn filter_stash_list(output: &str) -> String {
             } else {
                 rest.trim()
             };
-            result.push(format!("{}: {}", index, message));
+            result.push(format!("{index}: {message}"));
         } else {
             result.push(line.to_string());
         }
@@ -57,13 +57,12 @@ fn test_filter_stash_list_token_savings() {
 
     let savings = 100.0 - (output_tokens as f64 / input_tokens as f64 * 100.0);
 
-    println!("Input tokens: {}", input_tokens);
-    println!("Output tokens: {}", output_tokens);
-    println!("Token savings: {:.1}%", savings);
+    println!("Input tokens: {input_tokens}");
+    println!("Output tokens: {output_tokens}");
+    println!("Token savings: {savings:.1}%");
 
     assert!(
         savings >= 24.0,
-        "Git stash list filter: expected ≥24% savings, got {:.1}%",
-        savings
+        "Git stash list filter: expected ≥24% savings, got {savings:.1}%"
     );
 }

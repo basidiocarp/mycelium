@@ -393,15 +393,15 @@ mod tests {
 
     #[test]
     fn test_format_cpt_normal() {
-        assert_eq!(format_cpt(0.000003), "$3.00/MTok");
-        assert_eq!(format_cpt(0.0000038), "$3.80/MTok");
-        assert_eq!(format_cpt(0.00000386), "$3.86/MTok");
+        assert_eq!(format_cpt(0.000_003), "$3.00/MTok");
+        assert_eq!(format_cpt(0.000_003_8), "$3.80/MTok");
+        assert_eq!(format_cpt(0.000_003_86), "$3.86/MTok");
     }
 
     #[test]
     fn test_format_cpt_edge_cases() {
         assert_eq!(format_cpt(0.0), "$0.00/MTok"); // zero
-        assert_eq!(format_cpt(-0.000001), "$0.00/MTok"); // negative
+        assert_eq!(format_cpt(-0.000_001), "$0.00/MTok"); // negative
         assert_eq!(format_cpt(f64::INFINITY), "$0.00/MTok"); // infinite
         assert_eq!(format_cpt(f64::NAN), "$0.00/MTok"); // NaN
     }
