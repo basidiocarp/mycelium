@@ -17,15 +17,15 @@ pub use build::{
 pub use files::{Diff, Find, Grep, Ls, Peek, Read, Tree, Wc};
 #[allow(unused_imports)]
 pub use infra::{Atmos, Aws, Curl, Docker, Kubectl, Prisma, Psql, Terraform, Wget};
+#[cfg(unix)]
+#[allow(unused_imports)]
+pub use setup::ServeSocket;
 #[allow(unused_imports)]
 pub use setup::{
     Benchmark, CcEconomics, Completions, Config, Context, Deps, Discover, Doctor, Env, Err,
     Explain, Gain, HookAudit, Init, Invoke, Json, Learn, Log, Npm, Npx, ParseHealth, Pip, Plugin,
     Pnpm, Proxy, Rewrite, SelfUpdate, Summary, Verify,
 };
-#[cfg(unix)]
-#[allow(unused_imports)]
-pub use setup::ServeSocket;
 #[allow(unused_imports)]
 pub use vcs::{Gh, Git, Gt};
 
