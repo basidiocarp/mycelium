@@ -21,8 +21,11 @@ pub use infra::{Atmos, Aws, Curl, Docker, Kubectl, Prisma, Psql, Terraform, Wget
 pub use setup::{
     Benchmark, CcEconomics, Completions, Config, Context, Deps, Discover, Doctor, Env, Err,
     Explain, Gain, HookAudit, Init, Invoke, Json, Learn, Log, Npm, Npx, ParseHealth, Pip, Plugin,
-    Pnpm, Proxy, Rewrite, SelfUpdate, ServeSocket, Summary, Verify,
+    Pnpm, Proxy, Rewrite, SelfUpdate, Summary, Verify,
 };
+#[cfg(unix)]
+#[allow(unused_imports)]
+pub use setup::ServeSocket;
 #[allow(unused_imports)]
 pub use vcs::{Gh, Git, Gt};
 

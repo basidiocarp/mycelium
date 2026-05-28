@@ -10,6 +10,7 @@ use crate::init::claude_md::{
 };
 use crate::init::hook;
 use crate::init::json_patch::PatchMode;
+#[cfg(unix)]
 use crate::init::json_patch::patch_settings_json;
 
 use super::context;

@@ -5,6 +5,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::init::claude_md::resolve_claude_dir;
+#[cfg(unix)]
 use crate::init::hook::extract_hook_version;
 use crate::init::json_patch::hook_already_present;
 
