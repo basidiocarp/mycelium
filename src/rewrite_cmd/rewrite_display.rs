@@ -49,15 +49,20 @@ pub(crate) fn compound_segment_lines(input: &str) -> Vec<String> {
         return Vec::new();
     }
 
-    let excluded = crate::config::Config::load()
-        .map(|c| c.hooks.exclude_commands)
-        .unwrap_or_default();
+    let config = crate::config::Config::load().unwrap_or_default();
+    let excluded = config.hooks.exclude_commands;
+    let transparent_prefixes = config.filters.transparent_prefixes;
     let user_corrections = corrections_store::load_corrections(corrections_store::CORRECTIONS_JSON);
 
     let mut lines = vec!["Segments:".to_string()];
     for segment in segments {
         let trimmed = segment.trim();
-        let resolution = super::resolve_with_inputs_internal(trimmed, &excluded, &user_corrections);
+        let resolution = super::resolve_with_inputs_internal(
+            trimmed,
+            &excluded,
+            &transparent_prefixes,
+            &user_corrections,
+        );
         let output = resolution.rewritten.as_deref().unwrap_or(trimmed);
         lines.push(format!(
             "  - {} => {} ({}, reason: {})",

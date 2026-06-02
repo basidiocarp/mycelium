@@ -6,13 +6,14 @@ use super::rules::{IGNORED_EXACT, IGNORED_PREFIXES, PATTERNS, RULES};
 
 // Re-export the rewrite API from the rewriter module
 // Note: rewrite_command is pub; others are pub(crate) for internal use
-pub use super::rewriter::rewrite_command;
 #[cfg(test)]
 pub(crate) use super::rewriter::set_find_fd_rewrite_active_for_tests;
 #[allow(unused_imports)]
 pub(crate) use super::rewriter::{
     learned_correction_block_reason, rewrite_block_reason, rewrite_primary_command,
 };
+#[allow(unused_imports)]
+pub use super::rewriter::{rewrite_command, rewrite_command_with_prefixes};
 
 #[path = "registry_compound.rs"]
 pub(super) mod compound;

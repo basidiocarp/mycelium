@@ -202,6 +202,10 @@ pub struct FilterConfig {
     /// Show a header line when output is filtered (default: true)
     #[serde(default = "default_true")]
     pub show_filter_header: bool,
+    /// User-configurable wrapper command prefixes to strip before rewriting
+    /// (e.g. `["rtk run", "docker compose exec web"]`)
+    #[serde(default)]
+    pub transparent_prefixes: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -289,6 +293,7 @@ impl Default for FilterConfig {
             rhizome: None,
             summary: None,
             show_filter_header: true,
+            transparent_prefixes: Vec::new(),
         }
     }
 }

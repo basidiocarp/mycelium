@@ -74,6 +74,7 @@ pub fn explain(cmd: &str) -> String {
 pub(crate) fn resolve_with_inputs_internal(
     cmd: &str,
     excluded: &[String],
+    transparent_prefixes: &[String],
     user_corrections: &[corrections_store::UserCorrection],
 ) -> RewriteResolution {
     let input = cmd.trim().to_string();
@@ -108,7 +109,9 @@ pub(crate) fn resolve_with_inputs_internal(
         };
     }
 
-    if let Some(rewritten) = registry::rewrite_command(&input, excluded) {
+    if let Some(rewritten) =
+        registry::rewrite_command_with_prefixes(&input, excluded, transparent_prefixes)
+    {
         let source = if rewritten == input {
             RewriteSource::Passthrough
         } else {
@@ -136,11 +139,11 @@ pub(crate) fn resolve_with_inputs_internal(
 }
 
 fn resolve(cmd: &str) -> RewriteResolution {
-    let excluded = crate::config::Config::load()
-        .map(|c| c.hooks.exclude_commands)
-        .unwrap_or_default();
+    let config = crate::config::Config::load().unwrap_or_default();
+    let excluded = config.hooks.exclude_commands;
+    let transparent_prefixes = config.filters.transparent_prefixes;
     let user_corrections = corrections_store::load_corrections(corrections_store::CORRECTIONS_JSON);
-    resolve_with_inputs_internal(cmd, &excluded, &user_corrections)
+    resolve_with_inputs_internal(cmd, &excluded, &transparent_prefixes, &user_corrections)
 }
 
 #[cfg(test)]
@@ -221,7 +224,8 @@ mod tests {
             right: "mycelium git log -10 | grep feat".to_string(),
         }];
 
-        let resolution = resolve_with_inputs_internal("git log -10 | grep feat", &[], &corrections);
+        let resolution =
+            resolve_with_inputs_internal("git log -10 | grep feat", &[], &[], &corrections);
         assert!(resolution.rewritten.is_none());
         assert_eq!(resolution.source, RewriteSource::NoRewrite);
     }
@@ -235,6 +239,7 @@ mod tests {
 
         let resolution = resolve_with_inputs_internal(
             "mise exec -- just -- gh pr list --json number",
+            &[],
             &[],
             &corrections,
         );
@@ -252,6 +257,7 @@ mod tests {
         let resolution = resolve_with_inputs_internal(
             "git status && gh pr list --json number",
             &[],
+            &[],
             &corrections,
         );
         assert!(resolution.rewritten.is_none());
@@ -262,7 +268,7 @@ mod tests {
     fn test_resolve_uses_fd_for_safe_find_commands_when_available() {
         let _guard = set_find_fd_rewrite_active_for_tests(true);
 
-        let resolution = resolve_with_inputs_internal("find . -name '*.rs' -type f", &[], &[]);
+        let resolution = resolve_with_inputs_internal("find . -name '*.rs' -type f", &[], &[], &[]);
 
         assert_eq!(
             resolution.rewritten,
@@ -279,7 +285,7 @@ mod tests {
 
     #[test]
     fn test_resolve_routes_diagnostic_commands_to_invoke_passthrough() {
-        let resolution = resolve_with_inputs_internal("which git", &[], &[]);
+        let resolution = resolve_with_inputs_internal("which git", &[], &[], &[]);
 
         assert_eq!(
             resolution.rewritten,
@@ -292,5 +298,25 @@ mod tests {
                 .reason
                 .contains("diagnostic passthrough allowlist")
         );
+    }
+
+    #[test]
+    fn test_transparent_prefix_strips_wrapper_and_rewrites_inner() {
+        let transparent_prefixes = vec!["rtk run".to_string()];
+        let resolution =
+            resolve_with_inputs_internal("rtk run cargo test", &[], &transparent_prefixes, &[]);
+
+        assert!(resolution.rewritten.is_some());
+        let rewritten = resolution.rewritten.unwrap();
+        assert!(rewritten.contains("mycelium"));
+        assert!(rewritten.contains("rtk run"));
+    }
+
+    #[test]
+    fn test_transparent_prefix_with_empty_prefixes_unchanged() {
+        // With no transparent prefixes, behavior matches default rewrite_command
+        let resolution = resolve_with_inputs_internal("cargo test", &[], &[], &[]);
+        assert!(resolution.rewritten.is_some());
+        assert!(resolution.rewritten.unwrap().contains("mycelium"));
     }
 }

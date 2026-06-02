@@ -198,8 +198,33 @@ pub(crate) fn learned_correction_block_reason(cmd: &str, excluded: &[String]) ->
 /// Handles compound commands (`&&`, `||`, `;`) by rewriting each segment independently.
 /// Piped commands are left unchanged because downstream stages expect raw stdout,
 /// not Mycelium's summarized output.
+///
+/// This function is kept for backward compatibility. Use `rewrite_command_with_prefixes`
+/// to support user-configured transparent wrapper prefixes.
+#[allow(
+    dead_code,
+    reason = "Two-arg backward-compat shim retained for the existing test suite; production callers use rewrite_command_with_prefixes"
+)]
 #[must_use]
 pub fn rewrite_command(cmd: &str, excluded: &[String]) -> Option<String> {
+    rewrite_command_with_prefixes(cmd, excluded, &[])
+}
+
+/// Rewrite a raw command to its Mycelium equivalent, with support for user-configured
+/// transparent prefixes (wrapper commands to strip before rewriting).
+///
+/// Returns `Some(rewritten)` if the command has a Mycelium equivalent or is already Mycelium.
+/// Returns `None` if the command is unsupported or ignored (hook should pass through).
+///
+/// Handles compound commands (`&&`, `||`, `;`) by rewriting each segment independently.
+/// Piped commands are left unchanged because downstream stages expect raw stdout,
+/// not Mycelium's summarized output.
+#[must_use]
+pub fn rewrite_command_with_prefixes(
+    cmd: &str,
+    excluded: &[String],
+    transparent_prefixes: &[String],
+) -> Option<String> {
     let trimmed = cmd.trim();
     if trimmed.is_empty() {
         return None;
@@ -232,12 +257,16 @@ pub fn rewrite_command(cmd: &str, excluded: &[String]) -> Option<String> {
         return None;
     }
 
-    rewrite_compound(trimmed, excluded)
+    rewrite_compound(trimmed, excluded, transparent_prefixes)
 }
 
 /// Rewrite a compound command (with `&&`, `||`, `;`, `|`) by rewriting each segment.
 #[allow(clippy::too_many_lines)]
-fn rewrite_compound(cmd: &str, excluded: &[String]) -> Option<String> {
+fn rewrite_compound(
+    cmd: &str,
+    excluded: &[String],
+    transparent_prefixes: &[String],
+) -> Option<String> {
     let bytes = cmd.as_bytes();
     let len = bytes.len();
     let mut result = String::with_capacity(len + 32);
@@ -274,8 +303,8 @@ fn rewrite_compound(cmd: &str, excluded: &[String]) -> Option<String> {
                 if i + 1 < len && bytes[i + 1] == b'|' {
                     // `||` operator — rewrite left, continue
                     let seg = cmd[seg_start..i].trim();
-                    let rewritten =
-                        rewrite_segment(seg, excluded).unwrap_or_else(|| seg.to_string());
+                    let rewritten = rewrite_segment(seg, excluded, transparent_prefixes)
+                        .unwrap_or_else(|| seg.to_string());
                     if rewritten != seg {
                         any_changed = true;
                     }
@@ -294,7 +323,8 @@ fn rewrite_compound(cmd: &str, excluded: &[String]) -> Option<String> {
             b'&' if !in_single && !in_double && i + 1 < len && bytes[i + 1] == b'&' => {
                 // `&&` operator — rewrite left, continue
                 let seg = cmd[seg_start..i].trim();
-                let rewritten = rewrite_segment(seg, excluded).unwrap_or_else(|| seg.to_string());
+                let rewritten = rewrite_segment(seg, excluded, transparent_prefixes)
+                    .unwrap_or_else(|| seg.to_string());
                 if rewritten != seg {
                     any_changed = true;
                 }
@@ -315,8 +345,8 @@ fn rewrite_compound(cmd: &str, excluded: &[String]) -> Option<String> {
                 } else {
                     // single `&` background execution operator
                     let seg = cmd[seg_start..i].trim();
-                    let rewritten =
-                        rewrite_segment(seg, excluded).unwrap_or_else(|| seg.to_string());
+                    let rewritten = rewrite_segment(seg, excluded, transparent_prefixes)
+                        .unwrap_or_else(|| seg.to_string());
                     if rewritten != seg {
                         any_changed = true;
                     }
@@ -332,7 +362,8 @@ fn rewrite_compound(cmd: &str, excluded: &[String]) -> Option<String> {
             b';' if !in_single && !in_double => {
                 // `;` separator
                 let seg = cmd[seg_start..i].trim();
-                let rewritten = rewrite_segment(seg, excluded).unwrap_or_else(|| seg.to_string());
+                let rewritten = rewrite_segment(seg, excluded, transparent_prefixes)
+                    .unwrap_or_else(|| seg.to_string());
                 if rewritten != seg {
                     any_changed = true;
                 }
@@ -355,7 +386,8 @@ fn rewrite_compound(cmd: &str, excluded: &[String]) -> Option<String> {
 
     // Last (or only) segment
     let seg = cmd[seg_start..len].trim();
-    let rewritten = rewrite_segment(seg, excluded).unwrap_or_else(|| seg.to_string());
+    let rewritten =
+        rewrite_segment(seg, excluded, transparent_prefixes).unwrap_or_else(|| seg.to_string());
     if rewritten != seg {
         any_changed = true;
     }
@@ -396,7 +428,11 @@ fn rewrite_head_numeric(cmd: &str) -> Option<String> {
 /// Rewrite a single (non-compound) command segment.
 /// Returns `Some(rewritten)` if matched (including already-Mycelium passthrough).
 /// Returns `None` if no match (caller uses original segment).
-fn rewrite_segment(seg: &str, excluded: &[String]) -> Option<String> {
+fn rewrite_segment(
+    seg: &str,
+    excluded: &[String],
+    transparent_prefixes: &[String],
+) -> Option<String> {
     let trimmed = seg.trim();
     if trimmed.is_empty() {
         return None;
@@ -413,8 +449,14 @@ fn rewrite_segment(seg: &str, excluded: &[String]) -> Option<String> {
 
     let (env_prefix, cmd_clean) = shell::strip_env_prefix_segments(trimmed);
 
+    // Check user-supplied transparent prefixes first (longest-match scan)
+    if let Some(wrapper) = shell::split_transparent_prefix(&cmd_clean, transparent_prefixes) {
+        let rewritten = rewrite_segment(wrapper.inner, excluded, transparent_prefixes)?;
+        return Some(format!("{env_prefix}{}{rewritten}", wrapper.prefix));
+    }
+
     if let Some(wrapper) = shell::split_task_runner_command(&cmd_clean) {
-        let rewritten = rewrite_segment(wrapper.inner, excluded)?;
+        let rewritten = rewrite_segment(wrapper.inner, excluded, transparent_prefixes)?;
         return Some(format!("{env_prefix}{}{rewritten}", wrapper.prefix));
     }
 

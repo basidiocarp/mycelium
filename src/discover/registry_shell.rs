@@ -84,6 +84,65 @@ pub(crate) fn unwrap_all_task_runner_commands(mut cmd: &str) -> &str {
     cmd
 }
 
+/// Scan user-supplied transparent prefixes for a longest-match that appears at word boundary.
+///
+/// Returns `TaskRunnerCommand { prefix, inner }` if a prefix matches the start of `cmd` AND
+/// the character right after the matched prefix is whitespace or end-of-string.
+/// Empty/whitespace-only prefix entries are skipped.
+/// The `prefix` slice includes the trailing whitespace; `inner = payload.trim_start()`.
+///
+/// Returns `None` if no match, if the payload is empty, or if all prefixes are empty.
+pub(crate) fn split_transparent_prefix<'a>(
+    cmd: &'a str,
+    prefixes: &[String],
+) -> Option<TaskRunnerCommand<'a>> {
+    let trimmed = cmd.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    // Find the longest matching prefix that respects word boundaries.
+    let mut best_match: Option<(&str, usize)> = None; // (matched_prefix_str, matched_len)
+
+    for prefix_str in prefixes {
+        let prefix_trimmed = prefix_str.trim();
+        if prefix_trimmed.is_empty() {
+            continue;
+        }
+
+        if trimmed.starts_with(prefix_trimmed) {
+            let after_prefix_idx = prefix_trimmed.len();
+            // Check word boundary: char after prefix must be whitespace or end-of-string
+            if after_prefix_idx >= trimmed.len()
+                || trimmed.as_bytes()[after_prefix_idx].is_ascii_whitespace()
+            {
+                // Keep the longest match
+                if best_match.is_none() || prefix_trimmed.len() > best_match.unwrap().1 {
+                    best_match = Some((prefix_trimmed, prefix_trimmed.len()));
+                }
+            }
+        }
+    }
+
+    let (_matched_prefix, matched_len) = best_match?;
+    let rest = &trimmed[matched_len..].trim_start();
+
+    if rest.is_empty() {
+        return None;
+    }
+
+    // Compute the prefix slice to include the trailing whitespace.
+    let payload_after_prefix = &trimmed[matched_len..];
+    let inner_trimmed = payload_after_prefix.trim_start();
+    let prefix_end_idx = trimmed.len() - inner_trimmed.len();
+    let prefix_slice = &trimmed[..prefix_end_idx];
+
+    Some(TaskRunnerCommand {
+        prefix: prefix_slice,
+        inner: inner_trimmed,
+    })
+}
+
 pub(crate) fn strip_env_prefix_segments(cmd: &str) -> (String, String) {
     let stripped_cow = env_prefix().replace(cmd.trim(), "");
     let env_prefix_len = cmd.trim().len() - stripped_cow.len();
@@ -342,4 +401,91 @@ pub(crate) fn needs_shell_parser_fallback(cmd: &str) -> bool {
 
 pub(crate) fn has_unsupported_shell_quoting(cmd: &str) -> bool {
     contains_unquoted_sequence(cmd, b"$'") || contains_unquoted_sequence(cmd, b"$\"")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_split_transparent_prefix_simple_match() {
+        let prefixes = vec!["rtk run".to_string()];
+        let result = split_transparent_prefix("rtk run cargo test", &prefixes);
+        assert!(result.is_some());
+        let wrapper = result.unwrap();
+        assert_eq!(wrapper.inner, "cargo test");
+        assert_eq!(wrapper.prefix.trim(), "rtk run");
+    }
+
+    #[test]
+    fn test_split_transparent_prefix_longest_match_wins() {
+        let prefixes = vec![
+            "docker".to_string(),
+            "docker compose".to_string(),
+            "docker compose exec web".to_string(), // The longest, most specific prefix
+        ];
+        let result = split_transparent_prefix("docker compose exec web cargo test", &prefixes);
+        assert!(result.is_some());
+        let wrapper = result.unwrap();
+        assert_eq!(wrapper.inner, "cargo test");
+        // The prefix includes trailing whitespace
+        assert!(wrapper.prefix.contains("docker compose exec web"));
+    }
+
+    #[test]
+    fn test_split_transparent_prefix_word_boundary_required() {
+        let prefixes = vec!["do".to_string()];
+        let result = split_transparent_prefix("docker run cargo test", &prefixes);
+        assert!(result.is_none()); // "do" is not followed by whitespace in "docker"
+    }
+
+    #[test]
+    fn test_split_transparent_prefix_exact_match_is_valid() {
+        let prefixes = vec!["rtk run".to_string()];
+        let result = split_transparent_prefix("rtk run", &prefixes);
+        assert!(result.is_none()); // payload is empty after stripping
+    }
+
+    #[test]
+    fn test_split_transparent_prefix_empty_prefixes() {
+        let prefixes: Vec<String> = vec![];
+        let result = split_transparent_prefix("rtk run cargo test", &prefixes);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_split_transparent_prefix_whitespace_only_prefixes_skipped() {
+        let prefixes = vec!["  ".to_string(), "rtk run".to_string()];
+        let result = split_transparent_prefix("rtk run cargo test", &prefixes);
+        assert!(result.is_some());
+        let wrapper = result.unwrap();
+        assert_eq!(wrapper.inner, "cargo test");
+    }
+
+    #[test]
+    fn test_split_transparent_prefix_no_match() {
+        let prefixes = vec!["rtk run".to_string()];
+        let result = split_transparent_prefix("cargo test", &prefixes);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_split_transparent_prefix_preserves_trailing_whitespace_in_prefix_slice() {
+        let prefixes = vec!["rtk run".to_string()];
+        let result = split_transparent_prefix("rtk run    cargo test", &prefixes);
+        assert!(result.is_some());
+        let wrapper = result.unwrap();
+        assert_eq!(wrapper.inner, "cargo test");
+        // Prefix slice includes the trailing whitespace between wrapper and payload
+        assert!(wrapper.prefix.contains("rtk run"));
+    }
+
+    #[test]
+    fn test_split_task_runner_command_unchanged() {
+        // Verify that the existing task runner functions are unaffected
+        let result = split_task_runner_command("mise exec -- cargo test");
+        assert!(result.is_some());
+        let wrapper = result.unwrap();
+        assert_eq!(wrapper.inner, "cargo test");
+    }
 }
