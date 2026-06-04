@@ -188,19 +188,32 @@ pub fn tee_raw(raw: &str, command_slug: &str, exit_code: i32) -> Option<PathBuf>
     )
 }
 
+/// Collapse a tee file path's home-directory prefix to `~` for compact hints.
+/// Shared by `format_hint` and `format_hint_with_offset`.
+fn tee_path_display(path: &std::path::Path) -> String {
+    if let Some(home) = dirs::home_dir() {
+        if let Ok(relative) = path.strip_prefix(&home) {
+            return format!("~/{}", relative.display());
+        }
+    }
+    path.display().to_string()
+}
+
 /// Format the hint line with ~ shorthand for home directory.
 fn format_hint(path: &std::path::Path) -> String {
-    let display = if let Some(home) = dirs::home_dir() {
-        if let Ok(relative) = path.strip_prefix(&home) {
-            format!("~/{}", relative.display())
-        } else {
-            path.display().to_string()
-        }
-    } else {
-        path.display().to_string()
-    };
+    format!("[full output: {}]", tee_path_display(path))
+}
 
-    format!("[full output: {display}]")
+/// Like `format_hint`, but appends a `(from line N)` seek annotation so the
+/// model can resume reading a paginated slice from the right offset.
+// Public tee API surface (callable as `mycelium::tee::*` via the lib); the bin
+// target has no internal caller yet, so allow dead_code in that compilation.
+#[allow(dead_code)]
+fn format_hint_with_offset(path: &std::path::Path, line_offset: usize) -> String {
+    format!(
+        "[full output: {} (from line {line_offset})]",
+        tee_path_display(path)
+    )
 }
 
 /// Convenience: tee + format hint in one call.
@@ -209,6 +222,45 @@ fn format_hint(path: &std::path::Path) -> String {
 pub fn tee_and_hint(raw: &str, command_slug: &str, exit_code: i32) -> Option<String> {
     let path = tee_raw(raw, command_slug, exit_code)?;
     Some(format_hint(&path))
+}
+
+/// Tee a paginated slice of output to disk and return a seek hint, bypassing the
+/// `TeeMode`/exit-code gate that `tee_and_hint` applies via `should_tee`. Suitable
+/// for callers that hold a paginated slice rather than a complete run result — it
+/// always writes when conditions permit. Like `tee_raw`, it is fail-open: any I/O
+/// failure or disabled config returns `None` rather than panicking on the hot path.
+///
+/// Conditions: honors the `MYCELIUM_TEE=0` kill-switch and the `tee.enabled` flag,
+/// and enforces `MIN_TEE_SIZE` (content shorter than that is not worth teeing).
+// Public tee API surface (callable as `mycelium::tee::*` via the lib); the bin
+// target has no internal caller yet, so allow dead_code in that compilation.
+#[allow(dead_code)]
+#[must_use]
+pub fn force_tee_tail_hint(
+    content: &str,
+    command_slug: &str,
+    line_offset: usize,
+) -> Option<String> {
+    // Kill-switch first, matching tee_raw's gate order.
+    if std::env::var("MYCELIUM_TEE").ok().as_deref() == Some("0") {
+        return None;
+    }
+    if content.len() < MIN_TEE_SIZE {
+        return None;
+    }
+    let config = Config::load().ok()?;
+    if !config.tee.enabled {
+        return None;
+    }
+    let tee_dir = get_tee_dir(&config)?;
+    let path = write_tee_file(
+        content,
+        command_slug,
+        &tee_dir,
+        config.tee.max_file_size,
+        config.tee.max_files,
+    )?;
+    Some(format_hint_with_offset(&path, line_offset))
 }
 
 /// `TeeMode` controls when tee writes files.
@@ -383,6 +435,24 @@ mod tests {
         assert!(hint.starts_with("[full output: "));
         assert!(hint.ends_with(']'));
         assert!(hint.contains("123_cargo_test.log"));
+    }
+
+    #[test]
+    fn test_format_hint_with_offset() {
+        let path = PathBuf::from("/tmp/mycelium/tee/123_cargo_test.log");
+        let hint = format_hint_with_offset(&path, 42);
+        assert!(hint.starts_with("[full output: "));
+        assert!(hint.ends_with(']'));
+        assert!(hint.contains("123_cargo_test.log"));
+        assert!(hint.contains("(from line 42)"));
+    }
+
+    #[test]
+    fn test_force_tee_tail_hint_skips_below_min_size() {
+        // Content shorter than MIN_TEE_SIZE returns None without writing,
+        // matching should_tee's size gate — deterministic, no env/disk needed.
+        let hint = force_tee_tail_hint("short output", "rg_search", 12);
+        assert!(hint.is_none());
     }
 
     #[test]
