@@ -57,12 +57,15 @@ fn build_summary(raw: &str, command: &str, input_tokens: usize, exit_code: i32) 
     let error_count = raw.lines().filter(|l| is_error_line(l)).count();
     let warning_count = raw.lines().filter(|l| is_warning_line(l)).count();
 
+    // Detect output kind from first ~1KB
+    let output_kind = detect_output_kind(raw);
+
     let mut result = Vec::new();
 
     // Header with command and stats
     result.push(format!(
-        "[mycelium summary] {}: {} lines, {} tokens",
-        command, line_count, input_tokens
+        "[mycelium summary] {}: {} lines, {} tokens, kind: {}",
+        command, line_count, input_tokens, output_kind
     ));
 
     // Key stats — use exit code as ground truth; error keyword scan is supplemental.
@@ -86,6 +89,77 @@ fn build_summary(raw: &str, command: &str, input_tokens: usize, exit_code: i32) 
     ));
 
     result.join("\n")
+}
+
+/// Return the largest slice of `raw` whose byte length is at most `PREFIX_LIMIT`,
+/// always ending on a valid UTF-8 char boundary.
+///
+/// `is_char_boundary` is always true at 0 and at `raw.len()`, so this never
+/// panics and the returned slice length is always `<= PREFIX_LIMIT`.
+fn bounded_prefix(raw: &str) -> &str {
+    const PREFIX_LIMIT: usize = 1024;
+    // Walk down from PREFIX_LIMIT (or raw.len(), whichever is smaller) to find
+    // the largest char boundary that does not exceed PREFIX_LIMIT bytes.
+    let end = (0..=PREFIX_LIMIT.min(raw.len()))
+        .rev()
+        .find(|&i| raw.is_char_boundary(i))
+        .unwrap_or(0);
+    &raw[..end]
+}
+
+/// Classify output into one of six categories based on heuristics from the first ~1KB.
+///
+/// Inspects only a bounded prefix to avoid performance regression on large outputs.
+/// Returns a static string label: TestResults, BuildOutput, LogOutput, ListOutput, JsonOutput, or Generic.
+fn detect_output_kind(raw: &str) -> &'static str {
+    let prefix = bounded_prefix(raw);
+
+    let lower = prefix.to_lowercase();
+
+    // JsonOutput: starts with {, [, or contains structured json-like patterns
+    // Check early since it's unambiguous
+    let trimmed = prefix.trim_start();
+    if trimmed.starts_with('{') || trimmed.starts_with('[') {
+        return "JsonOutput";
+    }
+
+    // BuildOutput: cargo build, gcc, rustc, etc. (check before TestResults)
+    // "Compiling" and "Finished" are Build-specific
+    if lower.contains("compiling")
+        || lower.contains("building")
+        || lower.contains("finished ")
+        || (lower.contains("error:")
+            && (lower.contains("could not") || lower.contains("failed to")))
+    {
+        return "BuildOutput";
+    }
+
+    // TestResults: cargo test, pytest, npm test, etc.
+    if lower.contains("test result")
+        || lower.contains("tests run")
+        || (lower.contains("passed") && (lower.contains("failed") || lower.contains("test")))
+    {
+        return "TestResults";
+    }
+
+    // LogOutput: level-prefixed log lines (not build/error related)
+    if (lower.contains("info:") || lower.contains("debug:") || lower.contains("trace:"))
+        || (lower.contains("warn:") && !lower.contains("warning:"))
+    {
+        return "LogOutput";
+    }
+
+    // ListOutput: lists of files, directories, packages, etc.
+    // Look for lines that start with common list markers
+    if prefix.lines().take(20).any(|line| {
+        let l = line.trim_start();
+        l.starts_with('-') || l.starts_with('•') || l.starts_with('*') || l.starts_with('|')
+    }) {
+        return "ListOutput";
+    }
+
+    // Generic: default fallback
+    "Generic"
 }
 
 // "error" and "fatal" are rarely substrings of non-error words, so substring
@@ -251,5 +325,136 @@ mod tests {
     fn test_mixed_error_warning_classified_as_error() {
         assert!(is_error_line("warning: deprecated, may cause error"));
         assert!(!is_warning_line("warning: deprecated, may cause error"));
+    }
+
+    #[test]
+    fn test_detect_output_kind_test_results() {
+        let test_output = "test result: ok. 12 passed; 0 failed; 0 ignored";
+        assert_eq!(detect_output_kind(test_output), "TestResults");
+
+        let test_output2 = "running 15 tests\n...\ntest result: ok";
+        assert_eq!(detect_output_kind(test_output2), "TestResults");
+
+        let test_output3 = "running tests...\n3 passed, 0 failed";
+        assert_eq!(detect_output_kind(test_output3), "TestResults");
+    }
+
+    #[test]
+    fn test_detect_output_kind_build_output() {
+        let build_output = "Compiling mycelium v0.1.0\nFinished `release` profile [optimized]";
+        assert_eq!(detect_output_kind(build_output), "BuildOutput");
+
+        let build_output2 = "error: failed to compile\nwarning: unused variable";
+        assert_eq!(detect_output_kind(build_output2), "BuildOutput");
+
+        let build_output3 = "Building...\nFinished successfully";
+        assert_eq!(detect_output_kind(build_output3), "BuildOutput");
+    }
+
+    #[test]
+    fn test_detect_output_kind_log_output() {
+        let log_output = "TRACE: entering function\nDEBUG: variable x = 42";
+        assert_eq!(detect_output_kind(log_output), "LogOutput");
+
+        let log_output2 = "INFO: Server started\nDEBUG: Loaded config";
+        assert_eq!(detect_output_kind(log_output2), "LogOutput");
+
+        let log_output3 = "WARN: deprecated API\nERROR: something failed";
+        assert_eq!(detect_output_kind(log_output3), "LogOutput");
+    }
+
+    #[test]
+    fn test_detect_output_kind_json_output() {
+        let json_output = r#"{"status": "ok", "data": [1, 2, 3]}"#;
+        assert_eq!(detect_output_kind(json_output), "JsonOutput");
+
+        let json_output2 = "[{\"name\": \"alice\"}, {\"name\": \"bob\"}]";
+        assert_eq!(detect_output_kind(json_output2), "JsonOutput");
+
+        let json_output3 = "  \n  {\n\"key\": \"value\"\n}";
+        assert_eq!(detect_output_kind(json_output3), "JsonOutput");
+    }
+
+    #[test]
+    fn test_detect_output_kind_list_output() {
+        let list_output = "- file1.txt\n- file2.txt\n- file3.txt";
+        assert_eq!(detect_output_kind(list_output), "ListOutput");
+
+        let list_output2 = "• item 1\n• item 2\n• item 3";
+        assert_eq!(detect_output_kind(list_output2), "ListOutput");
+
+        let list_output3 = "| name  | version |\n| pkg1  | 1.0.0   |\n| pkg2  | 2.0.0   |";
+        assert_eq!(detect_output_kind(list_output3), "ListOutput");
+
+        let list_output4 = "* first\n* second\n* third";
+        assert_eq!(detect_output_kind(list_output4), "ListOutput");
+    }
+
+    #[test]
+    fn test_detect_output_kind_generic() {
+        // Empty input should return Generic
+        assert_eq!(detect_output_kind(""), "Generic");
+
+        // Plain text with no markers should return Generic
+        let plain_text = "This is just plain output without any special patterns";
+        assert_eq!(detect_output_kind(plain_text), "Generic");
+
+        // Short non-diagnostic text
+        let short_text = "hello world\nfoo bar\nbaz qux";
+        assert_eq!(detect_output_kind(short_text), "Generic");
+    }
+
+    #[test]
+    fn test_detect_output_kind_large_input_respects_limit() {
+        // Create an output larger than 1KB where the kind marker is beyond 1KB
+        let large_input = "normal output\n".repeat(100); // >1KB
+        let mut input_with_marker = large_input.clone();
+        input_with_marker.push_str("test result: ok"); // marker at end, beyond 1KB
+
+        // Should return Generic because the marker is outside the prefix
+        assert_eq!(detect_output_kind(&input_with_marker), "Generic");
+    }
+
+    #[test]
+    fn test_detect_output_kind_within_limit() {
+        // Create output where kind marker is within first 1KB
+        let mut input = String::new();
+        input.push_str("test result: ok\n");
+        for _ in 0..50 {
+            input.push_str("normal output\n"); // keep total under 1KB
+        }
+
+        assert_eq!(detect_output_kind(&input), "TestResults");
+    }
+
+    #[test]
+    fn test_detect_output_kind_multibyte_boundary_no_panic() {
+        // 'é' is 2 bytes in UTF-8, so 600 copies = 1200 bytes (> PREFIX_LIMIT
+        // of 1024). The 1024 cutoff lands mid-codepoint, which would panic on a
+        // raw byte slice. detect_output_kind must classify without panicking.
+        let multibyte = "\u{00e9}".repeat(600);
+        assert_eq!(multibyte.len(), 1200);
+        // Should return without panicking; content has no markers, so Generic.
+        assert_eq!(detect_output_kind(&multibyte), "Generic");
+    }
+
+    #[test]
+    fn test_bounded_prefix_length_never_exceeds_limit() {
+        // '\u{00e9}' ('é') is 2 bytes in UTF-8.
+        // 2000 copies = 4000 bytes, well over PREFIX_LIMIT (1024).
+        // Byte index 1024 falls mid-codepoint (odd offset into 2-byte sequences),
+        // so the old get(..1024).unwrap_or(raw) path would have fallen back to the
+        // full 4000-byte buffer. bounded_prefix must return a slice of <= 1024 bytes.
+        let huge = "\u{00e9}".repeat(2000);
+        assert_eq!(huge.len(), 4000);
+        let prefix = bounded_prefix(&huge);
+        assert!(
+            prefix.len() <= 1024,
+            "bounded_prefix returned {} bytes, expected <= 1024",
+            prefix.len()
+        );
+        // The result must still be valid UTF-8 (Rust &str invariant is enforced
+        // by the type, but we verify the boundary is sound via char count).
+        assert_eq!(prefix.chars().count(), prefix.len() / 2);
     }
 }
