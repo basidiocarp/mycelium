@@ -218,7 +218,12 @@ pub fn route_or_filter(
                         warn!("Failed to record summary in hyphae tracking: {e}");
                     }
                 }
-                FilterResult::full(raw, summary.summary)
+                let output = if let Some(hint) = crate::tee::tee_and_hint(raw, command, 0) {
+                    format!("{}\n{}", summary.summary, hint)
+                } else {
+                    summary.summary
+                };
+                FilterResult::full(raw, output)
             } else {
                 // Fallback to filter if summarization returns None
                 let result = filter_fn(raw);
