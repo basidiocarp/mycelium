@@ -54,7 +54,7 @@ format_push_string = "allow"
 
 [build-dependencies]
 clap = { version = "4", features = ["derive"] }
-clap_mangen = "0.2"
+clap_mangen = "0.3"
 
 [dev-dependencies]
 insta = "1"
